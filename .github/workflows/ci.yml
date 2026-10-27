@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test, coverage, lint and build
+        run: >
+          ./gradlew --console=plain
+          testDebugUnitTest koverVerifyDebug koverXmlReportDebug koverHtmlReportDebug
+          lintDebug assembleDebug
+
+      - name: Coverage summary
+        if: always()
+        run: python3 .github/scripts/coverage_summary.py app/build/reports/kover/reportDebug.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
