@@ -70,3 +70,18 @@ Branch: `feat/12-saved-views-and-notes`
 - Skipped: the v9/v10 saved-view flag difference — documented on `savedViews()` and tested both ways; the README's "reads both API v9 and v10" stays true.
 - Skipped: `docs/design/README.md` § Decisions — the branch already added its #12 entries; the component and icon variants are named there.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: full command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) passed in Docker, re-run with `--rerun-tasks`: 521 debug unit tests, 0 failed, 0 skipped; koverVerify green (debug line coverage 93.8%, branch 84.6%); lintDebug 0 errors, 17 warnings; debug APK built. No `testReleaseUnitTest` task ran in this build.
+- Server: not run (`~/.config/paperless-companion/verify.env` is absent, so there is no server address or token). The live `/api/schema/` has still not been read by any stage.
+- Verified: the calls below are checked only against the v3.3.4 source (planning and review) and the MockWebServer tests, not against a live server:
+  - `GET api/saved_views/`, `GET api/saved_views/{id}/`, `GET api/ui_settings/` (v9 flags on the view, v10 ids in `ui_settings`).
+  - `GET api/documents/` with a view's translated rule parameters, and with `more_like_id`.
+  - `GET` / `POST api/documents/{id}/notes/`.
+- Failed: none
+- Not self-verifiable:
+  - Real server (needs `verify.env`): read `/api/schema/`; compare the app's home and quick views and each view's document count with the web UI; `GET api/documents/{id}/notes/`; check whether `more_like_id` includes the source document on a 2.x server; with writes allowed, add a note to a self-uploaded document and read it back.
+  - Phone: the chip row scrolls with view chips at the start; the Notes screen with the keyboard open (the add field stays above it); TalkBack reads the Views sheet and the notes sensibly.
