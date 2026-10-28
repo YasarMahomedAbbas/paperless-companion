@@ -214,7 +214,7 @@ After `merge-release`'s STAGE COMPLETE (merged and released, or released not nee
 
    ```bash
    tmux has-session -t paperless-autopilot 2>/dev/null || \
-     tmux new-session -d -s paperless-autopilot -c "$MAIN" "claude --permission-mode auto '/autopilot'"
+     tmux new-session -d -s paperless-autopilot -c ~/projects/personal/paperless-companion "claude --permission-mode auto '/autopilot'"
    ```
 
 3. Last action, one command (it deletes this session's working directory and ends it):
