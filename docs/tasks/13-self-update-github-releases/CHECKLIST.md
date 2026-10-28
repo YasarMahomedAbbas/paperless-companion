@@ -123,29 +123,29 @@ Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Ht
 
 Goal: release builds check daily and on launch, post "Update ready" once per version, and can install a verified APK with Android's confirmation.
 
-### [ ] 3.1 — Build and manifest
+### [x] 3.1 — Build and manifest
 
-- `gradle/libs.versions.toml`: `work = "2.10.0"` (check the current stable on Google Maven before pinning), `work-runtime-ktx`; `app/build.gradle.kts`: `implementation(libs.work.runtime)`, `buildFeatures { buildConfig = true }`, add to kover excludes: `"*.data.update.PackageInstallerUpdates*"`, `"*.data.update.InstallResultReceiver*"`, `"*.data.update.PrefsUpdateStore*"`, `"*.data.update.UpdateWorker*"`, `"*.data.update.UpdateSchedule*"`, `"*.data.update.UpdateNotifier*"`. `ApkSigner.kt` is not excluded (the pure `sameSigners` lives there); if its Android half drags coverage below 80%, move `sameSigner(context, apk)` into `AndroidSigner.kt` and exclude that file.
+- `gradle/libs.versions.toml`: `work = "2.12.0"` (current stable on Google Maven, 2026-10-28; its AAR needs compileSdk 35 and AGP 8.6+, both met), `work-runtime-ktx`; `app/build.gradle.kts`: `implementation(libs.work.runtime)`, `buildFeatures { buildConfig = true }`, add to kover excludes: `"*.data.update.PackageInstallerUpdates*"`, `"*.data.update.InstallResultReceiver*"`, `"*.data.update.PrefsUpdateStore*"`, `"*.data.update.UpdateWorker*"`, `"*.data.update.UpdateSchedule*"`, `"*.data.update.UpdateNotifier*"`. `ApkSigner.kt` is not excluded (the pure `sameSigners` lives there); if its Android half drags coverage below 80%, move `sameSigner(context, apk)` into `AndroidSigner.kt` and exclude that file.
 - `AndroidManifest.xml`: `REQUEST_INSTALL_PACKAGES`, `POST_NOTIFICATIONS`; `<receiver android:name=".data.update.InstallResultReceiver" android:exported="false" />`.
 
-### [ ] 3.2 — `PrefsUpdateStore`
+### [x] 3.2 — `PrefsUpdateStore`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/PrefsUpdateStore.kt`
 SharedPreferences `updates`; the offer as a JSON string (`version`, `versionCode`, `notes`, `apk{name,size,sha256,location}`), unreadable → null; `offer` a `MutableStateFlow` loaded at construction and updated by `saveOffer`; `notified` long (default `Long.MIN_VALUE`); `asked_notifications` boolean.
 
-### [ ] 3.3 — `PackageInstallerUpdates` and `InstallResultReceiver`
+### [x] 3.3 — `PackageInstallerUpdates` and `InstallResultReceiver`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/PackageInstallerUpdates.kt`
-`class PackageInstallerUpdates(context: Context, io: CoroutineDispatcher = Dispatchers.IO) : AppInstaller`. Mirror the assistant's `Installer` for our own package only: `canInstall()` = `canRequestPackageInstalls()`; `permissionIntent()`; `install`: not allowed → `NEEDS_PERMISSION` (file kept); `!sameSigner` → `NOT_OURS`; session `MODE_FULL_INSTALL`, `setAppPackageName(packageName)`, `setSize`, `setRequireUserAction(USER_ACTION_REQUIRED)` on API 31+; commit with a mutable `PendingIntent` to the receiver (`FLAG_MUTABLE` on API 31+); `IOException` → `STORAGE`, other runtime → `REFUSED`; delete the file after. `installedVersionCode()` via `PackageInfoCompat.getLongVersionCode`.
+`class PackageInstallerUpdates(context: Context, store: UpdateStore, io: CoroutineDispatcher = Dispatchers.IO) : AppInstaller`. Mirror the assistant's `Installer` for our own package only: `canInstall()` = `canRequestPackageInstalls()`; `permissionIntent()`; `install`: not allowed → `NEEDS_PERMISSION` (file kept); `!sameSigner` → `NOT_OURS`; session `MODE_FULL_INSTALL`, `setAppPackageName(packageName)`, `setSize`, `setRequireUserAction(USER_ACTION_REQUIRED)` on API 31+; commit with a mutable `PendingIntent` to the receiver (`FLAG_MUTABLE` on API 31+); `IOException` → `STORAGE`, other runtime → `REFUSED`; delete the file after. `installedVersionCode()` via `PackageInfoCompat.getLongVersionCode`.
 `events: StateFlow<InstallEvent?>`, plus a data-side `val confirmation: StateFlow<Intent?>` with `consumeConfirmation(intent)`: the receiver posts `STATUS_PENDING_USER_ACTION`'s `EXTRA_INTENT` there, and `MainActivity` (app shell, gets it from `AppContainer`) starts it. Success → `Installed` and `store.saveOffer(null)`; anything else → `Failed(message)` (empty for `STATUS_FAILURE_ABORTED`).
-`class InstallResultReceiver : BroadcastReceiver` finds the installer via `(context.applicationContext as PaperlessApp).container.installer`.
+`class InstallResultReceiver : BroadcastReceiver` (same file) passes status, message and `EXTRA_INTENT` to `installer.onResult(...)`; it finds the installer via `(context.applicationContext as PaperlessApp).container.installer`.
 
-### [ ] 3.4 — Worker, schedule, notification
+### [x] 3.4 — Worker, schedule, notification
 
 Files in `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/`:
 - `UpdateSchedule.kt`: `object UpdateSchedule { fun daily(context); fun now(context) }` — unique periodic (24 h, `KEEP`) and one-time (`REPLACE`) work, both `NetworkType.CONNECTED`.
 - `UpdateWorker.kt`: `CoroutineWorker` building `container.checkForUpdate` and running it; `TryAgain` → `Result.retry()` up to 2 attempts, then success.
-- `UpdateNotifier.kt`: channel `updates` ("Updates", default importance), created in `PaperlessApp.onCreate`; `announce(release)` posts "Update ready" / "Version <version> is ready to install" (skipped without `POST_NOTIFICATIONS` granted on 33+), tap → `MainActivity` with extra `EXTRA_OPEN_UPDATES = "…OPEN_UPDATES"`, `PendingIntent.FLAG_IMMUTABLE`. Small icon: a new vector `res/drawable/ic_notification_update.xml`.
+- `UpdateNotifier.kt`: `class UpdateNotifier(context, opens: Class<out Activity>)` (the activity is handed in by `AppContainer`, so `data/` never names the shell); channel `updates` ("Updates", default importance), created in `PaperlessApp.onCreate`; `announce(release)` posts "Update ready" / "Version <version> is ready to install" (skipped without `POST_NOTIFICATIONS` granted on 33+), tap → `opens` with extra `UpdateNotifier.EXTRA_OPEN_UPDATES = "…OPEN_UPDATES"` (`NEW_TASK | SINGLE_TOP`), `PendingIntent.FLAG_IMMUTABLE`. Small icon: a new vector `res/drawable/ic_notification_update.xml`.
 - `AppContainer`: `updateStore`, `releases`, `downloader`, `installer`, `notifier`, `checkForUpdate` (with `installer::installedVersionCode`); `PaperlessApp.onCreate`: create the channel; when `!BuildConfig.DEBUG`, `UpdateSchedule.daily(this)`.
 
 ### Verify

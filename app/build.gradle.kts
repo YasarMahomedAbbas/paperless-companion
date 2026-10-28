@@ -48,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     lint {
         warningsAsErrors = false
@@ -71,6 +72,12 @@ kover {
                     "*Screen*",
                     "*.data.KeystoreSettingsRepository*",
                     "*.data.UriDocuments*",
+                    "*.data.update.PackageInstallerUpdates*",
+                    "*.data.update.InstallResultReceiver*",
+                    "*.data.update.PrefsUpdateStore*",
+                    "*.data.update.UpdateWorker*",
+                    "*.data.update.UpdateSchedule*",
+                    "*.data.update.UpdateNotifier*",
                 )
             }
         }
@@ -91,6 +98,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.work.runtime)
     implementation(libs.mlkit.document.scanner)
 
     testImplementation(libs.junit)
