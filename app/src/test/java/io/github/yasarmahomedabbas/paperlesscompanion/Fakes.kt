@@ -55,6 +55,8 @@ class FakeServer(
         if (taskFailures.isNotEmpty()) throw taskFailures.removeAt(0)
         return if (tasks.size > 1) tasks.removeAt(0) else tasks.first()
     }
+
+    override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

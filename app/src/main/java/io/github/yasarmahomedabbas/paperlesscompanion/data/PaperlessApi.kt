@@ -97,6 +97,9 @@ class PaperlessApi(
         return TaskInfo(status, message, documentId)
     }
 
+    /** The document's details page in the Paperless web UI (not an API endpoint). */
+    override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId/details"
+
     private fun authed(config: ServerConfig, path: String) = authed(config, url(config.baseUrl, path))
 
     private fun authed(config: ServerConfig, url: HttpUrl) =

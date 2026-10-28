@@ -81,7 +81,7 @@ Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/Fakes.k
 
 Goal: no file under `ui/` imports `data.*` or builds a server URL. The link and the uploads behave exactly as before.
 
-### [ ] 2.1 — Domain interface for files to upload
+### [x] 2.1 — Domain interface for files to upload
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/repository/Repositories.kt`
 ```kotlin
@@ -91,14 +91,14 @@ interface DocumentFiles {
 }
 ```
 
-### [ ] 2.2 — `UriDocuments` implements it
+### [x] 2.2 — `UriDocuments` implements it
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/UriDocuments.kt`
 - `class UriDocuments(resolver) : DocumentFiles`.
 - `override fun from(location: String, fallbackName: String): DocumentSource`: `val uri = Uri.parse(location)`, then the current body. Use `location` in the `FileNotFoundException` message.
 - Keep the class name. Kover already excludes `*.data.UriDocuments*`.
 
-### [ ] 2.3 — Document link on the server interface
+### [x] 2.3 — Document link on the server interface
 
 Files: `domain/repository/Repositories.kt`, `data/PaperlessApi.kt`
 - In `DocumentServer`, add `/** The address of a document's page in the server's own web interface. */ fun documentUrl(config: ServerConfig, documentId: Int): String`.
@@ -106,7 +106,7 @@ Files: `domain/repository/Repositories.kt`, `data/PaperlessApi.kt`
 - `FakeServer.documentUrl` returns `"${config.baseUrl}/documents/$documentId"` (any distinct shape will do).
 - `PaperlessApiTest`: add `` `documentUrl points at the document's details page` ``, asserting `"http://paperless:8000/documents/5/details"` for `CONFIG`.
 
-### [ ] 2.4 — Use case for the link
+### [x] 2.4 — Use case for the link
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/DocumentLinkUseCase.kt` (new)
 ```kotlin
@@ -117,7 +117,7 @@ class DocumentLinkUseCase(private val server: DocumentServer, private val settin
 ```
 Test: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/DocumentLinkUseCaseTest.kt`, covering signed in → `FakeServer`'s link and signed out → null.
 
-### [ ] 2.5 — ViewModel and screen
+### [x] 2.5 — ViewModel and screen
 
 Files: `ui/home/HomeViewModel.kt`, `ui/home/HomeScreen.kt`, `AppContainer.kt`, `MainActivity.kt`
 - `HomeUiState`: remove `documentUrl`. Keep `serverUrl`.

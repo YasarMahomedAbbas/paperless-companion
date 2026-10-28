@@ -1,5 +1,6 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
+import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
 import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
@@ -43,6 +44,11 @@ class PaperlessApiTest {
         } catch (e: ServerException) {
             assertEquals(kind, e.kind)
         }
+    }
+
+    @Test
+    fun `documentUrl points at the document's details page`() {
+        assertEquals("http://paperless:8000/documents/5/details", api.documentUrl(CONFIG, 5))
     }
 
     @Test
