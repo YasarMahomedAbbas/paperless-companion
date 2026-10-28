@@ -260,7 +260,7 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/viewe
 
 Goal: tapping Open on a finished upload shows the document in the viewer, and Share, Download, Get photo and Open in Paperless work end to end.
 
-### [ ] 4.1 — Wiring
+### [x] 4.1 — Wiring
 
 - `AppContainer.kt`:
   - `private val exports: DocumentExports = PhoneExports(context, "${context.packageName}.files")`. The authority must equal the manifest's `${applicationId}.files`; `applicationId == packageName` here.
@@ -269,16 +269,16 @@ Goal: tapping Open on a finished upload shows the document in the viewer, and Sh
 - `ui/home/HomeViewModel.kt`: remove `documentLink` and `documentUrl` (the viewer owns the web link now). Update `HomeViewModelTest` to match.
 - `ui/home/HomeScreen.kt`: new parameter `onOpenDocument: (Int) -> Unit`. The upload card's "Open" calls it in place of `ACTION_VIEW`.
 
-### [ ] 4.2 — `MainActivity`
+### [x] 4.2 — `MainActivity`
 
-- `private var openDocumentId by mutableStateOf<Int?>(null)`.
+- `var openDocumentId by rememberSaveable { mutableStateOf<Int?>(null) }` inside `setContent` (not an activity field like `showUpdates`, so a rotation keeps the viewer open).
 - While it is set, the home branch renders `ViewerScreen(viewModel = viewModel<ViewerViewModel>(key = "viewer-$id", factory = container.viewerViewModelFactory(id)), …)` with `BackHandler(enabled = locked == null)`, the same pattern as `showUpdates`.
 - `onShare`: `Intent(ACTION_SEND)` with type `mimeType ?: "application/octet-stream"`, `EXTRA_STREAM = Uri.parse(location)`, `ClipData` set and `FLAG_GRANT_READ_URI_PERMISSION`, wrapped in `Intent.createChooser(…, null)`.
-- `onPickSaveLocation`: a `registerForActivityResult(ActivityResultContracts.CreateDocument("*/*"))` launcher started with the name. Its result goes to `viewModel.saveTo(uri?.toString())`. The type is set through a small `CreateDocument` subclass that takes the MIME per launch, or the contract's input-intent override.
+- `onPickSaveLocation`: a `rememberLauncherForActivityResult(SaveAs())` launcher, where `SaveAs` is a small `ActivityResultContract<PickSaveLocation, Uri?>` building `ACTION_CREATE_DOCUMENT` with the name and the MIME per launch. Its result goes to `viewModel.saveTo(uri?.toString())`.
 - `onOpenUrl`: `ACTION_VIEW`, catching `ActivityNotFoundException` → no-op.
-- Signing out or the gate leaving Home clears `openDocumentId`.
+- Signing out (the gate going to SignIn) clears `openDocumentId`.
 
-### [ ] 4.3 — Tests
+### [x] 4.3 — Tests
 
 - `HomeViewModelTest` and `GateViewModelTest` still pass after the `documentUrl` removal.
 - `ArchitectureTest`: no `ui/` file imports `data/`. `PhoneExports` is named only in `AppContainer`.

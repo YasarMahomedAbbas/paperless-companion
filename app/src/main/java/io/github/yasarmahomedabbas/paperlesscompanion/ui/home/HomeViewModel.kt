@@ -6,7 +6,6 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,14 +23,10 @@ data class HomeUiState(
 
 class HomeViewModel(
     private val uploadDocument: UploadDocumentUseCase,
-    private val documentLink: DocumentLinkUseCase,
     private val settings: SettingsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState(serverUrl = settings.load()?.baseUrl.orEmpty()))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
-
-    /** The web address of an uploaded document, or null when signed out. */
-    fun documentUrl(documentId: Int): String? = documentLink(documentId)
 
     private val sources = mutableMapOf<Long, DocumentSource>()
     private var nextId = 0L

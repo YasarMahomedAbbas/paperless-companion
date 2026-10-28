@@ -8,7 +8,6 @@ import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,18 +26,13 @@ class HomeViewModelTest {
 
     private val server = FakeServer()
     private val settings = FakeSettings(CONFIG)
-    private val viewModel = HomeViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings), settings)
+    private val viewModel = HomeViewModel(UploadDocumentUseCase(server, settings), settings)
 
     private val uploads get() = viewModel.state.value.uploads
 
     @Test
     fun `shows the server`() {
         assertEquals("http://paperless:8000", viewModel.state.value.serverUrl)
-    }
-
-    @Test
-    fun `document links come from the server`() {
-        assertEquals("http://paperless:8000/documents/5", viewModel.documentUrl(5))
     }
 
     @Test

@@ -78,6 +78,8 @@ fun HomeScreen(
     onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
     onOpenUpdates: () -> Unit,
+    /** A finished upload's Open: shows the document in the viewer. */
+    onOpenDocument: (Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -158,7 +160,7 @@ fun HomeScreen(
         },
         onClearFinished = viewModel::clearFinished,
         onRetry = viewModel::retry,
-        onOpen = { id -> viewModel.documentUrl(id)?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } },
+        onOpen = onOpenDocument,
         lockAvailable = lockAvailable,
         lockEnabled = lockEnabled,
         onLockChange = onLockChange,
