@@ -25,7 +25,7 @@ Paperless-ngx 2.x or 3.x: the app reads both API v9 and v10 answers. Paperless o
 
 ## Architecture
 
-Three layers, each depending only on the one below it:
+Three layers; `ui` and `data` both depend on `domain`, never on each other:
 
 ```
 ui/       Compose screens + ViewModels (state as StateFlow)
