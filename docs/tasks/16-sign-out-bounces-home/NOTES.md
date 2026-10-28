@@ -20,3 +20,18 @@ Branch: `fix/16-sign-out-bounces-home`
   - Robolectric adds seconds per test class to `testDebugUnitTest`; checkpoint 1 records how much.
   - Kover's agent alongside Robolectric's sandbox class loader, and lint with `ui-test-manifest` in the debug manifest, are untested here until checkpoint 1 runs the full CI command.
   - Device check (sign out stays signed out, with and without the fingerprint lock) stays manual.
+
+## Implementation
+
+- Shipped:
+  - Robolectric 4.14.1 + Compose ui-test (BOM 1.7.6) for JVM screen tests: catalog `gradle/libs.versions.toml:17-21,42-45`; wiring `app/build.gradle.kts:57-83,140-144` (`isIncludeAndroidResources`, the `robolectricSdk` configuration, offline mode pointed at the jar's folder in the Gradle cache via a lambda `CommandLineArgumentProvider`; no `Sync` fallback needed, the build doesn't use the configuration cache); `app/src/test/resources/robolectric.properties` (`sdk=35`); Dependabot ignores `android-all-instrumented` (`.github/dependabot.yml`).
+  - The fix: `LoginViewModel.onSignedInHandled()` (`ui/login/LoginViewModel.kt:36`) clears `signedIn`; `LoginScreen`'s effect calls it after `onSignedIn` (`ui/login/LoginScreen.kt:35-40`).
+  - Tests: `app/src/testDebug/.../ui/LoginScreenTest.kt` (3 tests through the real screen), three new `LoginViewModelTest` cases. README "Tests cover" paragraph updated (`README.md:63`).
+- Tests: full CI command green. `testDebugUnitTest` 178 passed / 0 failed; `testReleaseUnitTest` 175 passed / 0 failed; koverVerify, lintDebug (lint clean with `ui-test-manifest` in the debug manifest) and assembleDebug pass.
+  - Before the fix, `a second sign-in screen after sign-out does not sign in on its own` failed with `expected:<1> but was:<2>` (the old sign-in re-delivered); it passes with the fix.
+  - Offline proof: after the first run put `android-all-instrumented-15-robolectric-12650502-i7.jar` into the host Gradle cache, `LoginScreenTest` re-ran green in the build image with `docker run --network none ... ./gradlew --offline ... --rerun-tasks`.
+  - Cost: `LoginScreenTest` takes about 4.1–4.6 s (mostly Robolectric's first sandbox start), against about 1.6 s for every other test class together; wall time of a cold `testDebugUnitTest` run grew by roughly that.
+- Outstanding: device check (sign in, Sign out stays on the sign-in screen with address and username filled in, sign in again reaches Home; again with the fingerprint lock on) is for self-verification. Real-server check: skipped, no Paperless call changed.
+- Contradicted the plan:
+  - `koverVerify` also runs `testReleaseUnitTest`, which the plan didn't account for. There the screen test failed twice over: Robolectric booted `PaperlessApp`, whose release `onCreate` schedules WorkManager (not initialized under Robolectric), and the release manifest has no `ComponentActivity` (`ui-test-manifest` is `debugImplementation`). Resolved by putting `LoginScreenTest` in `app/src/testDebug/` (compiled with `src/test/` for the debug unit tests only) and giving it `@Config(application = Application::class)` so the app's own wiring doesn't start. Checklist 1.5/2.1 updated to match.
+  - `signing in again after sign-out signs in once more` as written passed on the old code by coincidence (re-delivery made the second call; the real second sign-in produced an equal `ServerConfig`, so the keyed effect didn't re-run). Added a one-config check before signing in again so it also fails without the fix; checklist 2.1 updated.

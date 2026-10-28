@@ -29,6 +29,12 @@ class LoginViewModel(private val login: LoginUseCase) : ViewModel() {
     fun onUsername(value: String) = _state.update { it.copy(username = value, error = null) }
     fun onPassword(value: String) = _state.update { it.copy(password = value, error = null) }
 
+    /**
+     * The screen calls this once it has passed [LoginUiState.signedIn] on: this ViewModel outlives the
+     * screen (activity scope) and would otherwise sign in again when it is shown after Sign out.
+     */
+    fun onSignedInHandled() = _state.update { it.copy(signedIn = null) }
+
     fun submit() {
         val current = _state.value
         if (current.busy) return

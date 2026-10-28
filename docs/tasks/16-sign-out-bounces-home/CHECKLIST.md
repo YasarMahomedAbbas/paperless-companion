@@ -107,27 +107,27 @@ File: `app/src/testDebug/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/
 
 Goal: a sign-in result reaches the gate once. The sign-in screen shown after Sign out does not sign in on its own, proven through the real screen.
 
-### [ ] 2.1 — The failing screen test first
+### [x] 2.1 — The failing screen test first
 
 File: `app/src/testDebug/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginScreenTest.kt`
 Add, before touching the main code:
 - `a second sign-in screen after sign-out does not sign in on its own`: hold `var showLogin by mutableStateOf(true)` in the test and a list of configs `onSignedIn` received. `setContent { if (showLogin) LoginScreen(viewModel, null) { signedIn += it } }`. Type into "Server address" (`paperless:8000`), "Username" (`anna`), "Password" (`pw`) with `performTextInput`, click "Sign in", `waitForIdle()`, assert one config `ServerConfig("http://paperless:8000", "token-123")`. Then `showLogin = false`, `waitForIdle()` (Home), `showLogin = true`, `waitForIdle()` (sign-out): assert still exactly one config, "Sign in" is displayed, and the address and username fields still show `paperless:8000` and `anna`.
-- `signing in again after sign-out signs in once more`: the same sequence, then type the password again, click "Sign in", `waitForIdle()`, and assert two configs.
+- `signing in again after sign-out signs in once more`: the same sequence, assert one config, then type the password again, click "Sign in", `waitForIdle()`, and assert two configs. (The one-config check makes it fail on the old code too: there the re-delivery is the second call and the real second sign-in, an equal `ServerConfig`, doesn't re-run the effect.)
 Run it and confirm the first test fails on the current code (two configs), and note the failure in NOTES.
 
-### [ ] 2.2 — Add the handler to `LoginViewModel`
+### [x] 2.2 — Add the handler to `LoginViewModel`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/login/LoginViewModel.kt`
-Add `fun onSignedInHandled() = _state.update { it.copy(signedIn = null) }` with a one-line KDoc: the screen calls it after passing the config on, because the ViewModel outlives the screen (activity scope) and would otherwise re-deliver the result after Sign out. Leave `serverUrl` and `username` unchanged.
+Add `fun onSignedInHandled() = _state.update { it.copy(signedIn = null) }` with a KDoc: the screen calls it after passing the config on, because the ViewModel outlives the screen (activity scope) and would otherwise re-deliver the result after Sign out. Leave `serverUrl` and `username` unchanged.
 
-### [ ] 2.3 — Call it from `LoginScreen`
+### [x] 2.3 — Call it from `LoginScreen`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/login/LoginScreen.kt`
 Change the effect to:
 `LaunchedEffect(state.signedIn) { state.signedIn?.let { onSignedIn(it); viewModel.onSignedInHandled() } }`
 (Format it across lines as the file's style requires.) Leave `MainActivity` unchanged: the ViewModel stays at activity scope.
 
-### [ ] 2.4 — ViewModel tests
+### [x] 2.4 — ViewModel tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginViewModelTest.kt`
 Add three tests with the existing `fillIn()`, `FakeServer` and `runTest(main.dispatcher)` + `advanceUntilIdle()` pattern:
@@ -135,7 +135,7 @@ Add three tests with the existing `fillIn()`, `FakeServer` and `runTest(main.dis
 - `a handled sign-in keeps the address and username`
 - `handling with nothing pending changes nothing`
 
-### [ ] 2.5 — README test sentence
+### [x] 2.5 — README test sentence
 
 File: `README.md`
 The "Tests cover…" paragraph says Compose screens need a device. Change it to say screens can be tested on the JVM with Robolectric + Compose ui-test (the SDK jar comes from the Gradle cache, offline) and that screens are still left out of the coverage numbers.

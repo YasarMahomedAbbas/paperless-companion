@@ -60,7 +60,7 @@ There's no toolchain to install: the JDK, Android SDK and Gradle live in a Docke
 ./build.sh install                             # build and adb-install on a USB-connected phone
 ```
 
-Tests cover the domain and data layers and the ViewModels, with the HTTP client tested against MockWebServer. CI fails when line coverage drops below 80%. Compose screens and the Keystore code need a device and aren't counted.
+Tests cover the domain and data layers and the ViewModels, with the HTTP client tested against MockWebServer. Compose screens can be tested on the JVM with Robolectric and Compose ui-test (in `app/src/testDebug/`; Robolectric runs offline against an SDK jar Gradle keeps in its cache). CI fails when line coverage drops below 80%. Screens and the Keystore code aren't counted in the coverage numbers.
 
 ## CI/CD
 
