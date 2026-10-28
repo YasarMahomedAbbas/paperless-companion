@@ -45,24 +45,24 @@ Checked against the docs source (`docs/api.md`) and the server source (`src/docu
 
 Goal: `PaperlessApi` runs on an internal `PaperlessHttp` that the new library can reuse; a 404 is its own error kind; nothing visible changes and every existing test passes unchanged.
 
-### [ ] 1.1 — `ServerException.Kind.NOT_FOUND`
+### [x] 1.1 — `ServerException.Kind.NOT_FOUND`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Models.kt`
 Add `NOT_FOUND` to `Kind` (KDoc: "the server has no such item, or it is gone"). In `domain/usecase/UploadDocumentUseCase.kt` `userMessage()`, add `Kind.NOT_FOUND -> message ?: "Paperless couldn't find it"`, so an upload 404 still reads "Paperless returned HTTP 404: …" as today.
 
-### [ ] 1.2 — `PaperlessHttp`
+### [x] 1.2 — `PaperlessHttp`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessHttp.kt` (new)
 `internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatcher)`. It takes over `PaperlessApi`'s private `url(baseUrl, path)`, `authed(config, path|url)`, `call(request, client, badRequestIsAuth)`, `networkError`, `defaultClient()` and `JsonObject.string`, unchanged except that `call` maps **404 → `NOT_FOUND`** with the same "Paperless returned HTTP 404: …" message. Add:
 - `suspend fun json(config, method, path, query: Map<String,String> = emptyMap(), body: JsonElement? = null): JsonElement` (JSON body as `application/json`).
 - `suspend fun download(request: Request, into: File): Pair<String?, String?>`, which streams the body to `into` (write to `into.part`, rename on success, delete on any failure) and returns `Content-Disposition` and `Content-Type`. Same error mapping as `call`.
-- `suspend fun pages(config, path, query): List<JsonObject>`, which reads `results` and follows `next` (absolute URL from the server) until null. It accepts a bare array as one page.
+- `suspend fun pages(config, path, query): List<JsonObject>`, which reads `results` and follows `next` until null. Only `next`'s query is used, applied to `path` at the signed-in address (behind a proxy Paperless can build `next` with an inner host or scheme, and the token must never go there). It accepts a bare array as one page, and stops with `SERVER` after 1000 pages.
 - `fun JsonObject.int(key)`, `fun JsonObject.intList(key)`.
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessApi.kt`
 Delegate to `PaperlessHttp`; constructor signature and `defaultClient()` (kept as a forwarding companion function) unchanged, so `AppContainer` and `PaperlessApiTest` don't change.
 
-### [ ] 1.3 — Tests
+### [x] 1.3 — Tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessHttpTest.kt` (new)
 404 → `NOT_FOUND`; `download` writes the body, returns the headers, leaves no `.part` on success and no file on a 500 or a dropped connection; `pages` follows `next` over two pages and accepts a bare array; `json` sends the token and an `application/json` body.
