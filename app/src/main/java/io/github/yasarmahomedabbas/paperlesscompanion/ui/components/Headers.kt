@@ -68,6 +68,31 @@ fun BackBar(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
+ * The bar of a form (components.md § Top bars, Form bar): a close icon button ("Close without
+ * saving") and the 22/500 title. The actions are at the bottom of the form, not here.
+ */
+@Composable
+fun FormBar(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.s4, end = Spacing.gutter, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        AppIconButton(AppIcons.Close, "Close without saving", onClose)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+    }
+}
+
+/**
  * A section heading ("Uploading", "Tags"): 14/500 in `mfg`, on the 20 page gutter, with an
  * optional action at the end (Clear finished).
  */

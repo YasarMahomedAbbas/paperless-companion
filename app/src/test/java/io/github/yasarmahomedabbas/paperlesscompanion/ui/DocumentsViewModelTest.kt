@@ -607,4 +607,49 @@ class DocumentsViewModelTest {
         assertTrue(DocumentFilters().isEmpty)
         assertEquals(3, DocumentFilters(tagIds = setOf(1, 2), documentTypeId = 3).count)
     }
+
+    // Changes made elsewhere (#11)
+
+    @Test
+    fun `an edited document replaces its row in place and keeps the others and the page`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.loadMore()
+        advanceUntilIdle()
+        val before = vm.s.rows
+        val labels = vm.s.labels!!
+
+        val edited = doc(30, "Renamed").copy(correspondentId = 2)
+        vm.patch(edited)
+
+        assertEquals(50, vm.s.rows.size)
+        assertEquals(edited.toRow(labels), vm.s.rows[29])
+        assertEquals(before.filterIndexed { i, _ -> i != 29 }, vm.s.rows.filterIndexed { i, _ -> i != 29 })
+        assertEquals(60, vm.s.total)
+        // Paging carries on from page 2.
+        vm.loadMore()
+        advanceUntilIdle()
+        assertEquals(3, queries.last().page)
+    }
+
+    @Test
+    fun `an edit of a document not loaded changes nothing`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val before = vm.s
+
+        vm.patch(doc(99, "Elsewhere"))
+
+        assertEquals(before, vm.s)
+    }
+
+    @Test
+    fun `an edited search result keeps its snippet`() = runTest(main.dispatcher) {
+        val hit = SearchHit(1.0, "rates due", listOf(0..4))
+        answer = { DocumentPage(1, listOf(doc(1, "Rates").copy(searchHit = hit)), hasMore = false) }
+        val vm = loaded()
+
+        vm.patch(doc(1, "Rates — August"))
+
+        assertEquals("Rates — August", vm.s.rows.single().title)
+        assertEquals(hit, vm.s.rows.single().snippet)
+    }
 }

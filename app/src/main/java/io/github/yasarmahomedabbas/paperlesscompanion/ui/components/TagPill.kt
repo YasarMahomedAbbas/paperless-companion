@@ -13,10 +13,11 @@ import androidx.compose.ui.unit.dp
 /**
  * A tag, display only (docs/design/components.md § Tags): a fully round `raised` pill, `mfg` text
  * in a list row and `fg` text in the details ([inDetails]). Paperless tag colours are ignored so
- * the one-green rule holds.
+ * the one-green rule holds. [onRaised] is a pill inside a `field` (the Tags picker field), which
+ * steps down to a `surface` ground so it still stands out.
  */
 @Composable
-fun TagPill(name: String, inDetails: Boolean, modifier: Modifier = Modifier) {
+fun TagPill(name: String, inDetails: Boolean, modifier: Modifier = Modifier, onRaised: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     Text(
         name,
@@ -25,7 +26,7 @@ fun TagPill(name: String, inDetails: Boolean, modifier: Modifier = Modifier) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .background(colors.surfaceContainerHigh, CircleShape)
+            .background(if (onRaised) colors.surfaceContainer else colors.surfaceContainerHigh, CircleShape)
             .padding(horizontal = if (inDetails) 10.dp else 9.dp, vertical = if (inDetails) 4.dp else 3.dp),
     )
 }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -95,17 +96,30 @@ fun ViewerBar(
     }
 }
 
-/** One item of the More menu (docs/design/components.md § Menu): 48 high, a 20dp `mfg` icon and 15 `fg` text. */
+/**
+ * One item of the More menu (docs/design/components.md § Menu): 48 high, a 20dp `mfg` icon and 15
+ * `fg` text. A [destructive] item (Move to trash) is `destructive` text and icon; put a
+ * [MenuDivider] before it.
+ */
 @Composable
-fun MenuItem(text: String, icon: ImageVector, onClick: () -> Unit, enabled: Boolean = true) {
+fun MenuItem(text: String, icon: ImageVector, onClick: () -> Unit, enabled: Boolean = true, destructive: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     DropdownMenuItem(
         text = { Text(text, style = MaterialTheme.typography.lead) },
         onClick = onClick,
         enabled = enabled,
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
-        colors = MenuDefaults.itemColors(textColor = colors.onSurface, leadingIconColor = colors.onSurfaceVariant),
+        colors = MenuDefaults.itemColors(
+            textColor = if (destructive) colors.error else colors.onSurface,
+            leadingIconColor = if (destructive) colors.error else colors.onSurfaceVariant,
+        ),
         modifier = Modifier.height(48.dp).fillMaxWidth(),
         contentPadding = MenuDefaults.DropdownMenuItemContentPadding,
     )
+}
+
+/** The `border` divider before a menu's destructive item. */
+@Composable
+fun MenuDivider() {
+    HorizontalDivider(Modifier.padding(vertical = Spacing.s4), color = MaterialTheme.colorScheme.outline)
 }

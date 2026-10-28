@@ -162,3 +162,22 @@ Settled while building the viewer (#10):
 - **The full-screen tab** is the panel's own handle shrunk to 120 × 48; the rest of the panel
   slides below the screen edge. The page pill ("Page 1 of 3") is a `raised` fully round pill at
   the top centre of the pages, 13 `fg`.
+
+Settled while building Organise documents (#11):
+
+- **Picker field** gained what the Edit details form needs: an optional label above it (read
+  with the value by TalkBack as one button), tags as wrapping pills (`TagPill` with `onRaised`,
+  a `surface` pill on the `field` ground), and a `Date` variant with a calendar icon in place of
+  the chevron. While the labels load, a set field reads "Loading…"; if they fail, "Unknown".
+- **Edit and Download** sit side by side as two `Secondary` buttons in the quick actions and at
+  the foot of all details; Edit is disabled until the document has loaded.
+- **Picker sheets** share one load-failed card ("Couldn't load the choices", Try again) and one
+  no-match card ("No tag called '…'", with Open Paperless as its `Secondary` button). A picker
+  with nothing in it at all says "No tags yet". The tags picker pins the tags chosen when it
+  opened above the divider, so a tick never moves the row under the finger.
+- **Mixed checkbox** (`MixedChoiceRow`) is a `raised` box with a 2dp `mfg` ring and a 10 × 2
+  dash, exposed to TalkBack as a tri-state checkbox.
+- **The date picker** is Material's own `DatePickerDialog` on `surface`, `r-sheet`, with text
+  OK and Cancel.
+- **Discard changes?** reads "Your changes to this document haven't been saved." with Keep
+  editing and a `DestructiveText` Discard.

@@ -40,6 +40,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
@@ -128,7 +130,15 @@ class MainActivity : FragmentActivity() {
                 // Counts each opening, so reopening a document gets a fresh viewer rather than the last one's
                 // state (a stale failure, or another sign-in's document under the same id).
                 var viewerOpens by rememberSaveable { mutableIntStateOf(0) }
-                LaunchedEffect(current is GateState.SignIn) { if (current is GateState.SignIn) openDocumentId = null }
+                // Edit details open over the viewer; each opening gets a fresh form.
+                var editing by rememberSaveable { mutableStateOf(false) }
+                var editOpens by rememberSaveable { mutableIntStateOf(0) }
+                LaunchedEffect(current is GateState.SignIn) {
+                    if (current is GateState.SignIn) {
+                        openDocumentId = null
+                        editing = false
+                    }
+                }
 
                 Box(Modifier.fillMaxSize()) {
                     if (home != null) {
@@ -144,16 +154,39 @@ class MainActivity : FragmentActivity() {
                             }
                             when {
                                 screen == Screen.DOCUMENTS && documentId != null -> {
-                                    BackHandler(enabled = locked == null) { openDocumentId = null }
                                     val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
-                                    val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
-                                    ViewerScreen(
-                                        viewModel = viewer,
-                                        onBack = { openDocumentId = null },
-                                        onShare = ::share,
-                                        onPickSaveLocation = { saveAs.launch(it) },
-                                        onOpenUrl = ::openUrl,
-                                    )
+                                    val editingDocument = viewer.state.collectAsState().value.document
+                                    // The form starts from the viewer's document; after the app was killed the viewer loads it again first.
+                                    if (editing && editingDocument != null) {
+                                        val list = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory)
+                                        EditDetailsScreen(
+                                            viewModel = viewModel<EditDetailsViewModel>(
+                                                key = "edit-$documentId-$editOpens",
+                                                factory = container.editDetailsViewModelFactory(editingDocument),
+                                            ),
+                                            onClose = { editing = false },
+                                            onSaved = { document ->
+                                                viewer.showUpdated(document)
+                                                list.patch(document)
+                                                editing = false
+                                            },
+                                            onOpenUrl = ::openUrl,
+                                        )
+                                    } else {
+                                        BackHandler(enabled = locked == null) { openDocumentId = null }
+                                        val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
+                                        ViewerScreen(
+                                            viewModel = viewer,
+                                            onBack = { openDocumentId = null },
+                                            onShare = ::share,
+                                            onPickSaveLocation = { saveAs.launch(it) },
+                                            onOpenUrl = ::openUrl,
+                                            onEdit = {
+                                                editOpens++
+                                                editing = true
+                                            },
+                                        )
+                                    }
                                 }
                                 screen == Screen.DOCUMENTS -> saved.SaveableStateProvider("documents $key") {
                                     DocumentsScreen(
@@ -164,7 +197,11 @@ class MainActivity : FragmentActivity() {
                                         onPendingConsumed = gate::onPendingConsumed,
                                         onDocuments = gate::addPending,
                                         onOpenSettings = { screen = Screen.SETTINGS },
-                                        onOpenDocument = { viewerOpens++; openDocumentId = it },
+                                        onOpenDocument = {
+                                            viewerOpens++
+                                            editing = false
+                                            openDocumentId = it
+                                        },
                                     )
                                 }
                                 screen == Screen.SETTINGS -> {

@@ -146,25 +146,27 @@ The cases in the test plan's third to sixth bullets, on virtual time for the Und
 
 Goal: Edit on the document view opens the Edit details screen; its pickers work; Save updates the viewer and the list.
 
-### [ ] 3.0 — Gate: #9 and #10 are merged
+### [x] 3.0 — Gate: #9 and #10 are merged
 
 `gh issue view 9 --json state` and `gh issue view 10 --json state` are both CLOSED, and `git merge origin/main` (no rebase, no force-push) brings in their code. If either is still open, **stop and park** with a note naming which one. Never re-create their sheets, option rows, chips, search field, snackbar or dialog here. Once merged, read their final names: the list's ViewModel and row component, the viewer's ViewModel and details panel, the navigation in `MainActivity`, and the parts in `ui/components/`. Where a name below differs, use the merged one and record it in NOTES under "Contradicted the plan".
 
-### [ ] 3.1 — Shared parts this ticket adds
+### [x] 3.1 — Shared parts this ticket adds
 
-Files: `ui/components/PickerField.kt` (new), `ui/components/Dialogs.kt` (extend #9's dialog if it has one, else new)
-- `PickerField(label: String, value: String?, placeholder: String, onClick: () -> Unit, tags: List<String>? = null)`, per `components.md` § Picker field: the label above a `field` box with a chevron, or the tags wrapping as pills. It is a button to TalkBack ("<label>, <value>").
-- `ConfirmDialog(title, body, confirmLabel, onConfirm, onDismiss, destructive: Boolean)`: `Destructive` for trash, and `destructive` text for "Discard" (`layouts.md` § Form — Edit details).
-- Add `MixedChoiceRow(text: String, state: androidx.compose.ui.state.ToggleableState, onClick)` (the tri-state checkbox: `Indeterminate` is `raised` with a `mfg` ring and a dash) next to #9's `MultiChoiceRow`. The screen maps `TagMark` to `ToggleableState`, so components stay free of `ui/documents`. Each part gets a `@Preview`.
+Files: `ui/components/PickerField.kt` (#9's, extended), `ui/components/Dialog.kt` (#9's `AppDialog`, used as is), `ui/components/Sheets.kt`, `ui/components/TagPill.kt`, `ui/components/ViewerBar.kt`, `ui/components/Headers.kt`, `ui/components/AppIcons.kt`
+- #9's `PickerField(value, placeholder, onClick, modifier, icon)` gains `label: String? = null`, `tags: List<String>? = null` and `variant: PickerFieldVariant` (`Sheet` chevron / `Date` calendar), per `components.md` § Picker field: the label above a `field` box, or the tags wrapping as pills (`TagPill(onRaised = true)`). It is one button to TalkBack ("<label>, <value>").
+- No `ConfirmDialog`: #9's `AppDialog(title, body, confirmLabel, onConfirm, onDismiss, confirmVariant, dismissLabel)` already takes `ButtonVariant.Destructive` for trash and `DestructiveText` for "Discard".
+- `MixedChoiceRow(text: String, state: ToggleableState, onClick)` (the tri-state checkbox: `Indeterminate` is `raised` with a `mfg` ring and a dash) next to #9's `MultiChoiceRow`. The screen maps `TagMark` to `ToggleableState`, so components stay free of `ui/documents`.
+- Also: `FormBar(title, onClose)` in `Headers.kt`, `MenuItem(destructive = true)` and `MenuDivider()` in `ViewerBar.kt`, and drawn icons Calendar, Edit, Trash, Tag, DocumentType. Each part has a `@Preview` (or a row in its file's preview).
 
-### [ ] 3.2 — Picker sheets
+### [x] 3.2 — Picker sheets
 
 File: `ui/edit/PickerSheets.kt` (new)
-- `LabelPickerSheet(title: String, labels: List<Label>, selectedId: Int?, onPick: (Int?) -> Unit, onOpenPaperless: () -> Unit, onDismiss)`: a list sheet (#9's `AppBottomSheet` List variant) with an in-sheet search field, "None" first in `mfg`, `SingleChoiceRow`s, and tap-to-choose-and-close. Used for correspondent, document type and storage path.
-- `TagPickerSheet(tags: List<Tag>, chosen: List<Int>, onDone: (List<Int>) -> Unit, onOpenPaperless, onDismiss)`: a local draft, chosen tags above a divider (`chosenFirst`), `MultiChoiceRow`s, and a pinned bar with "<n> chosen" and a `Primary` Done.
+- The choices come as `PickerChoices<T>` (`Loading` skeleton / `Failed` with Try again via `onRetry` / `Ready(items)`), mapped from `LabelsStatus` by `LabelsStatus.choices { … }`.
+- `LabelPickerSheet(title: String, noun: String, choices: PickerChoices<Label>, selectedId: Int?, onPick: (Int?) -> Unit, onOpenPaperless: () -> Unit, onRetry, onDismiss)`: a list sheet (#9's `AppBottomSheet` List variant) with an in-sheet search field, "None" first in `mfg`, `SingleChoiceRow`s, and tap-to-choose-and-close. Used for correspondent, document type and storage path.
+- `TagPickerSheet(choices: PickerChoices<Tag>, chosen: List<Int>, onDone: (List<Int>) -> Unit, onOpenPaperless, onRetry, onDismiss)`: a local draft, the tags chosen when it opened above a divider (`chosenFirst`), `MultiChoiceRow`s, and a pinned bar with "<n> chosen" and a `Primary` Done.
 - Both: no match shows "No tag called '<query>'" (or correspondent / document type / storage path) with an "Open Paperless" `Secondary` button. A `Failed` labels status shows the load-failed state with Try again.
 
-### [ ] 3.3 — Edit details screen
+### [x] 3.3 — Edit details screen
 
 File: `ui/edit/EditDetailsScreen.kt` (new)
 `EditDetailsScreen(viewModel: EditDetailsViewModel, onClose: () -> Unit, onSaved: (Document) -> Unit, onOpenUrl: (String) -> Unit)`, per `layouts.md` § Form — Edit details:
@@ -174,12 +176,13 @@ File: `ui/edit/EditDetailsScreen.kt` (new)
 - Close, Cancel or Back with `hasChanges` asks "Discard changes?" (Keep editing / Discard); without changes it closes at once. `saved != null` calls `onSaved` once.
 - Previews: view, field error, save failed, labels failed.
 
-### [ ] 3.4 — Wiring
+### [x] 3.4 — Wiring
 
-Files: `AppContainer.kt`, `MainActivity.kt`, the viewer from #10
+Files: `AppContainer.kt`, `MainActivity.kt`, `ui/viewer/ViewerViewModel.kt`, `ui/viewer/ViewerScreen.kt`, `ui/documents/DocumentsViewModel.kt`
 - `AppContainer`: `fun editDetailsViewModelFactory(document: Document)` building `EditDetailsViewModel(document, UpdateDocumentUseCase(library, settings), LoadLabelsUseCase(library, settings), LabelsLinkUseCase(server, settings))`.
-- The viewer's details panel shows Edit beside Download (quick actions and all details), per `components.md` § Details panel. Edit pushes the Edit screen onto `MainActivity`'s stack with the viewer's current `Document` (a new screen value, Back pops it).
-- `onSaved(document)` updates the viewer's document (add `fun showUpdated(document: Document)` to #10's viewer ViewModel if it has none, tested) and calls the list's `patch(document)` (4.1). `onOpenUrl` opens the browser as `documentUrl` does today.
+- #10's `ViewerViewModel` kept only `DocumentDetails`, so `ViewerUiState` gains `document: Document?` (set when the details load) and the ViewModel keeps the labels it named them with.
+- The viewer's details panel shows Edit beside Download (quick actions and all details), per `components.md` § Details panel; `ViewerScreen` gains `onEdit: (Document) -> Unit`. `MainActivity` has no screen stack for the viewer (it is `openDocumentId`), so Edit sets a saveable `editing` flag (with an `editOpens` counter keying a fresh `EditDetailsViewModel`) that draws Edit details in place of the viewer; closing clears it.
+- `onSaved(document)` calls the viewer's new `showUpdated(document)` (tested) and the list's `patch(document)` (tested here, ahead of the rest of 4.1). `onOpenUrl` opens the browser as `documentUrl` does today.
 
 ### Verify
 

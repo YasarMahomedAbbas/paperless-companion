@@ -68,6 +68,8 @@ data class ViewerUiState(
     val saving: Boolean = false,
     /** Snackbar text, cleared by messageShown(). */
     val message: String? = null,
+    /** The document as last loaded or saved; Edit details starts from it. */
+    val document: Document? = null,
 )
 
 /** What the screen does once, outside itself: hand a file to another app, ask where to save, open a browser. */
@@ -97,6 +99,9 @@ class ViewerViewModel(
 
     /** The file waiting for the user to pick where it goes. */
     private var pending: DocumentFile? = null
+
+    /** The labels the details were named with; null when they didn't load. */
+    private var labels: Labels? = null
 
     init {
         loadDetails()
@@ -171,6 +176,15 @@ class ViewerViewModel(
 
     fun messageShown() = _state.update { it.copy(message = null) }
 
+    /** Edit details saved [document]: the panel shows it as the server now has it. */
+    fun showUpdated(document: Document) {
+        if (document.id != documentId) return
+        _state.update { it.copy(document = document, details = DetailsState.Ready(document.details(labels))) }
+    }
+
+    /** Snackbar text from elsewhere (a trash that failed). */
+    fun showMessage(message: String) = _state.update { it.copy(message = message) }
+
     private suspend fun save(file: DocumentFile) {
         if (!export.canSaveDirectly) {
             pending = file
@@ -195,20 +209,22 @@ class ViewerViewModel(
         _state.update { it.copy(details = DetailsState.Loading) }
         viewModelScope.launch {
             // Labels only name things: a failure leaves the names out, never the document.
-            val labels = async {
+            val loadingLabels = async {
                 try {
                     loadLabels()
                 } catch (e: ServerException) {
                     null
                 }
             }
-            val details = try {
-                DetailsState.Ready(getDocument(documentId).details(labels.await()))
+            val document = try {
+                getDocument(documentId)
             } catch (e: ServerException) {
-                labels.cancel()
-                DetailsState.Failed(e.userMessage(), e.isNetwork)
+                loadingLabels.cancel()
+                _state.update { it.copy(details = DetailsState.Failed(e.userMessage(), e.isNetwork)) }
+                return@launch
             }
-            _state.update { it.copy(details = details) }
+            labels = loadingLabels.await()
+            _state.update { it.copy(details = DetailsState.Ready(document.details(labels)), document = document) }
         }
     }
 

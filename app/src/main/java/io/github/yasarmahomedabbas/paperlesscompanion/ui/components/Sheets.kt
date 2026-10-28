@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -201,6 +203,47 @@ fun MultiChoiceRow(text: String, checked: Boolean, onClick: () -> Unit, modifier
     }
 }
 
+/**
+ * A tri-state option (the bulk Tags sheet): checked and unchecked look like [MultiChoiceRow];
+ * [ToggleableState.Indeterminate] (some of the selected documents carry it) is a `raised` box
+ * with a 2dp `mfg` ring and a dash. TalkBack hears the state as "partially checked".
+ */
+@Composable
+fun MixedChoiceRow(text: String, state: ToggleableState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val box = RoundedCornerShape(7.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clip(MaterialTheme.shapes.small)
+            .triStateToggleable(state = state, onClick = onClick, role = Role.Checkbox)
+            .padding(horizontal = Spacing.s16),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s16),
+    ) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .then(
+                    when (state) {
+                        ToggleableState.On -> Modifier.background(colors.primary, box)
+                        ToggleableState.Indeterminate -> Modifier.background(colors.surfaceContainerHigh, box).border(2.dp, colors.onSurfaceVariant, box)
+                        ToggleableState.Off -> Modifier.border(2.dp, colors.onSurfaceVariant, box)
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (state) {
+                ToggleableState.On -> Icon(AppIcons.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(16.dp))
+                ToggleableState.Indeterminate -> Box(Modifier.size(width = 10.dp, height = 2.dp).background(colors.onSurfaceVariant, CircleShape))
+                ToggleableState.Off -> Unit
+            }
+        }
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface, modifier = Modifier.weight(1f))
+    }
+}
+
 @Preview(name = "Sheet parts", widthDp = 360)
 @Composable
 private fun SheetPartsPreview() = PaperlessTheme {
@@ -214,6 +257,7 @@ private fun SheetPartsPreview() = PaperlessTheme {
             SingleChoiceRow("Oldest first", selected = false, onClick = {})
             MultiChoiceRow("Bills", checked = true, onClick = {})
             MultiChoiceRow("House", checked = false, onClick = {})
+            MixedChoiceRow("Tax", ToggleableState.Indeterminate, onClick = {})
             ListSheetActionBar {
                 AppButton("Clear all", {}, variant = ButtonVariant.Text)
                 AppButton("Show 23 documents", {}, Modifier.weight(1f))

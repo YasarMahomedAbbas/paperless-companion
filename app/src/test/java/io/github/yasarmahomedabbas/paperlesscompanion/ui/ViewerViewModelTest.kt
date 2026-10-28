@@ -120,6 +120,49 @@ class ViewerViewModelTest {
     }
 
     @Test
+    fun `the loaded document is kept for Edit details`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        assertNull(vm.state.value.document)
+        advanceUntilIdle()
+
+        assertEquals(bill, vm.state.value.document)
+    }
+
+    @Test
+    fun `a saved edit shows in the details with the labels already loaded`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val calls = library.calls.size
+
+        val edited = bill.copy(title = "Power bill — March", tagIds = listOf(8), correspondentId = null)
+        vm.showUpdated(edited)
+
+        assertEquals(edited, vm.state.value.document)
+        assertEquals("Power bill — March", vm.details().title)
+        assertEquals(listOf("Paid"), vm.details().tags)
+        assertNull(vm.details().correspondent)
+        assertEquals("nothing is fetched again", calls, library.calls.size)
+    }
+
+    @Test
+    fun `an edit of another document is ignored`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.showUpdated(doc(8, "Someone else"))
+
+        assertEquals(bill, vm.state.value.document)
+        assertEquals("Power bill", vm.details().title)
+    }
+
+    @Test
+    fun `a message from elsewhere shows as a snackbar`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        vm.showMessage("Can't reach Paperless")
+        assertEquals("Can't reach Paperless", vm.state.value.message)
+    }
+
+    @Test
     fun `tag names keep the document's order and unknown ids are left out`() = runTest(main.dispatcher) {
         library.document = bill.copy(tagIds = listOf(8, 1, 99), correspondentId = 99, documentTypeId = null)
         val vm = viewModel()

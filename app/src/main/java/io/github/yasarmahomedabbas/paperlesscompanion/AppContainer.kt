@@ -42,6 +42,10 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocument
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UpdateDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LabelsLinkUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
@@ -107,6 +111,17 @@ class AppContainer(private val context: Context) {
                 OpenDocumentFileUseCase(library, settings),
                 DocumentLinkUseCase(server, settings),
                 ExportDocumentUseCase(exports),
+            )
+        }
+    }
+    /** Edit details for [document], as the viewer last had it. */
+    fun editDetailsViewModelFactory(document: Document) = viewModelFactory {
+        initializer {
+            EditDetailsViewModel(
+                document,
+                UpdateDocumentUseCase(library, settings),
+                LoadLabelsUseCase(library, settings),
+                LabelsLinkUseCase(server, settings),
             )
         }
     }

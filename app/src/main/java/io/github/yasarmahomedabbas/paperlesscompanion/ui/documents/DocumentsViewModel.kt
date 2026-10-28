@@ -2,6 +2,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui.documents
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
@@ -45,6 +46,9 @@ class DocumentsViewModel(
     /** The search text the shown list was loaded with. */
     private var loadedText: String? = null
 
+    /** The documents behind [DocumentsUiState.rows], in the same order. */
+    private var loaded: List<Document> = emptyList()
+
     init {
         refresh()
     }
@@ -63,6 +67,7 @@ class DocumentsViewModel(
                 val page = browse(query)
                 loadedPage = query.page
                 hasMore = page.hasMore
+                loaded = loaded + page.documents
                 _state.update {
                     it.copy(rows = it.rows + page.documents.map { d -> d.toRow(labels) }, total = page.total, loadingMore = false)
                 }
@@ -143,6 +148,23 @@ class DocumentsViewModel(
         _state.update { it.copy(filterPreviewCount = null) }
     }
 
+    /**
+     * Edit details saved [document]: its row shows the change where it is, without a reload. A
+     * document that isn't loaded is left alone. The search match it was found by stays.
+     */
+    fun patch(document: Document) {
+        val index = loaded.indexOfFirst { it.id == document.id }
+        if (index < 0) return
+        loaded = loaded.toMutableList().also { it[index] = document.copy(searchHit = loaded[index].searchHit) }
+        showLoaded()
+    }
+
+    /** Re-draws the rows from [loaded], keeping everything else. */
+    private fun showLoaded() {
+        val labels = _state.value.labels ?: return
+        _state.update { it.copy(rows = loaded.map { d -> d.toRow(labels) }) }
+    }
+
     /** Page 1 again after the text, filters or sort changed; the labels too if they never loaded. */
     private fun reload() = loadFirstPage(withLabels = _state.value.labels == null, keepRows = false)
 
@@ -156,6 +178,7 @@ class DocumentsViewModel(
                 it.copy(status = ListStatus.Loading, rows = emptyList(), total = null, refreshing = false, loadingMore = false, loadMoreFailed = null)
             }
         }
+        if (!keepRows) loaded = emptyList()
         val query = query(page = 1)
         loadedText = query.text
         val known = _state.value.labels
@@ -168,6 +191,7 @@ class DocumentsViewModel(
                 }
                 loadedPage = 1
                 hasMore = page.hasMore
+                loaded = page.documents
                 _state.update {
                     it.copy(
                         labels = labels,
@@ -181,6 +205,7 @@ class DocumentsViewModel(
                 throw e
             } catch (e: Exception) {
                 hasMore = false
+                loaded = emptyList()
                 _state.update { it.copy(status = e.failure(), rows = emptyList(), total = null, refreshing = false) }
             }
         }
