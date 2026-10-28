@@ -45,7 +45,7 @@ jobs:
       - name: Check the signature
         run: |
           apk=app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME"/build-tools/34.0.0/apksigner verify --print-certs "$apk"
+          "$ANDROID_HOME"/build-tools/36.0.0/apksigner verify --print-certs "$apk"
           cp "$apk" "paperless-scan-${{ steps.version.outputs.name }}.apk"
 
       - name: Publish the release

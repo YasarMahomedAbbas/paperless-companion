@@ -86,8 +86,7 @@ class HttpApkDownloader(
             if (response.code != 200) {
                 throw UpdateException(Kind.SERVER, "HTTP ${response.code}", status = response.code)
             }
-            val body = response.body ?: throw UpdateException(Kind.SERVER, "no body", status = response.code)
-            copy(body.byteStream(), part, digest, total, onProgress)
+            copy(response.body.byteStream(), part, digest, total, onProgress)
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }

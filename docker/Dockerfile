@@ -1,11 +1,11 @@
 # Build environment: OpenJDK + Android SDK + Gradle, so nothing gets installed on the host.
 FROM docker.io/library/eclipse-temurin:21-jdk-noble
 
-ARG CMDLINE_TOOLS=11076708
-ARG GRADLE_VERSION=8.11.1
-ARG PLATFORM=android-35
-# The build-tools version AGP 8.7 expects by default.
-ARG BUILD_TOOLS=34.0.0
+ARG CMDLINE_TOOLS=16111833
+ARG GRADLE_VERSION=9.8.2
+ARG PLATFORM=android-37.0
+# The build-tools version AGP 9.4 expects by default.
+ARG BUILD_TOOLS=36.0.0
 
 ENV ANDROID_HOME=/opt/android-sdk \
     GRADLE_HOME=/opt/gradle

@@ -59,7 +59,7 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
         signIn: Boolean = false,
     ): JsonElement? = withContext(io) {
         val (code, text) = try {
-            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+            client.newCall(request).execute().use { it.code to it.body.string() }
         } catch (e: IOException) {
             throw networkError(request.url.host, e)
         }
@@ -115,8 +115,8 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
                 throw networkError(request.url.host, e)
             }
             response.use {
-                if (it.code !in 200..299) throw httpError(it.code, it.body?.string().orEmpty(), signIn = false)
-                val body = it.body ?: throw ServerException(Kind.SERVER, "Paperless sent no file")
+                if (it.code !in 200..299) throw httpError(it.code, it.body.string(), signIn = false)
+                val body = it.body
                 val total = body.contentLength().takeIf { length -> length >= 0 }
                 try {
                     body.byteStream().use { input -> part.outputStream().use { out -> copy(input, out, total, onProgress) } }

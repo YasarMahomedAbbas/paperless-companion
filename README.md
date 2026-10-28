@@ -77,7 +77,7 @@ Tests cover the domain and data layers and the ViewModels, with the HTTP client 
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`) runs on every push and PR: unit tests, the coverage check, lint and a debug build. The job summary shows the coverage numbers.
-- **Release** (`.github/workflows/release.yml`) runs when a `vX.Y.Z` tag is pushed. It tests, builds a signed APK and publishes it as a GitHub Release. The version code is derived from the tag (`v1.2.3` → 10203).
+- **Release** (`.github/workflows/release.yml`) runs when a `vX.Y.Z` tag is pushed. It tests, builds a signed APK and publishes it as a GitHub Release. The version code is derived from the tag (`v1.2.3` → 10203). Its signature check calls `apksigner` from a fixed build-tools version, the one AGP expects and `docker/Dockerfile` installs; an AGP bump that moves build-tools moves all three, or the release fails only at tag time.
 
   ```sh
   git tag v0.2.0 && git push origin v0.2.0
