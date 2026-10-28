@@ -47,3 +47,15 @@ Branch: `refactor/14-enforce-the-layers`
 - Skipped: the domain renames (`DocumentServer`, `ServerException`, `DocumentFiles`) — no doc named the old types; `rg` finds the new ones.
 - Skipped: README's use-case table describing uploads by Paperless endpoint — it describes what each use case achieves for a reader of the app; the calls themselves live in `PaperlessApi`, which the diagram already places in `data/`.
 - Stale, fixed separately: README.md:Architecture — said "each depending only on the one below it", but `data` depends on `domain` (it implements its interfaces); now "`ui` and `data` both depend on `domain`, never on each other" (commit 1e57edd).
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker. 64 tests passed / 0 failed / 0 skipped; line coverage 100% (koverVerify bound 80%); lint 0 errors (17 warnings); debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent; and the branch changes no Paperless API call, so there is nothing to check against the live schema).
+- Verified: no Paperless request, path, query or response handling changed (diff of `data/PaperlessApi.kt` is renames plus `documentUrl`, a web-UI link pinned byte-for-byte by `PaperlessApiTest`); `ArchitectureTest` passes on the tree and its rule tests show each forbidden import caught; the tree test failing on a restored `data.UriDocuments` import in `HomeScreen.kt` is recorded under Implementation.
+- Failed: none
+- Not self-verifiable:
+  - Open a finished upload's document link from the home screen: it should open `<server>/documents/<id>/details` in the browser, as before.
+  - Scan, take a photo, pick a file, and share a file into the app: each should upload as before (checks the `uri.toString()` → `Uri.parse` round trip in `HomeScreen`, `MainActivity` and `UriDocuments`, which has no unit test).
