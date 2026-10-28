@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yasarmahomedabbas.paperlesscompanion.data.KeystoreTokenVault
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessApi
+import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsStore
 import io.github.yasarmahomedabbas.paperlesscompanion.data.SealedSettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
@@ -20,6 +21,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateNotifier
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateSchedule
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
@@ -47,6 +49,8 @@ class AppContainer(private val context: Context) {
     val lock: AppLockRepository = sealed
     val documents: DocumentFiles = UriDocuments(context.contentResolver)
     private val server: DocumentServer = PaperlessApi()
+    // The documents already on the server. The document screens (#9-#11) build their use cases from it.
+    private val library: DocumentLibrary = PaperlessLibrary(files = File(context.cacheDir, "documents"))
 
     val gateViewModelFactory = viewModelFactory {
         initializer { GateViewModel(settings, lock, AppLock(lock, SystemClock::elapsedRealtime)) }

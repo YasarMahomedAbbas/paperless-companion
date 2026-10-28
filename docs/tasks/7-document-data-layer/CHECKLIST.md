@@ -78,7 +78,7 @@ File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Pap
 
 Goal: a use case can page through documents (sorted, filtered or searched), load one document and load the four label lists, against v9 and v10 answers.
 
-### [ ] 2.1 — Domain models
+### [x] 2.1 — Domain models
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Documents.kt` (new; `java.time` only)
 - `data class Document(val id: Int, val title: String, val created: LocalDate?, val added: Instant?, val modified: Instant?, val correspondentId: Int?, val documentTypeId: Int?, val storagePathId: Int?, val tagIds: List<Int>, val archiveSerialNumber: Int?, val originalFileName: String?, val pageCount: Int?, val mimeType: String?, val content: String? = null, val searchHit: SearchHit? = null)`. `content` is null in lists. `val thumbnail get() = DocumentThumbnail(id, modified)`.
@@ -91,12 +91,12 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/m
 - `data class Labels(val tags: List<Tag>, val correspondents: List<Label>, val documentTypes: List<Label>, val storagePaths: List<Label>)`.
 - `data class DocumentThumbnail(val documentId: Int, val version: Instant?)` (KDoc: what the UI hands the image loader; `version` changes when the document does).
 
-### [ ] 2.2 — `DocumentLibrary` (read half)
+### [x] 2.2 — `DocumentLibrary` (read half)
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/repository/Repositories.kt` (append)
 `interface DocumentLibrary` (KDoc: documents already on the server; throws ServerException): `suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage`, `suspend fun document(config: ServerConfig, id: Int): Document`, `suspend fun tags(config): List<Tag>`, `suspend fun correspondents(config): List<Label>`, `suspend fun documentTypes(config): List<Label>`, `suspend fun storagePaths(config): List<Label>`.
 
-### [ ] 2.3 — `PaperlessLibrary` (read half) and parsing
+### [x] 2.3 — `PaperlessLibrary` (read half) and parsing
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessLibrary.kt` (new)
 `class PaperlessLibrary(client: OkHttpClient = PaperlessApi.defaultClient(), io: CoroutineDispatcher = Dispatchers.IO, private val files: File) : DocumentLibrary`. `files` is the cache folder for checkpoint 3.
@@ -107,18 +107,18 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Pap
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessJson.kt` (new, internal)
 `fun JsonObject.toDocument(): Document`: `created` via `LocalDate.parse` of the first 10 characters (a v9 date, or an older datetime), `added`/`modified` via `OffsetDateTime.parse(...).toInstant()`, and any unparseable date becomes null, never an exception. Also `toTag()` and `toLabel()`, and `fun searchHit(json): SearchHit?` with `parseHighlights(html): Pair<String, List<IntRange>>`. That parser strips every tag, records the text inside `<span class="match">` as ranges, decodes `&amp; &lt; &gt; &quot; &#39;`, and treats an unclosed span as running to the end.
 
-### [ ] 2.4 — Use cases
+### [x] 2.4 — Use cases
 
 Files under `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/`:
 - `DocumentsUseCase.kt`, holding `internal fun SettingsRepository.signedIn(): ServerConfig = load() ?: throw ServerException(Kind.UNAUTHORIZED, "Not signed in")` and `class BrowseDocumentsUseCase(library, settings) { suspend operator fun invoke(query: DocumentQuery): DocumentPage }`, plus `class GetDocumentUseCase { suspend operator fun invoke(id: Int): Document }`.
 - `LoadLabelsUseCase.kt`: `suspend operator fun invoke(): Labels`, with the four lists loaded concurrently (`coroutineScope` + `async`). The first failure cancels the others and is rethrown.
 
-### [ ] 2.5 — Wiring and fakes
+### [x] 2.5 — Wiring and fakes
 
 File: `AppContainer.kt`: `private val library: DocumentLibrary = PaperlessLibrary(files = File(context.cacheDir, "documents"))`, with a comment that the screens (#9–#11) build their use cases from it.
 File: `app/src/test/java/.../Fakes.kt`: `class FakeLibrary : DocumentLibrary` with scripted answers, a recorded call list and an optional `failure`.
 
-### [ ] 2.6 — Tests
+### [x] 2.6 — Tests
 
 - `data/PaperlessLibraryTest.kt` (new): the read rows of the test plan, with **a v9 page (with `all`) and a v10 page (without)** for documents and for labels, each sort and filter param, search hits, 404/401.
 - `data/PaperlessJsonTest.kt` (new): `toDocument` with nulls and odd dates; highlight parsing cases.

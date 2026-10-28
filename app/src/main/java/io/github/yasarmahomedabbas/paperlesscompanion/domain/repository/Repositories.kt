@@ -2,10 +2,15 @@ package io.github.yasarmahomedabbas.paperlesscompanion.domain.repository
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
@@ -22,6 +27,19 @@ interface DocumentServer {
 
     /** The address of a document's page in the server's own web interface. */
     fun documentUrl(config: ServerConfig, documentId: Int): String
+}
+
+/** The documents already on the server, and the labels they carry. Implementations throw ServerException on any failure. */
+interface DocumentLibrary {
+    suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage
+
+    /** One document with everything known about it, its text included. A gone document is NOT_FOUND. */
+    suspend fun document(config: ServerConfig, id: Int): Document
+
+    suspend fun tags(config: ServerConfig): List<Tag>
+    suspend fun correspondents(config: ServerConfig): List<Label>
+    suspend fun documentTypes(config: ServerConfig): List<Label>
+    suspend fun storagePaths(config: ServerConfig): List<Label>
 }
 
 /** Turns a file the user picked, shot, scanned or shared (by its location, e.g. a content URI string) into a DocumentSource. */
