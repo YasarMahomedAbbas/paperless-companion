@@ -5,7 +5,7 @@ An Android app for scanning paper documents straight into a self-hosted [Paperle
 - **Scan document**: Google's ML Kit document scanner (edge detection, cropping, multiple pages) makes a PDF and uploads it.
 - **Take photo** and **Choose file**: for phones without Google Play services, or for PDFs you already have.
 - **Share to Paperless Scan**: send PDFs and images from any other app.
-- Follows each upload until Paperless has accepted it, shows its reason when it refuses one (a duplicate, for example), and links to the new document.
+- Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and links to the new document.
 
 The app talks only to your own server. It's built for a server reached over the home network or a VPN such as Tailscale, so plain `http://` addresses are allowed.
 
@@ -17,7 +17,11 @@ The app talks only to your own server. It's built for a server reached over the 
 
 To get updates automatically, add this repository's URL to [Obtainium](https://github.com/ImranR98/Obtainium).
 
-**Scanning needs Google Play services.** On GrapheneOS, that means sandboxed Google Play. Without it, the Scan button explains that, and Take photo and Choose file still work.
+**Scanning needs Google Play services.** On GrapheneOS, that means sandboxed Google Play. Without it, the Scan button explains that, and Take photo and Choose file still work. The scanner runs inside Play services, so it's **Play services** that needs the camera permission, not this app. If it's missing, the app says so and its **Open settings** button goes straight to Play services' permissions.
+
+## Server
+
+Paperless-ngx 2.x or 3.x: the app reads both API v9 and v10 answers. Paperless only refuses a duplicate upload when the server sets `PAPERLESS_CONSUMER_DELETE_DUPLICATES=true`; otherwise it keeps it as a second document.
 
 ## Architecture
 
@@ -36,7 +40,9 @@ data/     PaperlessApi (OkHttp + paperless-ngx REST), KeystoreSettingsRepository
 | Use case | What it does |
 |---|---|
 | `LoginUseCase` | Normalizes the server address, exchanges username and password for a token via `POST /api/token/`, saves it |
-| `UploadDocumentUseCase` | `POST /api/documents/post_document/`, then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
+| `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
+
+Any change to a Paperless call follows the current [API docs](https://docs.paperless-ngx.com/api/) and the server's own schema at `<server>/api/schema/view/` (see `CLAUDE.md`).
 
 ## Development
 

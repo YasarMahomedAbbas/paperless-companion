@@ -2,6 +2,18 @@
 
 Paperless Scan: an Android app (Kotlin, Jetpack Compose) that uploads scans, photos and files to a self-hosted Paperless-ngx server. See `README.md` for the layout, build and release.
 
+## Start here
+This repo is public, so private details live in the user's Obsidian vault: **`~/projects/vault/My-Vault/20-projects/paperless-companion/paperless-companion.md`**. It holds the status, the "start here" for the next session, the phone test list, open tasks, decisions, the home server's address and how to reach it.
+- **Read it at the start of every session** before doing anything else.
+- **Update it at the end**, or whenever something changes: status, a decision, a task done or added. Follow the vault's own `CLAUDE.md` (frontmatter, no hard-wrapped prose, tasks need a `📅` date and a tag).
+- Never copy private details (server address, accounts, family) into this repo.
+
+## Working on the app
+- **Build and test only in Docker:** `./build.sh ./gradlew --console=plain testDebugUnitTest koverVerify lintDebug assembleDebug` is what CI runs. Nothing is installed on the desktop.
+- **Release:** commit to `main`, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release workflow builds the signed APK and publishes it; wait for the run with `gh run watch` and check the APK is on the release. Phones update from GitHub Releases or Obtainium.
+- **Signing key:** `~/.config/paperless-companion/release.jks` + `keystore-password`, outside the repo, backed up in LastPass. Never print, move or regenerate them without asking: a new key forces every phone to uninstall the app.
+- A bug fix comes with a test that fails without it.
+
 ## Paperless API: always check the current docs
 Every call to Paperless (`data/PaperlessApi.kt`) must follow the **latest** Paperless-ngx API docs. Don't write or change a call from memory or from older examples: check the docs first, and check the live schema of the server it actually runs against.
 
