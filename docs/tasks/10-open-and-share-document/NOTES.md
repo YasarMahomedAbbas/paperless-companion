@@ -64,3 +64,27 @@ Branch: `feat/10-open-and-share-document`
 - Skipped: the `documents/` FileProvider cache path — the KDoc on `PhoneExports` states it, and sharing fails visibly without it.
 - Skipped: CLAUDE.md — no new cross-cutting rule; `DocumentExports` follows the existing layer rule that `ArchitectureTest` enforces.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker: 317 tests passed / 0 failed / 0 skipped, line coverage 92.0% (koverVerify ≥ 80% passed), lint has no errors (23 pre-existing warnings, none in this branch's files: version catalog, manifest, launcher icon), debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent, so no server address or token).
+- Verified:
+  - Progress from `Content-Length` and the null total for a chunked body: `PaperlessHttpTest` (MockWebServer), forwarded through `PaperlessLibraryTest` and `DocumentUseCasesTest`.
+  - The viewer's states and actions: 25 `ViewerViewModelTest` cases (loading, label failure, document failure + retry, file progress / not viewable / failure + retry, share, save direct and via picker, get original, open in Paperless).
+  - Layers: `ArchitectureTest` green (`PhoneExports` named only in `AppContainer`).
+  - No endpoint was added or changed. `GET /api/documents/{id}/`, the four label lists, `/preview/` and `/download/?original=true` are #7's calls and were checked against the docs and the server source at v3.3.4 / v2.20.15. They have not been checked against the live schema.
+- Failed: none
+- Not self-verifiable:
+  - Real server (needs verify.env). Check that `GET /api/documents/<id>/preview/` sends `Content-Length` behind granian and the proxy, so the MB bar is determinate and not a spinner. Check that a photo original's preview is `application/pdf` and that `/download/?original=true` is `image/*`.
+  - PDF rendering: pages show, pinch zoom 1–4× with pan, double tap toggles 2.5×, and the page pill counts.
+  - Details panel: the three stops (full screen, quick actions, all details); Back from full screen and from all details returns to quick actions, and from quick actions closes the viewer.
+  - Full screen: the bar and status bar hide, and a tap on the page brings the bar back for 3 s (the self-review fix).
+  - Reopening a document after a "Can't reach Paperless" failure loads it fresh (the self-review fix), and rotation keeps the viewer open.
+  - Share: the chooser opens and the receiving app reads the file.
+  - Download: on Android 10+ it saves to Downloads, the "Saved to Downloads" snackbar shows and the file appears in Files. On Android 8–9 the Save-as picker opens and saving works.
+  - Get photo on an image original saves the photo.
+  - Open in Paperless opens the browser at the document.
+  - All of it on home Wi-Fi and over the VPN.
