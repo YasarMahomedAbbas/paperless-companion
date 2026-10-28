@@ -61,3 +61,21 @@ Branch: `feat/8-fingerprint-unlock`
 - Skipped: docs/design/README.md — the branch already recorded its open decisions (no warning colour, no previews).
 - Skipped: CLAUDE.md — no new cross-cutting rule; the Keystore stays in data/, which the layer rules already say.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: full CI command green in Docker: 97 tests passed / 0 failed / 0 skipped, koverVerify passes at 95.47 % line coverage, lintDebug 0 errors, debug APK built.
+- Server: not run (not applicable: the branch adds or changes no Paperless call; nothing in `PaperlessApi` or the HTTP code is touched).
+- Verified: the lock policy (`AppLockTest`), the sealed store's read/unlock/save/switch/voided paths against a fake vault (`SealedSettingsRepositoryTest`), and the gate's Sign in / Lock / Home states plus the pending buffer (`GateViewModelTest`), all in the CI run above.
+- Failed: none
+- Not self-verifiable (check on both phones, GrapheneOS included):
+  - Launch shows the fingerprint prompt; the PIN/pattern fallback unlocks; cancel leaves the lock screen with a way to retry.
+  - The auth-bound key really refuses to decrypt without the app's own prompt (no token use before unlock).
+  - Away more than 1 minute → locked again on return; under 1 minute → not.
+  - A share from another app while locked waits behind the lock and lands after unlocking; a scan that returns after a re-lock is not lost.
+  - "Lock with fingerprint" switch off and on (each asks for the unlock, the app keeps working afterwards).
+  - Adding a fingerprint: expect the app to keep working (a time-limited key is likely not voided by enrolment); removing the screen lock → sign in again with the notice.
+  - A phone with no screen lock: the switch is hidden and the app works as before.
+  - Android 8–10 only: a weak-class biometric may not release the key; the app should stay locked and fall back to PIN/pattern.
