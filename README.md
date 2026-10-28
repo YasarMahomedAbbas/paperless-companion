@@ -35,12 +35,13 @@ domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
 data/     PaperlessApi (OkHttp + paperless-ngx REST), KeystoreSettingsRepository, UriDocuments
 ```
 
-`data` implements the interfaces `domain` defines, so the use cases never see HTTP or Android. `AppContainer` wires the layers together by hand, without a DI framework.
+`data` implements the interfaces `domain` defines, so the use cases never see HTTP or Android. `AppContainer` wires the layers together by hand, without a DI framework, and is the only file outside `data` that names a `data` class. `ArchitectureTest` fails the build when an import crosses these lines.
 
 | Use case | What it does |
 |---|---|
 | `LoginUseCase` | Normalizes the server address, exchanges username and password for a token via `POST /api/token/`, saves it |
 | `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
+| `DocumentLinkUseCase` | Gives the web address of an uploaded document on the signed-in server, for the link shown after an upload |
 
 Any change to a Paperless call follows the current [API docs](https://docs.paperless-ngx.com/api/) and the server's own schema at `<server>/api/schema/view/` (see `CLAUDE.md`).
 

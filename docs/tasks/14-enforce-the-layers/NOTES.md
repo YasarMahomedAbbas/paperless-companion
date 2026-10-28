@@ -39,3 +39,11 @@ Branch: `refactor/14-enforce-the-layers`
 - Raised: none
 - API: no Paperless call touched. `documentUrl` is the web-UI page `<server>/documents/<id>/details` (not an API endpoint), moved into `PaperlessApi` byte-for-byte; `PaperlessApiTest` pins the string. `verify.env` absent, live schema not checked (nothing to check).
 - Layers: clean. No `data.*` import or fully-qualified use outside `data/` and `AppContainer`; no endpoint path, field name or status string in `ui/` or `domain/`. The domain's remaining "Paperless" text is user-visible copy in `userMessage()`/`notConfirmed`, kept by decision Q2. One small behaviour note: the link now comes from `settings.load()` at tap time instead of the server URL cached in `HomeUiState`, so a signed-out tap opens nothing instead of a relative `/documents/<id>/details` URL. That is safer, not a regression.
+
+## Doc drift
+
+- Applied: README.md:Architecture — `DocumentLinkUseCase` added to the use-case table, and one sentence that `AppContainer` is the only file outside `data` naming a `data` class and that `ArchitectureTest` fails the build on a crossing import (rung 3: building the app; the table is the README's inventory of use cases).
+- Skipped: CLAUDE.md § Layers — already names `ArchitectureTest` and the rules it enforces; checked against the test's rule function, accurate.
+- Skipped: the domain renames (`DocumentServer`, `ServerException`, `DocumentFiles`) — no doc named the old types; `rg` finds the new ones.
+- Skipped: README's use-case table describing uploads by Paperless endpoint — it describes what each use case achieves for a reader of the app; the calls themselves live in `PaperlessApi`, which the diagram already places in `data/`.
+- Stale, fixed separately: README.md:Architecture — said "each depending only on the one below it", but `data` depends on `domain` (it implements its interfaces); now "`ui` and `data` both depend on `domain`, never on each other" (commit 1e57edd).
