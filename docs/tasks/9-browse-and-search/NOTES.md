@@ -40,3 +40,10 @@ Branch: `feat/9-browse-and-search`
   - `SettingsViewModel` also takes the update store and the installed version code, so the "ready" pill is worked out (and tested) there instead of in the activity.
   - The ViewModel keys gained a sign-out counter: keyed on the address alone, signing out and back in to the same server would have shown the old session's list.
   - `SearchHit.highlighted` takes its match style as a parameter (`searchMatch` from the theme in the app) so it is testable without Compose.
+
+## Review
+
+- Fixed: none. Candidates checked and refuted: the debounce job cancelling itself inside `reload()` (it has no suspension left, and the load runs in its own job); sign-out composing fresh ViewModels against cleared settings (the gate goes to SignIn synchronously in the same handler, so `home` is null before recomposition); load-more racing a refresh or a page-1 reload (`loadJob` is shared, so they cancel each other, and the guards check `refreshing` and `Loaded`); `stopSearch` missing a reload while the debounce is pending (it checks `typingJob`); a failed load-more retriggering forever (the scroll trigger only fires on a change of `(nearEnd, rowCount)`, and the retry is the footer button).
+- Raised: none.
+- API: no endpoint touched; `data/` and `domain/` are unchanged on this branch. The list, search, filter, label and thumbnail calls go through #7's `DocumentLibrary` as they are; self-verification still has to try them against a real server.
+- Layers: clean. No `ui/` import of `data/` and no Paperless field, path or query name in `ui/`; only `AppContainer` names `data/` classes.
