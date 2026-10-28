@@ -1,14 +1,20 @@
 package io.github.yasarmahomedabbas.paperlesscompanion
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.content.IntentCompat
@@ -16,6 +22,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
@@ -26,6 +34,10 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.askToUnlock
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
 /** A FragmentActivity because the biometric prompt is a fragment. */
 class MainActivity : FragmentActivity() {
@@ -35,6 +47,12 @@ class MainActivity : FragmentActivity() {
 
     /** The last unlocked home, kept composed under the lock screen when the app locks again. */
     private var lastHome: GateState.Home? = null
+
+    /** The Updates screen is open (from the menu or the "Update ready" notification). */
+    private var showUpdates by mutableStateOf(false)
+
+    // "Update ready" can't be posted without it; whatever the answer, it's only asked once.
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +68,22 @@ class MainActivity : FragmentActivity() {
                 }
             },
         )
+        // Debug builds aren't signed with the release key, so a release could never replace them.
+        if (!BuildConfig.DEBUG && savedInstanceState == null) {
+            container.checkForUpdatesNow()
+            askForNotificationsOnce()
+        }
+        // Android's install confirmation, started from here (it needs an activity). Only while the
+        // app is on screen: Android blocks an activity start from the background, so one that
+        // arrives then waits until the user comes back instead of being lost.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                container.installer.confirmation.filterNotNull().collect {
+                    container.installer.consumeConfirmation(it)
+                    startActivity(it)
+                }
+            }
+        }
         setContent {
             PaperlessTheme {
                 val state by gate.state.collectAsState()
@@ -63,17 +97,27 @@ class MainActivity : FragmentActivity() {
                     if (home != null) {
                         // Hidden from TalkBack too while the lock screen covers it.
                         Box(if (locked != null) Modifier.clearAndSetSemantics {} else Modifier) {
-                            HomeScreen(
-                                viewModel = viewModel<HomeViewModel>(key = home.config.baseUrl, factory = container.homeViewModelFactory),
-                                documents = container.documents,
-                                pending = if (locked == null) pending else emptyList(),
-                                onPendingConsumed = gate::onPendingConsumed,
-                                onDocuments = gate::addPending,
-                                lockAvailable = home.lockAvailable,
-                                lockEnabled = home.lockEnabled,
-                                onLockChange = ::changeLock,
-                                onSignedOut = gate::onSignedOut,
-                            )
+                            if (showUpdates) {
+                                BackHandler(enabled = locked == null) { showUpdates = false }
+                                UpdatesScreen(
+                                    viewModel = viewModel<UpdatesViewModel>(factory = container.updatesViewModelFactory),
+                                    onAllow = { startActivity(container.installer.permissionIntent()) },
+                                    onBack = { showUpdates = false },
+                                )
+                            } else {
+                                HomeScreen(
+                                    viewModel = viewModel<HomeViewModel>(key = home.config.baseUrl, factory = container.homeViewModelFactory),
+                                    documents = container.documents,
+                                    pending = if (locked == null) pending else emptyList(),
+                                    onPendingConsumed = gate::onPendingConsumed,
+                                    onDocuments = gate::addPending,
+                                    lockAvailable = home.lockAvailable,
+                                    lockEnabled = home.lockEnabled,
+                                    onLockChange = ::changeLock,
+                                    onSignedOut = gate::onSignedOut,
+                                    onOpenUpdates = { showUpdates = true },
+                                )
+                            }
                         }
                     }
                     if (locked != null) {
@@ -108,7 +152,15 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    private fun askForNotificationsOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || container.updateStore.askedForNotifications()) return
+        container.updateStore.markAskedForNotifications()
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     private fun receive(intent: Intent) {
+        // Shown only once signed in: the login screen ignores it.
+        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) showUpdates = true
         val uris = when (intent.action) {
             Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->

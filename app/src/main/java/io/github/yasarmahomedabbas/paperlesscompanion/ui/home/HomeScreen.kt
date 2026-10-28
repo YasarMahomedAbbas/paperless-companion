@@ -79,6 +79,7 @@ fun HomeScreen(
     lockEnabled: Boolean,
     onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
+    onOpenUpdates: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -147,11 +148,39 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Paperless Scan") },
                 actions = {
-                    TextButton(onClick = {
-                        viewModel.signOut()
-                        onSignedOut()
-                    }) { Text("Sign out") }
-                    if (lockAvailable) LockMenu(lockEnabled, onLockChange)
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Updates") },
+                                onClick = {
+                                    menu = false
+                                    onOpenUpdates()
+                                },
+                            )
+                            if (lockAvailable) {
+                                DropdownMenuItem(
+                                    text = { Text("Lock with fingerprint") },
+                                    trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
+                                    onClick = {
+                                        menu = false
+                                        onLockChange(!lockEnabled)
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Sign out") },
+                                onClick = {
+                                    menu = false
+                                    viewModel.signOut()
+                                    onSignedOut()
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -211,26 +240,6 @@ fun HomeScreen(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun LockMenu(lockEnabled: Boolean, onLockChange: (Boolean) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { open = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "More options")
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text("Lock with fingerprint") },
-                trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
-                onClick = {
-                    open = false
-                    onLockChange(!lockEnabled)
-                },
-            )
         }
     }
 }

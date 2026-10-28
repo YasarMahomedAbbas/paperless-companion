@@ -67,3 +67,11 @@ These live in `.claude/skills/design-canvas/assets/artboard.dc.html` for the can
   the error colour until #6 adds it.
 - No `@Preview`s: the app has no `ui-tooling` dependency yet, so the lock screen (#8) ships
   without one, like the other screens.
+- The Updates screen (#13) is a detail screen built from stock Material 3 parts on the current
+  theme, like the home screen, because `ui/components/` and the recipes don't exist yet; #6
+  restyles it and moves its entry out of the home overflow menu (⋮ → Updates, Sign out). It has
+  no skeleton or separate empty state: the offer is stored on the phone, so nothing loads, and
+  "Up to date" is the empty state. A failed *Check now* is its error, with *Check now* as Try
+  again; it says to check the connection rather than the home network or VPN, since GitHub
+  isn't on the home network. Its icons (back, more) are Material Icons until Material Symbols
+  are added.

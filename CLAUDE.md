@@ -4,7 +4,7 @@ Paperless Scan: an Android app (Kotlin, Jetpack Compose) that uploads scans, pho
 
 ## Working on the app
 - **Build and test only in Docker:** `./build.sh ./gradlew --console=plain testDebugUnitTest koverVerify lintDebug assembleDebug` is what CI runs. Nothing is installed on the desktop.
-- **Release:** commit to `main`, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release workflow builds the signed APK and publishes it; wait for the run with `gh run watch` and check the APK is on the release. Phones update from GitHub Releases or Obtainium.
+- **Release:** commit to `main`, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release workflow builds the signed APK and publishes it; wait for the run with `gh run watch` and check the APK is on the release. Installed copies update themselves from the latest release, so the tag format (`vX.Y.Z`, minor and patch below 100), the asset name `paperless-scan-<version>.apk` and the tag-to-version-code formula in `release.yml` are a contract with every phone: changing one means changing `data/update/GitHubReleases.kt` in the same release.
 - **Signing key:** kept outside the repo and given to the Release workflow as the `RELEASE_KEYSTORE_B64` and `RELEASE_KEYSTORE_PASSWORD` secrets. Never print, move or regenerate it without asking: a new key forces every installed copy to be uninstalled before it can update.
 - A bug fix comes with a test that fails without it.
 
