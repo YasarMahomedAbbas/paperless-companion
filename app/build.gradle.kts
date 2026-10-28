@@ -69,7 +69,8 @@ kover {
                     "*.AppContainer*",
                     "*.ComposableSingletons*",
                     "*Screen*",
-                    "*.data.KeystoreSettingsRepository*",
+                    "*.data.KeystoreTokenVault*",
+                    "*.data.PrefsStore*",
                     "*.data.UriDocuments*",
                 )
             }

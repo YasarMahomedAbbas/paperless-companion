@@ -39,7 +39,7 @@ Today `KeystoreSettingsRepository` keeps the server URL in prefs and the token A
 
 Goal: the data layer can seal the token with an auth-bound key, reports Locked / Voided / Ready in domain terms, and its decision logic is unit-tested. The app's behaviour is unchanged until checkpoint 3 wires the gate (`MainActivity` keeps calling `load()`).
 
-### [ ] 1.1 — Domain: what a stored sign-in can be
+### [x] 1.1 — Domain: what a stored sign-in can be
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Models.kt`
 Add:
@@ -56,7 +56,7 @@ sealed interface StoredSignIn {
 }
 ```
 
-### [ ] 1.2 — Domain: the lock's repository
+### [x] 1.2 — Domain: the lock's repository
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/repository/Repositories.kt`
 - `SettingsRepository` gains `fun read(): StoredSignIn`. `load()` becomes a default method: `fun load(): ServerConfig? = (read() as? StoredSignIn.Ready)?.config`. `save` / `clear` stay. `save` doc: "with the lock active and no recent unlock, the token is held in memory only until `AppLockRepository.unlock()` seals it."
@@ -77,30 +77,31 @@ interface AppLockRepository {
 }
 ```
 
-### [ ] 1.3 — Data: the vault and the store, device-only adapters
+### [x] 1.3 — Data: the vault and the store, device-only adapters
 
 Files (new): `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/TokenVault.kt`, `.../data/KeystoreTokenVault.kt`, `.../data/KeyValueStore.kt`
-- `TokenVault.kt`: `interface TokenVault { fun seal(plain: String, locked: Boolean): String; fun open(sealed: String, locked: Boolean): String; fun delete(locked: Boolean) }`, plus `class VaultLockedException : Exception()` (the user hasn't unlocked recently) and `class VaultVoidedException : Exception()` (the key is gone for good).
+- `TokenVault.kt`: `interface TokenVault { fun seal(plain: String, locked: Boolean): String; fun open(sealed: String, locked: Boolean): String; fun delete(locked: Boolean) }` (`seal` never throws `VaultVoidedException`: on a voided key it deletes it and seals with a fresh one), plus `class VaultLockedException : Exception()` (the user hasn't unlocked recently) and `class VaultVoidedException : Exception()` (the key is gone for good).
 - `KeystoreTokenVault(keyguard: KeyguardManager) : TokenVault`: move the AES-GCM code out of `KeystoreSettingsRepository`. Plain alias stays `paperless-token` (so existing installs still decrypt). Locked alias `paperless-token-locked`, built with `setUserAuthenticationRequired(true)`; on API 30+ `setUserAuthenticationParameters(UNLOCK_SECONDS, AUTH_BIOMETRIC_STRONG or AUTH_DEVICE_CREDENTIAL)`, below that `setUserAuthenticationValidityDurationSeconds(UNLOCK_SECONDS)`, with `UNLOCK_SECONDS = 10`. Keep `setInvalidatedByBiometricEnrollment` at its default (true). Map `UserNotAuthenticatedException` → `VaultLockedException`. Map `KeyPermanentlyInvalidatedException` (thrown at `init`) → delete that alias, then throw `VaultVoidedException`. Expose `fun isDeviceSecure() = keyguard.isDeviceSecure`.
 - `KeyValueStore.kt`: `interface KeyValueStore { fun getString(key: String): String?; fun getBoolean(key: String): Boolean?; fun edit(block: MutableMap<String, Any?>.() -> Unit) }` (a null value removes the key; `clear()` as `fun clear()`), and `class PrefsStore(prefs: SharedPreferences) : KeyValueStore`.
 
-### [ ] 1.4 — Data: the sealed settings repository
+### [x] 1.4 — Data: the sealed settings repository
 
 File: rename `.../data/KeystoreSettingsRepository.kt` → `.../data/SealedSettingsRepository.kt`, as `class SealedSettingsRepository(private val store: KeyValueStore, private val vault: TokenVault, private val deviceSecure: () -> Boolean) : SettingsRepository, AppLockRepository`.
 Prefs keys: `url`, `token` (unchanged), `token_locked` (Boolean: which key sealed `token`; absent = false, i.e. old installs), `lock_enabled` (absent = true).
 In memory: `private var unlocked: ServerConfig?` and `private var unsaved: Boolean`.
 - `canLock() = deviceSecure()`; `isEnabled() = store.getBoolean("lock_enabled") ?: true`; `private fun active() = canLock() && isEnabled()`.
-- `read()`: `unlocked` → Ready. No `url`/`token` → None. If `active()`, or `token_locked` is true → Locked (never touch the vault here: a recent screen unlock would otherwise open the time-limited key without the app's prompt). Else `vault.open(token, false)` → cache → Ready; `VaultVoidedException` or any other failure → clear → Voided.
-- `unlock()`: if `unsaved` → seal `unlocked` with the key `active()` asks for, write it, `unsaved = false`, Ready. If `unlocked` is already set → Ready. If nothing is stored → None. Else `vault.open(token, token_locked)`. Then if `token_locked != active()`, re-seal with the right key (migration and screen-lock changes). Cache → Ready. `VaultLockedException` → Locked. `VaultVoidedException` → clear → Voided.
+- `read()`: `unlocked` → Ready. No `url`/`token` → None. `token_locked` but no screen lock any more → clear → Voided (removing the screen lock voids the key). If `active()`, or `token_locked` is true → Locked (never touch the vault here: a recent screen unlock would otherwise open the time-limited key without the app's prompt). Else `vault.open(token, false)` → cache → Ready; `VaultVoidedException` or any other failure → clear → Voided.
+- `unlock()`: if `unsaved` → seal `unlocked` with the key `active()` asks for, write it, `unsaved = false`, Ready. If `unlocked` is already set → Ready. If nothing is stored → None. Else `vault.open(token, token_locked)`. Then if `token_locked != active()`, re-seal with the right key and delete the old one (migration and screen-lock changes); if that re-seal is refused, keep the old seal and still return Ready. Cache → Ready. `VaultLockedException` → Locked. `VaultVoidedException` → clear → Voided.
 - `save(config)`: `unlocked = config`. Try `vault.seal(token, active())` and write `url`, `token`, `token_locked`. On `VaultLockedException`, write only `url`, remove `token`, and set `unsaved = true` (the gate's Protect step seals it).
-- `setEnabled(enabled)`: write `lock_enabled`. If `unlocked` is set, re-seal it with `canLock() && enabled` and write `token`/`token_locked`. `VaultLockedException` → keep the old seal and rethrow as `IllegalStateException("Unlock first")`. Then `vault.delete` the key no longer used.
+- `setEnabled(enabled)`: if `unlocked` is set and not `unsaved`, re-seal it with `canLock() && enabled` and write `token`/`token_locked`. `VaultLockedException` → keep the old seal and rethrow as `IllegalStateException("Unlock first")`. Then write `lock_enabled` and `vault.delete` the key no longer used.
+- `hasUnsavedSignIn() = unsaved` (moved here from 2.2: the save tests need it).
 - `forget()`: if `active()` and not `unsaved`, `unlocked = null`.
 - `clear()`: `store.clear()` (keeps nothing; `lock_enabled` resets to default), `unlocked = null`, `unsaved = false`, `vault.delete(true)`.
 
 File: `.../AppContainer.kt`: `private val sealed = SealedSettingsRepository(PrefsStore(context.getSharedPreferences("server", MODE_PRIVATE)), KeystoreTokenVault(context.getSystemService(KeyguardManager::class.java)), ...isDeviceSecure)`; `val settings: SettingsRepository = sealed`; `val lock: AppLockRepository = sealed`.
 File: `app/build.gradle.kts` kover excludes: replace `*.data.KeystoreSettingsRepository*` with `*.data.KeystoreTokenVault*` and `*.data.PrefsStore*`. `SealedSettingsRepository` **is** counted.
 
-### [ ] 1.5 — Tests
+### [x] 1.5 — Tests
 
 Files: `app/src/test/java/.../data/SealedSettingsRepositoryTest.kt` (new), `app/src/test/java/.../Fakes.kt`
 - Fakes: `FakeVault : TokenVault` (seals as `"<locked|plain>:<plain>"`; `lockedUntilUnlock: Boolean` makes locked seal/open throw `VaultLockedException`; `voided: Boolean` throws `VaultVoidedException`; records `deleted`). `MapStore : KeyValueStore`. Make `FakeSettings` implement `read()` (Ready/None from `config`) so existing tests compile unchanged.
