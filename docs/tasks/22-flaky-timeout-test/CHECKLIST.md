@@ -33,13 +33,13 @@ Problem: one `PaperlessApiTest` case asserts the text of OkHttp's/the JDK's time
 
 Goal: the timeout tests pass regardless of which layer raises the timeout, and the classification is pinned for every wording.
 
-### [ ] 1.1 — Rework the flaky assertion
+### [x] 1.1 — Rework the flaky assertion
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessApiTest.kt`
 In `a status check that gets no answer is a no-answer error, not unreachable`, replace `assertTrue(e.message!!.contains("timeout"))` with:
 `assertTrue(e.cause is java.net.SocketTimeoutException)` and `assertTrue(e.message!!.startsWith("no answer from ${server.hostName}: "))`. Keep `assertEquals(Kind.NO_ANSWER, e.kind)`. Import `java.net.SocketTimeoutException`.
 
-### [ ] 1.2 — Pin the classification for every timeout wording
+### [x] 1.2 — Pin the classification for every timeout wording
 
 File: same.
 Add `fun \`a timeout is sorted by where it happened, whatever its wording\`() = runTest { … }`. For each `(message, kind)` in `"timeout" to NO_ANSWER`, `"Read timed out" to NO_ANSWER`, `"Connect timed out" to UNREACHABLE`, `"connect timed out" to UNREACHABLE`: build `PaperlessApi(client = OkHttpClient.Builder().addInterceptor { throw SocketTimeoutException(message) }.build())`, call `task(config, "t")`, catch `ServerException`, assert the kind, `cause is SocketTimeoutException`, and that the message ends with `": $message"`. Use the message in assertion texts so a failure names the wording. Import `okhttp3.OkHttpClient`. Before adding the final assertions, temporarily run the `"Read timed out"` case against the old `contains("timeout")` check to confirm it fails; note the result in NOTES.
