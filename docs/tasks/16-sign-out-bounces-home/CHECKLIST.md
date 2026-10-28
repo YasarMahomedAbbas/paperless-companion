@@ -45,7 +45,7 @@ Problem: After tapping Sign out, the sign-in screen shows for a moment and then 
 
 Goal: `testDebugUnitTest` can compose a screen with `createComposeRule()` under Robolectric at SDK 35, offline, with the SDK jar taken from the Gradle cache.
 
-### [ ] 1.1 — Version catalog
+### [x] 1.1 — Version catalog
 
 File: `gradle/libs.versions.toml`
 - `[versions]`: `robolectric = "4.14.1"` and `robolectricSdk = "15-robolectric-12650502-i7"`, with a comment above them: the SDK jar is the one Robolectric 4.14.1 uses for SDK 35 (the targetSdk); bumping Robolectric or the targetSdk means bumping this too (read the new version's `DefaultSdkProvider`), and tests fail offline until they match.
@@ -55,7 +55,7 @@ File: `gradle/libs.versions.toml`
   - `compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }` (BOM-managed)
   - `compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }` (BOM-managed)
 
-### [ ] 1.2 — Gradle wiring
+### [x] 1.2 — Gradle wiring
 
 File: `app/build.gradle.kts`
 - `dependencies`: `testImplementation(libs.robolectric)`, `testImplementation(libs.compose.ui.test.junit4)`, `debugImplementation(libs.compose.ui.test.manifest)` (it puts the `ComponentActivity` that `createComposeRule()` launches into the debug manifest; the BOM already applies through `implementation(platform(...))`, as for `compose.ui.tooling`).
@@ -79,20 +79,20 @@ File: `app/build.gradle.kts`
   (Robolectric's offline resolver looks for `android-all-instrumented-<version>.jar` by name in that directory, which is the jar's own folder in the Gradle cache. If the implementer finds the lambda `CommandLineArgumentProvider` captures the configuration in a way the configuration cache rejects, an explicit `Sync` task into `layout.buildDirectory.dir("robolectric")` that the test tasks depend on is the fallback; record which in NOTES.)
 - Leave the Kover filters unchanged: `*Screen*` classes stay excluded, so the screen test adds no coverage numbers and the 80% bound is unaffected.
 
-### [ ] 1.3 — Pin the SDK
+### [x] 1.3 — Pin the SDK
 
 File: `app/src/test/resources/robolectric.properties` (new)
 `sdk=35` with a comment: matches `targetSdk`; the jar is pinned in the version catalog.
 
-### [ ] 1.4 — Keep Dependabot from moving the SDK jar on its own
+### [x] 1.4 — Keep Dependabot from moving the SDK jar on its own
 
 File: `.github/dependabot.yml`
 Under the gradle entry, add `ignore: [{ dependency-name: "org.robolectric:android-all-instrumented" }]` with a comment: it moves only together with Robolectric (see the catalog comment). A Robolectric bump then fails its PR's tests until the jar is bumped by hand, which is the intended signal.
 
-### [ ] 1.5 — Smoke test
+### [x] 1.5 — Smoke test
 
-File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginScreenTest.kt` (new)
-`@RunWith(RobolectricTestRunner::class) class LoginScreenTest` with `@get:Rule val compose = createComposeRule()`, a `LoginViewModel(LoginUseCase(FakeServer(), FakeSettings()))` built in the test, and one test `the sign-in screen shows its fields and the Sign in button`: `setContent { LoginScreen(viewModel, notice = null, onSignedIn = {}) }`, then `onNodeWithText("Server address")`, `"Username"`, `"Password"` exist and `onNodeWithText("Sign in")` is displayed. Do not use `MainDispatcherRule` here: under Robolectric `viewModelScope` runs on the main looper, and the compose rule's `waitForIdle()` drives it.
+File: `app/src/testDebug/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginScreenTest.kt` (new; in `testDebug`, not `test`, because `koverVerify` also runs `testReleaseUnitTest`, and the release manifest has no `ComponentActivity` since `ui-test-manifest` is debug-only)
+`@RunWith(RobolectricTestRunner::class) @Config(application = Application::class) class LoginScreenTest` (a plain `Application`, so Robolectric doesn't run `PaperlessApp.onCreate`, which in release schedules WorkManager) with `@get:Rule val compose = createComposeRule()`, a `LoginViewModel(LoginUseCase(FakeServer(), FakeSettings()))` built in the test, and one test `the sign-in screen shows its fields and the Sign in button`: `setContent { LoginScreen(viewModel, notice = null, onSignedIn = {}) }`, then `onNodeWithText("Server address")`, `"Username"`, `"Password"` exist and `onNodeWithText("Sign in")` is displayed. Do not use `MainDispatcherRule` here: under Robolectric `viewModelScope` runs on the main looper, and the compose rule's `waitForIdle()` drives it.
 
 ### Verify
 
@@ -109,7 +109,7 @@ Goal: a sign-in result reaches the gate once. The sign-in screen shown after Sig
 
 ### [ ] 2.1 — The failing screen test first
 
-File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginScreenTest.kt`
+File: `app/src/testDebug/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/LoginScreenTest.kt`
 Add, before touching the main code:
 - `a second sign-in screen after sign-out does not sign in on its own`: hold `var showLogin by mutableStateOf(true)` in the test and a list of configs `onSignedIn` received. `setContent { if (showLogin) LoginScreen(viewModel, null) { signedIn += it } }`. Type into "Server address" (`paperless:8000`), "Username" (`anna`), "Password" (`pw`) with `performTextInput`, click "Sign in", `waitForIdle()`, assert one config `ServerConfig("http://paperless:8000", "token-123")`. Then `showLogin = false`, `waitForIdle()` (Home), `showLogin = true`, `waitForIdle()` (sign-out): assert still exactly one config, "Sign in" is displayed, and the address and username fields still show `paperless:8000` and `anna`.
 - `signing in again after sign-out signs in once more`: the same sequence, then type the password again, click "Sign in", `waitForIdle()`, and assert two configs.

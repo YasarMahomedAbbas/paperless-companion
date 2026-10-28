@@ -7,6 +7,10 @@ updates:
     groups:
       gradle:
         patterns: ["*"]
+    ignore:
+      # Robolectric's SDK jar moves only together with Robolectric, by hand (see the comment in
+      # gradle/libs.versions.toml). A Robolectric bump fails its PR's tests until it is bumped.
+      - dependency-name: "org.robolectric:android-all-instrumented"
   - package-ecosystem: github-actions
     directory: /
     schedule:

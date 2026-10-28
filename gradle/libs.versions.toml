@@ -14,6 +14,11 @@ okhttp = "4.12.0"
 work = "2.12.0"
 mlkitScanner = "16.0.0-beta1"
 junit = "4.13.2"
+robolectric = "4.14.1"
+# The SDK jar Robolectric 4.14.1 uses for SDK 35 (the targetSdk, pinned in robolectric.properties).
+# Bumping Robolectric or the targetSdk means bumping this too (read the new version's
+# DefaultSdkProvider); until they match, the tests fail, because Robolectric runs offline.
+robolectricSdk = "15-robolectric-12650502-i7"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -34,6 +39,10 @@ okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver",
 work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "mlkitScanner" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+robolectric-android-all = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricSdk" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
