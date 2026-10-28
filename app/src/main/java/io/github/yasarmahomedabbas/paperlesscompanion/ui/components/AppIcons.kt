@@ -51,6 +51,8 @@ object AppIcons {
     val Edit = outline("Edit", "M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4")
     val Trash = outline("Trash", "M4 7h16M10 11v6M14 11v6", "M6 7l1 13h10l1-13M9 7V4h6v3")
     val Tag = outline("Tag", "M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z", "M8 7.5v.01")
+    /** A bookmark: the saved views. */
+    val Views = outline("Views", "M6 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17l-6-4-6 4z")
     val DocumentType = outline("DocumentType", "M6 3h8l5 5v13H6z", "M14 3v5h5M9 13h6M9 17h6")
 }
 

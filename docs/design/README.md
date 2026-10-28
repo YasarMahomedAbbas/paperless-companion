@@ -200,3 +200,19 @@ Settled while building Organise documents (#11):
   You can bring them back from there." (the titles aren't listed). Its Undo is the same
   snackbar, "3 moved to trash".
 - **Snackbars** can be swiped away sideways (`AppSnackbarHost`).
+
+Settled while building saved views, notes and more like this (#12):
+
+- **View chips come first** in the Documents chip row: each home (dashboard) view is an
+  `Unselected` chip, `Selected` while it's the chosen one; tapping the chosen one clears it. A
+  chosen view that isn't a home view shows as a `Selected` chip right after them ("Stop showing
+  …" to TalkBack). Then a **Views** `Action` chip, then Filters, the filter chips and the sort.
+- **The Views chip** has a bookmark icon drawn in `AppIcons.kt` (`Views`), and shows only when
+  the server has saved views. It opens the short **Saved views** sheet: single-choice rows, the
+  quick-list (sidebar) views first in the server's order, then a `border-muted` divider and an
+  "Other views" section heading over the rest by name. The views load with the labels; when
+  they fail the list still works, just without view chips.
+- **A view's own order** reads "View's order" on the sort chip until a sort is picked. Choosing
+  a view clears the filters; filters and search then narrow it.
+- **An empty view** says "Nothing in <view>" / "No document is in this saved view right now."
+  with "Show all documents", which clears the view.

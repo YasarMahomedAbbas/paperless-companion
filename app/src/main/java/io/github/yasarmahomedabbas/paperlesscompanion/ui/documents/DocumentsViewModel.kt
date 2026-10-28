@@ -6,10 +6,13 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -33,6 +36,7 @@ private const val PAGE_SIZE = 25
 class DocumentsViewModel(
     private val browse: BrowseDocumentsUseCase,
     private val loadLabels: LoadLabelsUseCase,
+    private val savedViews: SavedViewsUseCase,
     private val debounceMillis: Long = 400,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DocumentsUiState())
@@ -123,8 +127,25 @@ class DocumentsViewModel(
         if (loadedText != null || typingJob?.isActive == true) reload()
     }
 
+    /** A picked sort replaces a view's own order. */
     fun setSort(option: SortOption) {
-        _state.update { it.copy(sort = option) }
+        _state.update { it.copy(sort = option, viewOrder = false) }
+        reload()
+    }
+
+    /**
+     * Lists [view]'s documents in its own order. The user's filters are cleared, since the view
+     * brings its own; choosing the chosen view again clears it.
+     */
+    fun chooseView(view: SavedView) {
+        if (_state.value.view?.id == view.id) return clearView()
+        stopPreview()
+        _state.update { it.copy(view = view, viewOrder = true, filters = DocumentFilters()) }
+        reload()
+    }
+
+    fun clearView() {
+        _state.update { it.copy(view = null, viewOrder = false) }
         reload()
     }
 
@@ -140,7 +161,7 @@ class DocumentsViewModel(
 
     fun removeDocumentType() = setFilters(_state.value.filters.copy(documentTypeId = null))
 
-    /** "No documents match" → Clear filters: drops the filters and the search text. */
+    /** "No documents match" → Clear filters: drops the filters and the search text; a chosen view stays. */
     fun clearFilters() {
         _state.update { it.copy(filters = DocumentFilters(), text = "") }
         reload()
@@ -259,10 +280,13 @@ class DocumentsViewModel(
         val known = _state.value.labels
         loadJob = viewModelScope.launch {
             try {
-                val (labels, page) = coroutineScope {
-                    val labels = if (withLabels || known == null) async { loadLabels() } else null
+                val fresh = withLabels || known == null
+                val (labels, page, views) = coroutineScope {
+                    val labels = if (fresh) async { loadLabels() } else null
+                    // The views are extra: without them the list still works, only without view chips.
+                    val views = if (fresh) async { loadViews() } else null
                     val page = async { browse(query) }
-                    (labels?.await() ?: checkNotNull(known)) to page.await()
+                    Triple(labels?.await() ?: checkNotNull(known), page.await(), views?.await())
                 }
                 consumed = page.documents.size
                 hasMore = page.hasMore
@@ -270,6 +294,7 @@ class DocumentsViewModel(
                 _state.update {
                     it.copy(
                         labels = labels,
+                        views = if (fresh) views else it.views,
                         rows = page.documents.map { d -> d.toRow(labels) },
                         total = page.total,
                         status = if (page.documents.isEmpty()) ListStatus.Empty else ListStatus.Loaded,
@@ -286,6 +311,14 @@ class DocumentsViewModel(
         }
     }
 
+    private suspend fun loadViews(): SavedViews? = try {
+        savedViews()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
     private fun query(page: Int, filters: DocumentFilters = _state.value.filters): DocumentQuery {
         val s = _state.value
         return DocumentQuery(
@@ -297,6 +330,8 @@ class DocumentsViewModel(
             descending = s.sort.descending,
             page = page,
             pageSize = PAGE_SIZE,
+            view = s.view?.id,
+            viewOrder = s.viewOrder,
         )
     }
 }

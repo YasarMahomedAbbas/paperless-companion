@@ -226,7 +226,7 @@ Files: `Fakes.kt`, `data/PaperlessViewsTest.kt` (new), `data/PaperlessLibraryTes
 
 Goal: the home views show as chips at the start of the chip row, and a Views chip opens a sheet with every view. Choosing one lists its documents, and it can be cleared.
 
-### [ ] 3.1 — State and ViewModel
+### [x] 3.1 — State and ViewModel
 
 Files: `ui/documents/DocumentsUiState.kt`, `ui/documents/DocumentsViewModel.kt`, `AppContainer.kt`
 - `DocumentsUiState` gains:
@@ -235,7 +235,7 @@ Files: `ui/documents/DocumentsUiState.kt`, `ui/documents/DocumentsViewModel.kt`,
   - `val viewOrder: Boolean = false`.
   `sortLabel` gives "View's order" when `view != null && viewOrder && text.isBlank()`. `showResultLine` is also true with a view.
 - `DocumentsViewModel(browse, loadLabels, savedViews: SavedViewsUseCase, debounceMillis)`:
-  - The views load alongside the labels in `loadFirstPage(withLabels = true)`, in their own `async` whose failure becomes `views = null` and never fails the list.
+  - The views load alongside the labels in `loadFirstPage(withLabels = true)`, in their own `async` whose failure becomes `views = null` and never fails the list. A reload that doesn't fetch the labels keeps the views it has.
   - `chooseView(view: SavedView)`: `stopPreview()`, then set `view`, `viewOrder = true`, `filters = DocumentFilters()` and clear `similar` (checkpoint 4), then `reload()`. Choosing the chosen view again clears it.
   - `clearView()`: `view = null`, `viewOrder = false`, `reload()`.
   - `setSort` sets `viewOrder = false`.
@@ -243,7 +243,7 @@ Files: `ui/documents/DocumentsUiState.kt`, `ui/documents/DocumentsViewModel.kt`,
   - `query()` passes `view = s.view?.id` and `viewOrder`.
 - `AppContainer`: pass `SavedViewsUseCase(library, settings)`.
 
-### [ ] 3.2 — Chips and the Views sheet
+### [x] 3.2 — Chips and the Views sheet
 
 Files: `ui/documents/DocumentsScreen.kt`, `ui/documents/ViewsSheet.kt` (new). Apply `design-recipe` first.
 - `FilterChips`:
@@ -257,8 +257,9 @@ Files: `ui/documents/DocumentsScreen.kt`, `ui/documents/ViewsSheet.kt` (new). Ap
   - Tapping a row chooses it and closes the sheet. The sheet is added to the `DocumentsSheet` enum.
 - `DocumentsScreenActions` gains `onChooseView`, `onClearView` and `onOpenViews`, wired in `DocumentsScreen`.
 - `@Preview` for the chip row with views and for the sheet.
+- Empty state in a view with no filters or text: "Nothing in <view>", "No document is in this saved view right now.", **Show all documents** (`clearView`).
 
-### [ ] 3.3 — Tests and manual
+### [x] 3.3 — Tests and manual
 
 Files: `ui/DocumentsViewModelTest.kt`, `docs/design/README.md`
 - The `DocumentsViewModelTest` view cases from the test plan.

@@ -34,6 +34,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.Settings
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.CheckForUpdateUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
@@ -98,7 +99,13 @@ class AppContainer(private val context: Context) {
         initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
     val documentsViewModelFactory = viewModelFactory {
-        initializer { DocumentsViewModel(BrowseDocumentsUseCase(library, settings), LoadLabelsUseCase(library, settings)) }
+        initializer {
+            DocumentsViewModel(
+                BrowseDocumentsUseCase(library, settings),
+                LoadLabelsUseCase(library, settings),
+                SavedViewsUseCase(library, settings),
+            )
+        }
     }
     val uploadsViewModelFactory = viewModelFactory {
         initializer { UploadsViewModel(UploadDocumentUseCase(server, settings)) }
