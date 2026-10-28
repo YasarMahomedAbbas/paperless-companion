@@ -23,3 +23,9 @@ Branch: `fix/22-flaky-timeout-test`
 - Raised: none
 - API: none touched (`GET /api/tasks/?task_id=` only exercised by the test, unchanged)
 - Layers: clean
+
+## Doc drift
+
+- No drift found. The branch only changes `PaperlessApiTest.kt`; `rg` over CLAUDE.md, README.md and docs/ (excluding docs/tasks/) finds no claim about timeouts, their wording or this test.
+- Skipped: "assert a network error's kind and cause, not the JDK's message wording": rung 1, the reworked tests show the pattern and a session copying a neighbouring test picks it up; not worth a CLAUDE.md line.
+- Stale, fixed separately: none
