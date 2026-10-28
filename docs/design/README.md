@@ -181,3 +181,9 @@ Settled while building Organise documents (#11):
   OK and Cancel.
 - **Discard changes?** reads "Your changes to this document haven't been saved." with Keep
   editing and a `DestructiveText` Discard.
+- **Move to trash** is the More menu's last item, after a `border` divider, in `destructive`;
+  it is disabled until the document has loaded. Its confirm is an `AppDialog` with the
+  `Destructive` button. A trash that fails stays on the viewer as a snackbar.
+- **The Undo snackbar** shows on the list, not the viewer (the viewer closes on success). It has
+  no time-out of its own: the app's 8-second offer decides when it goes, and swiping it away
+  ends the offer. The Add button rises 64 above it while it shows.

@@ -59,7 +59,9 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ButtonVarian
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DetailRow
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DetailsPanel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DeterminateProgress
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.MenuDivider
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.MenuItem
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppDialog
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.NoticeBanner
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.NoticeTone
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.PanelStop
@@ -90,6 +92,8 @@ fun ViewerScreen(
     onPickSaveLocation: (ViewerEvent.PickSaveLocation) -> Unit,
     onOpenUrl: (String) -> Unit,
     onEdit: (Document) -> Unit,
+    /** Move to trash was confirmed. */
+    onTrash: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(viewModel) {
@@ -119,6 +123,7 @@ fun ViewerScreen(
         onOpenInPaperless = viewModel::openInPaperless,
         onRetry = viewModel::retry,
         onEdit = { state.document?.let(onEdit) },
+        onTrash = onTrash,
     )
 }
 
@@ -135,8 +140,10 @@ fun ViewerContent(
     onOpenInPaperless: () -> Unit,
     onRetry: () -> Unit,
     onEdit: () -> Unit,
+    onTrash: () -> Unit,
     panel: AnchoredDraggableState<PanelStop> = rememberDetailsPanelState(),
     menuOpenAtStart: Boolean = false,
+    confirmTrashAtStart: Boolean = false,
     pages: @Composable (file: File, fullScreen: Boolean, onTap: () -> Unit, bottomPadding: Dp) -> Unit =
         { file, fullScreen, onTap, bottom -> PdfPages(file, fullScreen, onTap, onDownload, bottomPadding = bottom) },
 ) {
@@ -145,6 +152,8 @@ fun ViewerContent(
     val stop = panel.stop
     val fullScreen = stop == PanelStop.FULL_SCREEN
     var menuOpen by remember { mutableStateOf(menuOpenAtStart) }
+    var confirmTrash by remember { mutableStateOf(confirmTrashAtStart) }
+    val askTrash = { confirmTrash = true }
     var peek by remember { mutableStateOf(false) }
     LaunchedEffect(peek) {
         if (peek) {
@@ -165,7 +174,7 @@ fun ViewerContent(
     Box(Modifier.fillMaxSize().background(colors.background)) {
         Column(Modifier.fillMaxSize()) {
             AnimatedVisibility(visible = !fullScreen, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
-                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless) }
+                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null }) }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (val file = state.file) {
@@ -195,7 +204,7 @@ fun ViewerContent(
         // In full screen a tap on the page brings the bar back for a moment.
         AnimatedVisibility(visible = fullScreen && peek, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
             Box(Modifier.background(colors.background).statusBarsPadding()) {
-                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless)
+                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null })
             }
         }
         DetailsPanel(
@@ -204,6 +213,19 @@ fun ViewerContent(
             all = { AllDetails(state, onEdit, onDownload, onRetry) },
         )
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
+    if (confirmTrash) {
+        AppDialog(
+            title = "Move to trash?",
+            body = "'$title' goes to the Paperless trash. You can bring it back from there.",
+            confirmLabel = "Move to trash",
+            onConfirm = {
+                confirmTrash = false
+                onTrash()
+            },
+            onDismiss = { confirmTrash = false },
+            confirmVariant = ButtonVariant.Destructive,
+        )
     }
 }
 
@@ -217,6 +239,8 @@ private fun Bar(
     onMenuOpenChange: (Boolean) -> Unit,
     onDownload: () -> Unit,
     onOpenInPaperless: () -> Unit,
+    /** Null until the document has loaded. */
+    onTrash: (() -> Unit)?,
 ) {
     ViewerBar(
         title = title,
@@ -228,6 +252,8 @@ private fun Bar(
     ) {
         MenuItem("Download", AppIcons.Download, { onMenuOpenChange(false); onDownload() }, enabled = canExport)
         MenuItem("Open in Paperless", AppIcons.OpenExternal, { onMenuOpenChange(false); onOpenInPaperless() })
+        MenuDivider()
+        MenuItem("Move to trash", AppIcons.Trash, { onMenuOpenChange(false); onTrash?.invoke() }, enabled = onTrash != null, destructive = true)
     }
 }
 
@@ -401,13 +427,14 @@ private fun PreviewPages(file: File, fullScreen: Boolean, onTap: () -> Unit, bot
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Preview(state: ViewerUiState, stop: PanelStop = PanelStop.QUICK, menuOpen: Boolean = false) = PaperlessTheme {
+private fun Preview(state: ViewerUiState, stop: PanelStop = PanelStop.QUICK, menuOpen: Boolean = false, confirmTrash: Boolean = false) = PaperlessTheme {
     ViewerContent(
         state = state,
         snackbar = remember { SnackbarHostState() },
-        onBack = {}, onShare = {}, onDownload = {}, onDownloadOriginal = {}, onOpenInPaperless = {}, onRetry = {}, onEdit = {},
+        onBack = {}, onShare = {}, onDownload = {}, onDownloadOriginal = {}, onOpenInPaperless = {}, onRetry = {}, onEdit = {}, onTrash = {},
         panel = rememberDetailsPanelState(stop),
         menuOpenAtStart = menuOpen,
+        confirmTrashAtStart = confirmTrash,
         pages = { file, fullScreen, onTap, bottom -> PreviewPages(file, fullScreen, onTap, bottom) },
     )
 }
@@ -427,6 +454,10 @@ private fun DetailsExpandedPreview() = Preview(previewReady, PanelStop.ALL)
 @Preview(name = "More menu", widthDp = 360, heightDp = 780)
 @Composable
 private fun MoreMenuPreview() = Preview(previewReady, menuOpen = true)
+
+@Preview(name = "Move to trash?", widthDp = 360, heightDp = 780)
+@Composable
+private fun ConfirmTrashPreview() = Preview(previewReady, confirmTrash = true)
 
 @Preview(name = "Loading", widthDp = 360, heightDp = 780)
 @Composable

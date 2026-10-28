@@ -195,21 +195,21 @@ Files: `AppContainer.kt`, `MainActivity.kt`, `ui/viewer/ViewerViewModel.kt`, `ui
 
 Goal: the More menu's Move to trash asks first, returns to the list, and offers Undo for 8 seconds; edits and trash show in the list without a reload.
 
-### [ ] 4.1 — List patches in place
+### [x] 4.1 — List patches in place
 
 File: `ui/documents/DocumentsViewModel.kt` (from #9), test `ui/DocumentsViewModelTest.kt`
-Add `fun patch(document: Document)` (replace the loaded document with that id and re-map its row; no-op if not loaded), `fun apply(ids: Collection<Int>, edit: BulkEdit)` (via `Document.with`), `fun remove(ids: Collection<Int>)` (drop the rows, remember each one's document and index, `total - n`) and `fun putBack(ids: Collection<Int>)` (re-insert the remembered ones at their old indices, clamped, `total + n`). Also `fun documents(ids: Collection<Int>): List<Document>` for the bulk Tags sheet. If #9 keeps only rows, keep the `Document`s alongside them. Tests: the cases in the test plan's DocumentsViewModel bullet.
+#9 keeps only rows, so the ViewModel now keeps the loaded `Document`s alongside them (`loaded`) and re-maps rows from them. Add `fun patch(document: Document)` (built in checkpoint 3; it keeps the row's search snippet) (replace the loaded document with that id and re-map its row; no-op if not loaded), `fun apply(ids: Collection<Int>, edit: BulkEdit)` (via `Document.with`), `fun remove(ids: Collection<Int>)` (drop the rows, remember each one's document and index, `total - n`) and `fun putBack(ids: Collection<Int>)` (re-insert the remembered ones at their old indices, clamped, `total + n`; one already back is skipped). Emptying the list makes it `Empty`, and putting back makes it `Loaded` again. A new search, filter or sort forgets the remembered rows; a pull to refresh keeps them. Also `fun documents(ids: Collection<Int>): List<Document>` for the bulk Tags sheet. If #9 keeps only rows, keep the `Document`s alongside them. Tests: the cases in the test plan's DocumentsViewModel bullet.
 
-### [ ] 4.2 — More menu and confirm
+### [x] 4.2 — More menu and confirm
 
-File: the viewer screen from #10
-Add a `border` divider and then "Move to trash" (`destructive` text and icon) as the More menu's last item. It opens `ConfirmDialog("Move to trash?", "'<title>' goes to the Paperless trash. You can bring it back from there.", "Move to trash", destructive = true)`. Confirm calls `trashViewModel.trash(listOf(id))`. On `Trashed`, the viewer closes back to the list. A failure stays on the viewer with the snackbar message.
+File: `ui/viewer/ViewerScreen.kt` (from #10)
+Add a `MenuDivider()` and then "Move to trash" (`MenuItem(destructive = true)`, Trash icon) as the More menu's last item, disabled until the document has loaded. It opens `AppDialog("Move to trash?", "'<title>' goes to the Paperless trash. You can bring it back from there.", "Move to trash", confirmVariant = Destructive)`. Confirm calls `ViewerScreen`'s new `onTrash`, which `MainActivity` wires to `trash.trash(listOf(id))`. On `Trashed`, the viewer closes back to the list. A failure stays on the viewer with the snackbar message (`MainActivity` hands it to the viewer's new `showMessage`).
 
-### [ ] 4.3 — Snackbar with Undo on the list
+### [x] 4.3 — Snackbar with Undo on the list
 
 Files: `ui/documents/DocumentsScreen.kt`, `AppContainer.kt`, `MainActivity.kt`
 - `trashViewModelFactory` in `AppContainer`. One activity-scoped `TrashViewModel` is passed to the viewer and the list.
-- The list collects `TrashEvent`: `Trashed` → `documents.remove(ids)`, `Restored` → `documents.putBack(ids)`.
+- `MainActivity` (not the list screen, which isn't composed while the viewer shows) collects `TrashEvent`: `Trashed` → `documents.remove(ids)` and closes the viewer if it shows one of them, `Restored` → `documents.putBack(ids)`. `DocumentsScreen` gains a `trash: TrashViewModel` parameter for the snackbars.
 - While `undoable` is set, the list shows #10's snackbar (`components.md` § Snackbar) with the message and a `primary` Undo calling `undo()`. The app's 8-second timer, not `SnackbarDuration`, decides when it goes. Swiping it away calls `undoShown()`, and the Add button moves up above it. `failure` shows as a snackbar with no action, then `failureShown()`.
 
 ### Verify

@@ -10,6 +10,14 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppSnackbarHost
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -115,8 +123,27 @@ fun DocumentsScreen(
     onOpenSettings: () -> Unit,
     /** Opens a document in the viewer: a row's tap, or a finished upload card's "Open". */
     onOpenDocument: (Int) -> Unit,
+    /** Activity-wide, so a trash from the viewer offers its Undo here. */
+    trash: TrashViewModel,
 ) {
     val state by documents.state.collectAsState()
+    val trashState by trash.state.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // The Undo stays until the app's own 8-second timer clears the offer, which cancels this and takes the snackbar away.
+    LaunchedEffect(trashState.undoable) {
+        val offer = trashState.undoable ?: return@LaunchedEffect
+        when (snackbar.showSnackbar(offer.message, actionLabel = "Undo", duration = SnackbarDuration.Indefinite)) {
+            SnackbarResult.ActionPerformed -> trash.undo()
+            SnackbarResult.Dismissed -> trash.undoShown()
+        }
+    }
+    LaunchedEffect(trashState.failure) {
+        val message = trashState.failure ?: return@LaunchedEffect
+        trash.failureShown()
+        // Outside this effect, which restarts (and would cancel it) once the failure is cleared.
+        scope.launch { snackbar.showSnackbar(message) }
+    }
     val uploadState by uploads.state.collectAsState()
     val context = LocalContext.current
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
@@ -185,6 +212,7 @@ fun DocumentsScreen(
         state = state,
         uploads = uploadState.uploads,
         notice = notice,
+        snackbar = snackbar,
         actions = DocumentsScreenActions(
             onRefresh = documents::refresh,
             onLoadMore = documents::loadMore,
@@ -289,6 +317,7 @@ private fun DocumentsContent(
     uploads: List<UploadItem>,
     notice: String?,
     actions: DocumentsScreenActions,
+    snackbar: SnackbarHostState = remember { SnackbarHostState() },
     listState: LazyListState = rememberLazyListState(),
 ) {
     val colors = MaterialTheme.colorScheme
@@ -362,15 +391,21 @@ private fun DocumentsContent(
                 DocumentList(state, uploads, notice, actions, listState)
             }
         }
+        // The Add button moves up above a snackbar.
+        val lift by animateDpAsState(if (snackbar.currentSnackbarData != null) SNACKBAR_LIFT else 0.dp, label = "lift")
         AddButton(
             actions.onAdd,
             Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .padding(end = Spacing.gutter, bottom = Spacing.actionBottom),
+                .padding(end = Spacing.gutter, bottom = Spacing.actionBottom + lift),
         )
+        AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
+
+/** How far the Add button rises over a snackbar: the snackbar's height and a gap. */
+private val SNACKBAR_LIFT = 64.dp
 
 /** Filters (with how many are on), one removable chip per applied filter, then the sort order. */
 @Composable

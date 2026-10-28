@@ -43,6 +43,10 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCas
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UpdateDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DeleteDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.TrashUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LabelsLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
@@ -112,6 +116,12 @@ class AppContainer(private val context: Context) {
                 DocumentLinkUseCase(server, settings),
                 ExportDocumentUseCase(exports),
             )
+        }
+    }
+    /** One per signed-in session, shared by the viewer and the list, so the Undo outlives the viewer. */
+    val trashViewModelFactory = viewModelFactory {
+        initializer {
+            TrashViewModel(DeleteDocumentUseCase(library, settings), BulkEditUseCase(library, settings), TrashUseCase(library, settings))
         }
     }
     /** Edit details for [document], as the viewer last had it. */

@@ -43,6 +43,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsScre
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashEvent
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
@@ -146,6 +148,20 @@ class MainActivity : FragmentActivity() {
                         Box(if (locked != null) Modifier.clearAndSetSemantics {} else Modifier) {
                             val key = "$session ${home.config.baseUrl}"
                             val uploads = viewModel<UploadsViewModel>(key = "uploads $key", factory = container.uploadsViewModelFactory)
+                            val list = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory)
+                            val trash = viewModel<TrashViewModel>(key = "trash $key", factory = container.trashViewModelFactory)
+                            // Here rather than on a screen, so the list follows a trash made from the viewer.
+                            LaunchedEffect(trash) {
+                                trash.events.collect { event ->
+                                    when (event) {
+                                        is TrashEvent.Trashed -> {
+                                            list.remove(event.ids)
+                                            if (openDocumentId in event.ids) openDocumentId = null
+                                        }
+                                        is TrashEvent.Restored -> list.putBack(event.ids)
+                                    }
+                                }
+                            }
                             // Keeps the list's scroll and sheets while the viewer covers it.
                             val saved = rememberSaveableStateHolder()
                             val documentId = openDocumentId
@@ -158,7 +174,6 @@ class MainActivity : FragmentActivity() {
                                     val editingDocument = viewer.state.collectAsState().value.document
                                     // The form starts from the viewer's document; after the app was killed the viewer loads it again first.
                                     if (editing && editingDocument != null) {
-                                        val list = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory)
                                         EditDetailsScreen(
                                             viewModel = viewModel<EditDetailsViewModel>(
                                                 key = "edit-$documentId-$editOpens",
@@ -174,6 +189,13 @@ class MainActivity : FragmentActivity() {
                                         )
                                     } else {
                                         BackHandler(enabled = locked == null) { openDocumentId = null }
+                                        // A trash that failed shows on the viewer, where it was asked for.
+                                        val trashFailure = trash.state.collectAsState().value.failure
+                                        LaunchedEffect(trashFailure) {
+                                            trashFailure ?: return@LaunchedEffect
+                                            viewer.showMessage(trashFailure)
+                                            trash.failureShown()
+                                        }
                                         val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
                                         ViewerScreen(
                                             viewModel = viewer,
@@ -185,12 +207,13 @@ class MainActivity : FragmentActivity() {
                                                 editOpens++
                                                 editing = true
                                             },
+                                            onTrash = { trash.trash(listOf(documentId)) },
                                         )
                                     }
                                 }
                                 screen == Screen.DOCUMENTS -> saved.SaveableStateProvider("documents $key") {
                                     DocumentsScreen(
-                                        documents = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory),
+                                        documents = list,
                                         uploads = uploads,
                                         files = container.documents,
                                         pending = if (locked == null) pending else emptyList(),
@@ -202,6 +225,7 @@ class MainActivity : FragmentActivity() {
                                             editing = false
                                             openDocumentId = it
                                         },
+                                        trash = trash,
                                     )
                                 }
                                 screen == Screen.SETTINGS -> {

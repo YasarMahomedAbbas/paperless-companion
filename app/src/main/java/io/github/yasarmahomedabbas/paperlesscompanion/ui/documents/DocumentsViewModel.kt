@@ -2,7 +2,9 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui.documents
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
@@ -48,6 +50,9 @@ class DocumentsViewModel(
 
     /** The documents behind [DocumentsUiState.rows], in the same order. */
     private var loaded: List<Document> = emptyList()
+
+    /** Rows taken out by a trash, by id, with the index each had, until Undo puts them back. */
+    private val removed = mutableMapOf<Int, IndexedValue<Document>>()
 
     init {
         refresh()
@@ -159,10 +164,57 @@ class DocumentsViewModel(
         showLoaded()
     }
 
-    /** Re-draws the rows from [loaded], keeping everything else. */
-    private fun showLoaded() {
+    /** A bulk change went through for [ids]: the loaded ones show it, as the server now has them. */
+    fun apply(ids: Collection<Int>, edit: BulkEdit) {
+        val wanted = ids.toSet()
+        if (loaded.none { it.id in wanted }) return
+        loaded = loaded.map { if (it.id in wanted) it.with(edit) else it }
+        showLoaded()
+    }
+
+    /** The loaded documents among [ids], in list order (the bulk Tags sheet marks their tags). */
+    fun documents(ids: Collection<Int>): List<Document> {
+        val wanted = ids.toSet()
+        return loaded.filter { it.id in wanted }
+    }
+
+    /**
+     * [ids] went to the trash: their rows go, and each is remembered with where it stood so
+     * [putBack] can return it there.
+     */
+    fun remove(ids: Collection<Int>) {
+        val wanted = ids.toSet()
+        val gone = loaded.withIndex().filter { it.value.id in wanted }
+        if (gone.isEmpty()) return
+        gone.forEach { removed[it.value.id] = it }
+        loaded = loaded.filter { it.id !in wanted }
+        showLoaded(totalChange = -gone.size)
+    }
+
+    /** Undo brought [ids] back from the trash: each remembered one returns to its old place. */
+    fun putBack(ids: Collection<Int>) {
+        val back = ids.mapNotNull { removed.remove(it) }.filter { r -> loaded.none { it.id == r.value.id } }.sortedBy { it.index }
+        if (back.isEmpty()) return
+        val list = loaded.toMutableList()
+        back.forEach { list.add(it.index.coerceAtMost(list.size), it.value) }
+        loaded = list
+        showLoaded(totalChange = back.size)
+    }
+
+    /** Re-draws the rows from [loaded], keeping everything else; [totalChange] moves the count. */
+    private fun showLoaded(totalChange: Int = 0) {
         val labels = _state.value.labels ?: return
-        _state.update { it.copy(rows = loaded.map { d -> d.toRow(labels) }) }
+        _state.update {
+            it.copy(
+                rows = loaded.map { d -> d.toRow(labels) },
+                total = it.total?.let { t -> (t + totalChange).coerceAtLeast(0) },
+                status = when {
+                    it.status != ListStatus.Loaded && it.status != ListStatus.Empty -> it.status
+                    loaded.isEmpty() -> ListStatus.Empty
+                    else -> ListStatus.Loaded
+                },
+            )
+        }
     }
 
     /** Page 1 again after the text, filters or sort changed; the labels too if they never loaded. */
@@ -178,7 +230,11 @@ class DocumentsViewModel(
                 it.copy(status = ListStatus.Loading, rows = emptyList(), total = null, refreshing = false, loadingMore = false, loadMoreFailed = null)
             }
         }
-        if (!keepRows) loaded = emptyList()
+        if (!keepRows) {
+            loaded = emptyList()
+            // Another search, filter or sort: a trashed row may not belong in the new list.
+            removed.clear()
+        }
         val query = query(page = 1)
         loadedText = query.text
         val known = _state.value.labels

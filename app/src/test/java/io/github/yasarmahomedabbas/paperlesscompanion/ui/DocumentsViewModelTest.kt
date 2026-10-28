@@ -5,6 +5,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.FakeLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
 import io.github.yasarmahomedabbas.paperlesscompanion.doc
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
@@ -651,5 +652,89 @@ class DocumentsViewModelTest {
 
         assertEquals("Rates — August", vm.s.rows.single().title)
         assertEquals(hit, vm.s.rows.single().snippet)
+    }
+
+    @Test
+    fun `a bulk change patches every loaded document it names`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val labels = vm.s.labels!!
+
+        vm.apply(listOf(2, 4, 99), BulkEdit.SetCorrespondent(2))
+
+        assertEquals(doc(2, "Bill").copy(correspondentId = 2).toRow(labels), vm.s.rows[1])
+        assertEquals(doc(4, "Bill").copy(correspondentId = 2).toRow(labels), vm.s.rows[3])
+        assertEquals(doc(3, "Bill").toRow(labels), vm.s.rows[2])
+        assertEquals(listOf(2, 4), vm.documents(listOf(4, 2, 99)).map { it.id })
+        assertEquals(2, vm.documents(listOf(2)).single().correspondentId)
+    }
+
+    @Test
+    fun `trashed rows go and come back where they were`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val before = vm.s.rows
+
+        vm.remove(listOf(1, 5, 99))
+
+        assertEquals(23, vm.s.rows.size)
+        assertEquals(58, vm.s.total)
+        assertFalse(vm.s.rows.any { it.id == 1 || it.id == 5 })
+
+        vm.putBack(listOf(5, 1))
+
+        assertEquals(before, vm.s.rows)
+        assertEquals(60, vm.s.total)
+    }
+
+    @Test
+    fun `trashing every row is empty, and Undo fills it again`() = runTest(main.dispatcher) {
+        answer = { DocumentPage(1, listOf(doc(1)), hasMore = false) }
+        val vm = loaded()
+
+        vm.remove(listOf(1))
+        assertEquals(ListStatus.Empty, vm.s.status)
+        assertEquals(0, vm.s.total)
+
+        vm.putBack(listOf(1))
+        assertEquals(ListStatus.Loaded, vm.s.status)
+        assertEquals(listOf(1), vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a row put back after the list shrank goes at the end`() = runTest(main.dispatcher) {
+        answer = { DocumentPage(3, listOf(doc(1), doc(2), doc(3)), hasMore = false) }
+        val vm = loaded()
+
+        vm.remove(listOf(3))
+        vm.remove(listOf(1, 2))
+        vm.putBack(listOf(3))
+
+        assertEquals(listOf(3), vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `putting back what wasn't removed, or is already back, changes nothing`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.remove(listOf(1))
+        vm.putBack(listOf(1))
+        val before = vm.s
+
+        vm.putBack(listOf(1, 2))
+
+        assertEquals(before, vm.s)
+    }
+
+    @Test
+    fun `a new search forgets the trashed rows`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.remove(listOf(1))
+        // The server no longer lists it.
+        answer = { DocumentPage(59, (2..25).map { doc(it) }, hasMore = true) }
+        vm.setSort(SortOption.entries.last())
+        advanceUntilIdle()
+
+        vm.putBack(listOf(1))
+
+        assertEquals(24, vm.s.rows.size)
+        assertEquals(59, vm.s.total)
     }
 }
