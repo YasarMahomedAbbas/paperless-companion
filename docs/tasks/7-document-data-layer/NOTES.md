@@ -40,3 +40,11 @@ Branch: `feat/7-document-data-layer`
   - `ThumbnailFetcher.Factory` became `ThumbnailFetcherFactory` (the fetcher it returns is Coil's own network fetcher, so there is no `ThumbnailFetcher` class); the kover pattern still matches. Checklist 3.3 edited.
   - Coil 3.0.4 checked: `Options.copy(diskCacheKey = …)` compiles and `NetworkFetcher` reads `options.diskCacheKey`; its default cache strategy does not parse the response's `Cache-Control`, so the thumb endpoint's `no-cache` doesn't force a refetch. Confirm on a device with #9.
   - `restore` with an empty id list makes no call, like `bulkEdit`.
+
+## Review
+
+- Fixed: bulk delete on Paperless 2 never fell back (`data/PaperlessLibrary.kt` `bulkDelete`). 2.x has no `/api/documents/delete/`, and its DRF router matches the path as document-detail with pk `delete`, which has no POST, so an authed user gets **405**, not 404 (checked in the v2.20.15 `urls.py`: the explicit `^delete/` route exists only in v3.3.4). It now falls back on 405 or 404, through a new `PaperlessHttp.jsonUnless` that keeps the status code inside `data/`. New test: 405 → `bulk_edit` `delete`. Commit e52d1a1.
+- Raised: #21 (a 403 on a document call reads "Wrong username or password / sign in again"; needs a permission-refused kind before the edit screens), #22 (flaky `PaperlessApiTest` timeout-message assertion, seen once in `testReleaseUnitTest`).
+- API: checked against the server source at v3.3.4 and v2.20.15 (no live schema: `verify.env` absent, so self-verification must still read `/api/schema/`). `GET /api/documents/` (page, page_size, fields, ordering, query, tags__id__all, correspondent__id, document_type__id; v9 `all` ignored), `GET|PATCH|DELETE /api/documents/{id}/`, `/thumb/`, `/preview/`, `/download/[?original=true]`, the four label lists (paged via `next`, host pinned), `GET|POST /api/trash/`, `POST /api/documents/bulk_edit/` all match. `POST /api/documents/delete/` is v10-only; the 2.x answer was 405, not 404 (fixed above).
+- Layers: clean. No Paperless names, paths or status codes in `domain/`; `NOT_FOUND` is in the app's own words.
+- CI: full command green after the fix (275 tests, koverVerify, lint, assemble).
