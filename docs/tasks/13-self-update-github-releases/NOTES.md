@@ -31,3 +31,12 @@ Branch: `feat/13-self-update-github-releases`
 - API: no Paperless call touched. GitHub `GET /repos/…/releases/latest` re-checked live (now `v0.1.5`, asset `paperless-scan-0.1.5.apk`, `size`, `digest` `sha256:…`, `browser_download_url`): matches the parser and the MockWebServer fixtures' shape.
 - Layers: `MainActivity`'s two `data/` imports moved behind `AppContainer`; domain names only app terms (release, APK file, installer), no GitHub or Android types.
 - CI after fixes: `testDebugUnitTest koverVerify lintDebug assembleDebug` green, 129 tests / 0 failed / 0 skipped (incl. `ArchitectureTest`).
+
+## Doc drift
+
+- Applied: CLAUDE.md:Working on the app (Release) — replaced "Phones update from GitHub Releases or Obtainium" with the self-update contract: tag format, asset name `paperless-scan-<version>.apk` and the version-code formula in `release.yml` must change together with `GitHubReleases.kt`, or every installed copy silently stops finding updates (rung 2: every ticket ends in a release, and nothing fails in CI if the workflow renames the asset).
+- Skipped: README Install section and use-case table, architecture block — already updated by the branch; checked against `UpdateSchedule` (daily + per launch, network constraint), `MainActivity`/`AppContainer` (`!BuildConfig.DEBUG` gates), `GitHubReleases` (`releases/latest`, digest, asset name); all true.
+- Skipped: docs/design/README.md open decision for the Updates screen — matches `HomeScreen` (⋮ → Updates, Sign out; MoreVert) and `UpdatesScreen` (ArrowBack); nothing else to add.
+- Skipped: README CI/CD version-code line (`v1.2.3` → 10203) — still true, `versionCodeOf` uses the same formula.
+- Skipped: the release-builds-only rule, the signer check and the "Android always confirms" behaviour — code and README state them; no future session is likely to get them wrong without a doc.
+- Stale, fixed separately: none
