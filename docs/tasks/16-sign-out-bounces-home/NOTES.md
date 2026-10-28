@@ -35,3 +35,10 @@ Branch: `fix/16-sign-out-bounces-home`
 - Contradicted the plan:
   - `koverVerify` also runs `testReleaseUnitTest`, which the plan didn't account for. There the screen test failed twice over: Robolectric booted `PaperlessApp`, whose release `onCreate` schedules WorkManager (not initialized under Robolectric), and the release manifest has no `ComponentActivity` (`ui-test-manifest` is `debugImplementation`). Resolved by putting `LoginScreenTest` in `app/src/testDebug/` (compiled with `src/test/` for the debug unit tests only) and giving it `@Config(application = Application::class)` so the app's own wiring doesn't start. Checklist 1.5/2.1 updated to match.
   - `signing in again after sign-out signs in once more` as written passed on the old code by coincidence (re-delivery made the second call; the real second sign-in produced an equal `ServerConfig`, so the keyed effect didn't re-run). Added a one-config check before signing in again so it also fails without the fix; checklist 2.1 updated.
+
+## Review
+
+- Fixed: none. Checked: the effect calls `onSignedIn` then `onSignedInHandled()` with no suspension between them, so leaving composition can't cancel one without the other; `gate.onSignedIn` is synchronous; a sign-in that completes while the screen is hidden is still delivered when it returns (unchanged behaviour). Every "Done when" item and ticked task is in the diff; nothing from Out of scope. `LoginScreenTest` would fail without the fix (recorded in Implementation), and its second test checks one config before re-signing in so it can't pass by coincidence.
+- Raised: none
+- API: none touched (no Paperless call added or changed).
+- Layers: clean (changes only in `ui/login/` and test/build wiring; no `data/` or Paperless names).
