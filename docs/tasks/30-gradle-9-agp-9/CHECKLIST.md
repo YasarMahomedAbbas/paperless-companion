@@ -113,12 +113,13 @@ Read the "Upgrading to OkHttp 5" notes and fix only what fails to compile or beh
 
 Goal: every remaining version from #28 is in, and the suite (including the Robolectric screen tests) passes on them.
 
-### [ ] 3.1 — Bump
+### [x] 3.1 — Bump
 
 File: `gradle/libs.versions.toml`
 `composeBom = "2026.09.00"`, `appcompat = "1.8.0"`, `fragment = "1.9.1"`, `coroutines = "1.11.0"`, `serialization = "1.12.0"`, `robolectric = "4.17"`, `robolectricSdk = "15-robolectric-13954326-i7"` (update the comment to name Robolectric 4.17), `coil = "3.6.3"`, `mlkitScanner = "16.0.0"`. `activityCompose`, `lifecycle`, `biometric`, `work` aren't in #28 and stay (Gradle resolves the higher transitive versions Compose pulls in).
 
-### [ ] 3.2 — Fix what the new versions break
+### [x] 3.2 — Fix what the new versions break
+Done: the only break was Material 3 1.4 no longer bringing in `material-icons-core` transitively (`Icons.*` in `ViewerBar.kt` and `UpdatesScreen.kt` went unresolved). Declared it explicitly (`compose-material-icons-core`, version from the BOM: 1.7.8), so no screen changes. Nothing was held back.
 
 Files: whatever the compiler, lint and the tests name, most likely Compose screens under `ui/` (Material 3 1.4 / Compose 1.12 deprecations-turned-errors, `ExperimentalMaterial3Api` changes) and the Robolectric tests in `app/src/testDebug/`. If a screen changes how it looks, apply `design-recipe`; the intent is no visual change. If one dependency can't move without a large rewrite, put it back to its current version and write why in NOTES (the ticket allows this), then keep going with the rest.
 
