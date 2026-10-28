@@ -43,22 +43,22 @@ The build is `settings.gradle.kts` + root `build.gradle.kts` + `app/build.gradle
 
 Goal: the app builds and every check passes on the new toolchain, with the libraries still at their current versions (except what the toolchain itself forces).
 
-### [ ] 1.1 — Docker image for AGP 9.4 and compileSdk 37
+### [x] 1.1 — Docker image for AGP 9.4 and compileSdk 37
 
 File: `docker/Dockerfile`
 `CMDLINE_TOOLS=16111833`, `PLATFORM=android-37.0`, `BUILD_TOOLS=36.0.0` (comment: "the build-tools version AGP 9.4 expects by default"), `GRADLE_VERSION=9.8.2`. Confirm the platform package name with `sdkmanager --list` inside the image if `android-37.0` is refused; whatever name AGP's `compileSdk = 37` asks for is the one to install (the build error names it).
 
-### [ ] 1.2 — Gradle wrapper 9.8.2
+### [x] 1.2 — Gradle wrapper 9.8.2
 
 Files: `gradle/wrapper/gradle-wrapper.properties`, `gradle/wrapper/gradle-wrapper.jar`, `gradlew`, `gradlew.bat`
 Run `./build.sh ./gradlew wrapper --gradle-version 9.8.2 --distribution-type bin` (on the old wrapper), then once more on the new one so the jar and scripts are 9.8.2's own. Keep `validateDistributionUrl=true` and `networkTimeout`.
 
-### [ ] 1.3 — Versions in the catalog
+### [x] 1.3 — Versions in the catalog
 
 File: `gradle/libs.versions.toml`
 `agp = "9.4.1"`, `kotlin = "2.4.21"`, `kover = "0.9.11"`. Keep the `kotlin-android` plugin entry (see 1.4: it is how the KGP version is chosen, and how Dependabot keeps tracking it).
 
-### [ ] 1.4 — Built-in Kotlin
+### [x] 1.4 — Built-in Kotlin
 
 Files: `build.gradle.kts`, `app/build.gradle.kts`
 - Root: keep `alias(libs.plugins.kotlin.android) apply false`: it only puts KGP 2.4.21 on the build classpath, which is what AGP 9's built-in Kotlin compiles with (AGP 9 otherwise uses the KGP it depends on). Check with `./build.sh ./gradlew buildEnvironment` that `kotlin-gradle-plugin:2.4.21` is what resolves. If AGP rejects even the `apply false` declaration, use `buildscript { dependencies { classpath(...) } }` with a `kotlin-gradle-plugin` library entry instead, and say so in NOTES.
@@ -66,12 +66,13 @@ Files: `build.gradle.kts`, `app/build.gradle.kts`
 - Replace `kotlinOptions { jvmTarget = "17" }` with a top-level `kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }` (or `jvmToolchain`-free equivalent the AGP 9 docs show). `compileOptions` stays at Java 17.
 - `compileSdk = 37` (AGP 9 also offers `compileSdk { version = release(37) }`; either is fine). `targetSdk` and `minSdk` unchanged.
 
-### [ ] 1.5 — Whatever else AGP 9 / Gradle 9 removed
+### [x] 1.5 — Whatever else AGP 9 / Gradle 9 removed
 
 Files: `app/build.gradle.kts`, `gradle.properties`
+Done: the only change needed was `configurations.creating` → `configurations.create("robolectricSdk")` (Gradle 9.6 deprecation). `gradle.properties` and `jvmArgumentProviders` needed nothing; the remaining `Configuration.setVisible` deprecation comes from AGP's own code.
 Fix each error or removal the build reports, nothing more. Expected candidates: properties in `gradle.properties` that AGP 9 made defaults or errors (`android.useAndroidX`, `android.nonTransitiveRClass`) — drop only if the build warns or fails on them; Gradle 9 deprecations in the `robolectricSdk` configuration (`configurations.creating` → `configurations.register`/`dependencyScope` + resolvable if required) and the `Test` task's `jvmArgumentProviders`. Keep the Robolectric offline wiring and the Kover excludes exactly as they are in meaning. If AGP 9's new DSL breaks Kover 0.9.11 (no `koverVerify` / no variant reports), that is a stop: record it, don't rewrite coverage.
 
-### [ ] 1.6 — Release workflow's apksigner path
+### [x] 1.6 — Release workflow's apksigner path
 
 File: `.github/workflows/release.yml`
 `"$ANDROID_HOME"/build-tools/34.0.0/apksigner` → `36.0.0` (the version AGP 9.4.1 installs and builds with). Nothing else in `release.yml` changes: not the version formula, the asset name or the signing env vars.
