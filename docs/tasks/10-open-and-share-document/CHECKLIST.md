@@ -203,31 +203,32 @@ File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/Viewe
 
 Goal: the viewer screen and its parts exist in the house style, with a `@Preview` for every state in `layouts.md` § Viewer. Use the `design-recipe` skill; shape: **viewer**.
 
-### [ ] 3.1 — Shared parts
+### [x] 3.1 — Shared parts
 
 All under `ui/components/`. If #9 has already merged a part with the same recipe, reuse it instead.
-- `ViewerBar.kt`: `ViewerBar(title, onBack, onShare, moreMenu: @Composable () -> Unit)`. Back, a title at 18/500 ellipsised to one line, then Share and More icon buttons with content descriptions "Back", "Share" and "More options". The More menu follows the recipe: `surface`, `r-card`, 244 wide.
+- `ViewerBar.kt`: `ViewerBar(title, onBack, onShare, menuOpen, onMenuOpenChange, shareEnabled, menu: @Composable ColumnScope.() -> Unit)`, plus `MenuItem(text, icon, onClick, enabled)`. Back, a title at 18/500 ellipsised to one line, then Share and More icon buttons with content descriptions "Back", "Share" and "More options". The More menu follows the recipe: `surface`, `r-card`, 244 wide.
 - `TagPill.kt`: `TagPill(name, inDetails: Boolean)`, display only, per § Tags. Paperless tag colours are ignored.
 - `DetailsPanel.kt`:
   - `enum class PanelStop { FULL_SCREEN, QUICK, ALL }`.
   - `DetailsPanel(state: AnchoredDraggableState<PanelStop>, quick: @Composable () -> Unit, all: @Composable () -> Unit)`. Anchors: FULL_SCREEN = only the 120 × 48 "Show details" handle tab showing, QUICK = 268 high, ALL = 180 below the top. Top corners are `r-sheet`; a swipe moves one stop.
   - `DetailRow(label, value)` for the definition list.
 - `StatusCard.kt`: `StatusCard(icon, tone, statement, hint, actionLabel, onAction)` per § Status card.
-- `ProgressBar.kt`: `DeterminateProgress(done: Long, total: Long)`, a fully round bar with "x.x of y.y MB" under it at 14 `mfg`. It falls back to the 24dp spinner when the total is unknown.
+- `Progress.kt`: `DeterminateProgress(done: Long, total: Long?)`, a fully round bar with "x.x of y.y MB" under it at 14 `mfg`. It falls back to the 24dp spinner when the total is unknown.
+- Also needed and added: `Skeleton.kt` (`SkeletonBlock`), `Snackbar.kt` (`AppSnackbarHost`), the `Download` / `OpenExternal` icons, and the `viewerTitle` / `statement` type slots.
 - Add each to `docs/design/README.md` decisions only where the recipe left a gap.
 
-### [ ] 3.2 — PDF pages
+### [x] 3.2 — PDF pages
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/viewer/PdfPages.kt` (new)
 - `@Composable fun PdfPages(file: java.io.File, fullScreen: Boolean, onTap: () -> Unit, modifier: Modifier)`.
-- Opens `ParcelFileDescriptor` + `PdfRenderer` in a `DisposableEffect`, closed on dispose. All rendering goes through one `Mutex`, because `PdfRenderer` allows one page open at a time. Pages render on `Dispatchers.IO` into `ARGB_8888` bitmaps at the column width × 2, filled white first.
+- Opens `ParcelFileDescriptor` + `PdfRenderer` in a `DisposableEffect`, closed on dispose. All rendering goes through one `Mutex`, because `PdfRenderer` allows one page open at a time. Pages render on `Dispatchers.IO` into `ARGB_8888` bitmaps at the column width × 2 (capped at 2048 px wide, so a page stays a few MB), filled white first.
 - Pages sit in a `LazyColumn` as white paper on `bg` with a small shadow, 12 apart. The gutter is 16 when full screen.
 - Pinch zoom 1–4× with pan via `Modifier.transformable` on the column, and a double tap toggles 1× / 2.5×.
 - The pill reads "Page n of N", from `firstVisibleItemIndex`.
 - A renderer that throws (a corrupt PDF) gives the "Can't show this file" status card with Download.
-- Kover excludes `"*.ui.viewer.PdfPages*"`, since it needs a device.
+- Kover excludes `"*.ui.viewer.PdfPages*"` and `"*.ui.viewer.PdfDocument*"`, since they need a device.
 
-### [ ] 3.3 — `ViewerScreen`
+### [x] 3.3 — `ViewerScreen`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/viewer/ViewerScreen.kt` (new)
 - `ViewerScreen(viewModel, onBack, onShare: (ViewerEvent.Share) -> Unit, onPickSaveLocation: (ViewerEvent.PickSaveLocation) -> Unit, onOpenUrl: (String) -> Unit)`. Events are collected in a `LaunchedEffect`. It delegates to a stateless `ViewerContent(state, …)` for previews.
