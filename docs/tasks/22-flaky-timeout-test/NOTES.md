@@ -29,3 +29,13 @@ Branch: `fix/22-flaky-timeout-test`
 - No drift found. The branch only changes `PaperlessApiTest.kt`; `rg` over CLAUDE.md, README.md and docs/ (excluding docs/tasks/) finds no claim about timeouts, their wording or this test.
 - Skipped: "assert a network error's kind and cause, not the JDK's message wording": rung 1, the reworked tests show the pattern and a session copying a neighbouring test picks it up; not worth a CLAUDE.md line.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: passed
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` BUILD SUCCESSFUL; 184 debug and 184 release unit tests passed / 0 failed / 0 skipped, line coverage 90.3% (bound 80%), lint clean, debug APK built.
+- Server: not applicable. The branch changes only `PaperlessApiTest.kt`; no Paperless call is added or changed (`verify.env` is also absent).
+- Verified: the reworked no-answer timeout test and the interceptor-driven wording test pass in both debug and release unit-test runs (the release run under `koverVerify` is where the flake showed).
+- Failed: none
+- Not self-verifiable: none
