@@ -14,7 +14,7 @@ Launched in its own detached session, by hand, by a timer, or by a pipeline that
 ```bash
 tmux has-session -t paperless-autopilot 2>/dev/null || \
   tmux new-session -d -s paperless-autopilot -c ~/projects/personal/paperless-companion \
-  "claude '/autopilot'"
+  "claude --permission-mode auto '/autopilot'"
 ```
 
 **Silence is the contract.** No text until something is launched. Tool calls only.

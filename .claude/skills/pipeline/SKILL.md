@@ -55,7 +55,7 @@ if [ ! -d "$WT" ]; then
   git -C "$ROOT" worktree add --detach "$WT" origin/main
 fi
 tmux has-session -t "paperless-<n>" 2>/dev/null \
-  || tmux new-session -d -s "paperless-<n>" -c "$WT" "claude '/pipeline #<n>'"
+  || tmux new-session -d -s "paperless-<n>" -c "$WT" "claude --permission-mode auto '/pipeline #<n>'"
 ```
 
 Detached at `origin/main`, because `main` is checked out in the main tree. Nothing to seed:
@@ -214,7 +214,7 @@ After `merge-release`'s STAGE COMPLETE (merged and released, or released not nee
 
    ```bash
    tmux has-session -t paperless-autopilot 2>/dev/null || \
-     tmux new-session -d -s paperless-autopilot -c "$MAIN" "claude '/autopilot'"
+     tmux new-session -d -s paperless-autopilot -c "$MAIN" "claude --permission-mode auto '/autopilot'"
    ```
 
 3. Last action, one command (it deletes this session's working directory and ends it):
