@@ -190,9 +190,9 @@ File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/Updat
 
 ## Checkpoint 5 — README · commit: `docs: say the app updates itself from GitHub Releases`
 
-### [ ] 5.1 — Install section
+### [x] 5.1 — Install section
 
-File: `README.md`: replace the Obtainium line: install the first APK by hand; after that the app checks GitHub Releases daily and on opening, posts "Update ready", and installs from *⋮ → Updates* with Android's confirmation (and "Install unknown apps" once). Mention it's release builds only, the size/sha256/signer checks, and that a copy installed earlier needs this one manual update to start. Add `CheckForUpdateUseCase` to the use-case table.
+File: `README.md`: replace the Obtainium line: install the first APK by hand; after that the app checks GitHub Releases daily and on opening, posts "Update ready", and installs from *⋮ → Updates* with Android's confirmation (and "Install unknown apps" once). Mention it's release builds only, the size/sha256/signer checks, and that a copy installed earlier needs this one manual update to start. Add `CheckForUpdateUseCase` to the use-case table and `data/update/` to the layer sketch.
 
 ### Verify
 
