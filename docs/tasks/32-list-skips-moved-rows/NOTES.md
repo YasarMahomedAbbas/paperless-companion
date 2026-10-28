@@ -35,3 +35,9 @@ Branch: `fix/32-list-skips-moved-rows`
 - Raised: none.
 - API: `GET /api/documents/` (no change but `page_size=100`). Matches the paperless-ngx source (`StandardPagination`, max 100000) as planning found. docs.paperless-ngx.com answered 403 at planning, and `verify.env` is absent, so the live schema wasn't read. That is left to self-verification.
 - Layers: clean (a `ui/` change only, in domain terms).
+
+## Doc drift
+
+- No drift found. The branch changes only `ui/documents/DocumentsViewModel.kt` and its test; README's feature list, architecture block and use-case table (`BrowseDocumentsUseCase`: one page of `GET /api/documents/`) and `docs/design/layouts.md` (infinite scroll, pull to refresh, loading-more footer) still match the code.
+- Skipped: the re-fetch of the shown window after a change that moves documents (`refetchWindow`, `page_size=100`). It's ViewModel-internal, explained in its KDoc and pinned by `DocumentsViewModelTest`; it reuses the existing refreshing indicator and load-more footer, so no screen state or rule changes for a future session to get wrong.
+- Stale, fixed separately: none
