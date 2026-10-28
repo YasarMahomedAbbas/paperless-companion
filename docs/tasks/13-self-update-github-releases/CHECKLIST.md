@@ -52,16 +52,16 @@ asked once on the first launch of a release build that has this feature. Downloa
 Goal: the app can ask GitHub for the latest release, tell whether it's newer than the installed version,
 remember it and announce it once; all unit-tested.
 
-### [ ] 1.1 — Domain models
+### [x] 1.1 — Domain models
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Updates.kt`
 - `data class ApkFile(val name: String, val size: Long, val sha256: String /* lower-case hex */, val location: String /* opaque download address */)`
 - `data class AppRelease(val version: String, val versionCode: Long, val notes: String, val apk: ApkFile)` with `fun isNewerThan(installed: Long) = versionCode > installed`
 - `class UpdateException(val kind: Kind, message: String, cause: Throwable? = null) : Exception(message, cause)` with
-  `enum class Kind { OFFLINE, SERVER, CHECKSUM, NOT_OURS, NEEDS_PERMISSION, REFUSED, STORAGE }`; `SERVER` carries `val status: Int? = null` (for retry on ≥500 / no status).
+  `enum class Kind { OFFLINE, SERVER, CHECKSUM, NOT_OURS, NEEDS_PERMISSION, REFUSED, STORAGE }`; `UpdateException` carries `val status: Int? = null`, set on `SERVER` (for retry on ≥500 / no status).
 - `sealed interface InstallEvent { data object Installed; data class Failed(val detail: String) }` (Android's confirmation itself never reaches the domain; see 3.3).
 
-### [ ] 1.2 — Ports
+### [x] 1.2 — Ports
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/repository/Repositories.kt` (append)
 - `interface ReleaseSource { suspend fun latest(): AppRelease? }` — null when there's no usable release; throws `UpdateException(OFFLINE | SERVER)`.
@@ -69,20 +69,20 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/r
 - `interface ApkDownloader { suspend fun download(apk: ApkFile, onProgress: (done: Long, total: Long) -> Unit): File; fun clear() }` — throws `UpdateException(OFFLINE | SERVER | CHECKSUM | STORAGE)`.
 - `interface AppInstaller { fun installedVersionCode(): Long; fun canInstall(): Boolean; suspend fun install(apk: File); val events: StateFlow<InstallEvent?>; fun clearEvents() }` — `install` throws `NEEDS_PERMISSION` (file kept), `NOT_OURS`, `STORAGE`, `REFUSED` (file deleted otherwise).
 
-### [ ] 1.3 — `CheckForUpdateUseCase`
+### [x] 1.3 — `CheckForUpdateUseCase`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/CheckForUpdateUseCase.kt`
 `class CheckForUpdateUseCase(releases: ReleaseSource, store: UpdateStore, installed: () -> Long, announce: (AppRelease) -> Unit)`,
 `enum class Outcome { Done, TryAgain }`, `suspend fun run(): Outcome`: newer release → `saveOffer`, and `announce` + `markNotified` only when its version code > `notifiedVersionCode()`; not newer or null → `saveOffer(null)`; `OFFLINE` or `SERVER` with status null/≥500 → `TryAgain`, offer untouched; other `SERVER` (403 rate limit, 404 handled as null already) → `Done`. Mirrors the assistant's `UpdateCheck`.
 
-### [ ] 1.4 — `GitHubReleases` and `versionCodeOf`
+### [x] 1.4 — `GitHubReleases` and `versionCodeOf`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/GitHubReleases.kt`
 `class GitHubReleases(client: OkHttpClient = OkHttpClient(), io: CoroutineDispatcher = Dispatchers.IO, url: String = LATEST) : ReleaseSource`,
 `LATEST = "https://api.github.com/repos/YasarMahomedAbbas/paperless-companion/releases/latest"`. Headers `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`. 404 → null; other non-2xx → `SERVER(status)`; `IOException` → `OFFLINE`; malformed JSON → null (nothing usable, not worth retrying). Parse with `kotlinx.serialization.json` elements as `PaperlessApi` does. `tag_name` → `versionCodeOf`; asset name must equal `"paperless-scan-$version.apk"` where version is the tag without `v`; `digest` must start `sha256:` with 64 hex chars (lower-cased); any missing → null.
 `internal fun versionCodeOf(tag: String): Long?` — optional `v`, exactly three non-negative integer parts, minor and patch < 100, else null.
 
-### [ ] 1.5 — Tests
+### [x] 1.5 — Tests
 
 Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/GitHubReleasesTest.kt` (MockWebServer, mirror `PaperlessApiTest`),
 `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/CheckForUpdateUseCaseTest.kt`,

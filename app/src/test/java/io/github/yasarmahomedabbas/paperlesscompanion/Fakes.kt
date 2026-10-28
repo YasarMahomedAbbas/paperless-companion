@@ -1,13 +1,19 @@
 package io.github.yasarmahomedabbas.paperlesscompanion
 
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -55,6 +61,32 @@ class FakePaperless(
         if (taskFailures.isNotEmpty()) throw taskFailures.removeAt(0)
         return if (tasks.size > 1) tasks.removeAt(0) else tasks.first()
     }
+}
+
+fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =
+    AppRelease(version, versionCode, notes, ApkFile("paperless-scan-$version.apk", 1234, "ab".repeat(32), "https://example.test/$version.apk"))
+
+/** A release source that answers [latest] (or throws [failure]) and counts the calls. */
+class FakeReleases(var latest: AppRelease? = null, var failure: Exception? = null) : ReleaseSource {
+    var calls = 0
+
+    override suspend fun latest(): AppRelease? {
+        calls++
+        failure?.let { throw it }
+        return latest
+    }
+}
+
+class FakeUpdateStore(offer: AppRelease? = null, var notified: Long = Long.MIN_VALUE) : UpdateStore {
+    private val _offer = MutableStateFlow(offer)
+    override val offer: StateFlow<AppRelease?> = _offer
+    var asked = false
+
+    override fun saveOffer(release: AppRelease?) { _offer.value = release }
+    override fun notifiedVersionCode() = notified
+    override fun markNotified(versionCode: Long) { notified = versionCode }
+    override fun askedForNotifications() = asked
+    override fun markAskedForNotifications() { asked = true }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
