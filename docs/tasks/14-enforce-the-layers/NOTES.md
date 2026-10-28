@@ -32,3 +32,10 @@ Branch: `refactor/14-enforce-the-layers`
   The import was reverted afterwards.
 - Outstanding: device-only checks (open a finished upload's document link; scan or share a file and see it upload) are left for self-verification. Real-server check not needed (no Paperless call changed) and `verify.env` is absent.
 - Contradicted the plan: none. Small additions: the `UploadDocumentUseCase` KDoc also says "the server" instead of "Paperless" (comment only).
+
+## Review
+
+- Fixed: none
+- Raised: none
+- API: no Paperless call touched. `documentUrl` is the web-UI page `<server>/documents/<id>/details` (not an API endpoint), moved into `PaperlessApi` byte-for-byte; `PaperlessApiTest` pins the string. `verify.env` absent, live schema not checked (nothing to check).
+- Layers: clean. No `data.*` import or fully-qualified use outside `data/` and `AppContainer`; no endpoint path, field name or status string in `ui/` or `domain/`. The domain's remaining "Paperless" text is user-visible copy in `userMessage()`/`notConfirmed`, kept by decision Q2. One small behaviour note: the link now comes from `settings.load()` at tap time instead of the server URL cached in `HomeUiState`, so a signed-out tap opens nothing instead of a relative `/documents/<id>/details` URL. That is safer, not a regression.
