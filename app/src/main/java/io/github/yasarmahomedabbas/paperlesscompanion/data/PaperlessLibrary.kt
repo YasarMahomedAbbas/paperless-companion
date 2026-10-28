@@ -10,6 +10,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -50,7 +52,10 @@ class PaperlessLibrary(
             // A list needs no document text, which can be megabytes per document.
             put("fields", LIST_FIELDS)
             val text = query.text?.trim()?.takeIf { it.isNotEmpty() }
-            if (text != null) {
+            if (query.similarTo != null) {
+                // "More like this" answers in relevance order and can't be combined with a text search.
+                put("more_like_id", query.similarTo.toString())
+            } else if (text != null) {
                 // Full-text search answers in relevance order; an ordering would override it.
                 put("query", text)
             } else {
@@ -175,6 +180,27 @@ class PaperlessLibrary(
         })
     }
 
+    /**
+     * Paperless answers a failure inside its notes view with HTTP 200 and `{"error": "…"}`, so only a list
+     * counts as an answer. A user without the note permissions gets 403 (FORBIDDEN).
+     */
+    override suspend fun notes(config: ServerConfig, documentId: Int): List<Note> =
+        notesFrom(http.json(config, "GET", "api/documents/$documentId/notes/"), "Paperless couldn't load the notes")
+
+    override suspend fun addNote(config: ServerConfig, documentId: Int, text: String): List<Note> =
+        notesFrom(
+            http.json(config, "POST", "api/documents/$documentId/notes/", body = buildJsonObject { put("note", text) }),
+            "Paperless couldn't save the note",
+        )
+
+    /** The web interface's "enable notes" setting; on unless it says false. */
+    override suspend fun notesEnabled(config: ServerConfig): Boolean =
+        (uiSettings(config)["notes_enabled"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.booleanOrNull ?: true
+
+    /** The signed-in user's web interface settings (`settings` of `api/ui_settings/`), or empty. */
+    private suspend fun uiSettings(config: ServerConfig): JsonObject =
+        (http.json(config, "GET", "api/ui_settings/") as? JsonObject)?.get("settings") as? JsonObject ?: JsonObject(emptyMap())
+
     private suspend fun labels(config: ServerConfig, path: String) =
         http.pages(config, path, mapOf("page_size" to "100", "ordering" to "name"))
 
@@ -207,6 +233,12 @@ class PaperlessLibrary(
                 DocumentSort.DOCUMENT_TYPE -> "document_type__name"
                 DocumentSort.ARCHIVE_SERIAL_NUMBER -> "archive_serial_number"
             }
+
+        fun notesFrom(json: JsonElement, failed: String): List<Note> = when {
+            json is JsonArray -> json.filterIsInstance<JsonObject>().map { it.toNote() }
+            json is JsonObject && "error" in json -> throw ServerException(Kind.SERVER, failed)
+            else -> throw ServerException(Kind.SERVER, "Paperless sent no notes")
+        }
 
         fun obj(json: JsonElement) = json as? JsonObject ?: throw ServerException(Kind.SERVER, "Paperless sent no document")
 

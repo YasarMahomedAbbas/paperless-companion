@@ -101,21 +101,21 @@ Paths below are under `app/src/main/java/io/github/yasarmahomedabbas/paperlessco
 
 Goal: the domain can load and add a document's notes, knows whether notes are on, and can list documents similar to one. Each call is tested against MockWebServer, with no UI yet.
 
-### [ ] 1.1 — Domain models
+### [x] 1.1 — Domain models
 
 File: `domain/model/Documents.kt`
 - `data class Note(val id: Int, val text: String, val created: Instant?, val author: String?)`, KDoc "A note someone left on a document; [author] is null when the server doesn't say who".
 - `Document` gains `val noteCount: Int? = null`, KDoc "How many notes it has; only known when one document is loaded".
 - `DocumentQuery` gains `val similarTo: Int? = null`, KDoc "Documents like this one, most alike first; [text] and [sort] are ignored". Update the class KDoc to match.
 
-### [ ] 1.2 — Library interface
+### [x] 1.2 — Library interface
 
 File: `domain/repository/Repositories.kt` (`DocumentLibrary`)
 - `suspend fun notes(config: ServerConfig, documentId: Int): List<Note>`, KDoc "Newest first".
 - `suspend fun addNote(config: ServerConfig, documentId: Int, text: String): List<Note>`, KDoc "Adds a note and returns all of the document's notes, newest first".
 - `suspend fun notesEnabled(config: ServerConfig): Boolean`, KDoc "False when the server's owner switched notes off".
 
-### [ ] 1.3 — Paperless implementation
+### [x] 1.3 — Paperless implementation
 
 Files: `data/PaperlessLibrary.kt`, `data/PaperlessJson.kt`
 - `notes`: `http.json(config, "GET", "api/documents/$id/notes/")`. A `JsonArray` maps through `JsonObject.toNote()`. A `JsonObject` with `error` throws `ServerException(Kind.SERVER, "Paperless couldn't load the notes")`, and anything else throws SERVER "Paperless sent no notes".
@@ -127,7 +127,7 @@ Files: `data/PaperlessLibrary.kt`, `data/PaperlessJson.kt`
   - `toDocument()` sets `noteCount = (this["notes"] as? JsonArray)?.size`. `LIST_FIELDS` stays without notes.
 - KDoc on `notes`: it says Paperless answers 200 + `{"error"}` on failure.
 
-### [ ] 1.4 — Use cases
+### [x] 1.4 — Use cases
 
 File: `domain/usecase/NotesUseCase.kt` (new)
 `class NotesUseCase(library, settings)` with:
@@ -136,7 +136,7 @@ File: `domain/usecase/NotesUseCase.kt` (new)
 - `suspend fun enabled(): Boolean`.
 More like this needs no new use case: it's `BrowseDocumentsUseCase` with `similarTo`.
 
-### [ ] 1.5 — Fakes and tests
+### [x] 1.5 — Fakes and tests
 
 Files: `Fakes.kt`, `data/PaperlessLibraryTest.kt`, `data/PaperlessJsonTest.kt`, `domain/DocumentUseCasesTest.kt`
 - `FakeLibrary` gains:

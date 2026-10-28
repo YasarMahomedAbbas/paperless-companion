@@ -22,12 +22,17 @@ data class Document(
     val content: String? = null,
     /** Set when the document came from a text search. */
     val searchHit: SearchHit? = null,
+    /** How many notes it has; only known when one document is loaded. */
+    val noteCount: Int? = null,
 ) {
     val thumbnail get() = DocumentThumbnail(id, modified)
 }
 
 /** Why a document matched a search: [excerpt] is plain text, [matches] the highlighted ranges in it. */
 data class SearchHit(val score: Double?, val excerpt: String, val matches: List<IntRange>)
+
+/** A note someone left on a document; [author] is null when the server doesn't say who. */
+data class Note(val id: Int, val text: String, val created: Instant?, val author: String?)
 
 /** One page of documents out of [total]; [hasMore] when a later page exists. */
 data class DocumentPage(val total: Int, val documents: List<Document>, val hasMore: Boolean)
@@ -36,7 +41,8 @@ enum class DocumentSort { CREATED, ADDED, MODIFIED, TITLE, CORRESPONDENT, DOCUME
 
 /**
  * Which documents to list. A blank [text] counts as none. With [text], results come in relevance order
- * and [sort] is ignored. A document must carry every one of [tagIds].
+ * and [sort] is ignored. With [similarTo], the documents most like that one come first, and [text] and
+ * [sort] are ignored. A document must carry every one of [tagIds].
  */
 data class DocumentQuery(
     val text: String? = null,
@@ -47,6 +53,8 @@ data class DocumentQuery(
     val descending: Boolean = true,
     val page: Int = 1,
     val pageSize: Int = 25,
+    /** Documents like this one, most alike first; [text] and [sort] are ignored. */
+    val similarTo: Int? = null,
 ) {
     init {
         require(page >= 1) { "page starts at 1" }

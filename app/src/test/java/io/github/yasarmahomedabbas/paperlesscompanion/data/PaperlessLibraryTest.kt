@@ -8,6 +8,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileK
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
@@ -226,7 +227,7 @@ class PaperlessLibraryTest {
 
         val document = library.document(config, 7)
 
-        assertEquals(expectedListDoc.copy(content = "Dear customer"), document)
+        assertEquals(expectedListDoc.copy(content = "Dear customer", noteCount = 0), document)
         val request = server.takeRequest()
         assertEquals("/api/documents/7/", request.path)
         assertEquals("GET", request.method)
@@ -590,5 +591,121 @@ class PaperlessLibraryTest {
         val e = expectError(Kind.SERVER) { library.bulkEdit(config, listOf(7), BulkEdit.ModifyTags(setOf(99), emptySet())) }
 
         assertTrue(e.message!!.contains("Tag 99 does not exist"))
+    }
+
+    // --- notes ---
+
+    private val notesJson = """[""" +
+        """{"id":3,"note":"Paid in full","created":"2026-10-03T09:14:00Z","user":{"id":1,"username":"ann","first_name":"Ann","last_name":"Lee"}},""" +
+        """{"id":2,"note":"Asked for a copy","created":"2026-10-02T08:00:00+02:00","user":{"id":2,"username":"bob","first_name":"","last_name":""}},""" +
+        """{"id":1,"note":"Old","created":"2026-10-01T09:00:00Z","user":null}""" +
+        """]"""
+
+    private val expectedNotes = listOf(
+        Note(3, "Paid in full", Instant.parse("2026-10-03T09:14:00Z"), "Ann Lee"),
+        Note(2, "Asked for a copy", Instant.parse("2026-10-02T06:00:00Z"), "bob"),
+        Note(1, "Old", Instant.parse("2026-10-01T09:00:00Z"), null),
+    )
+
+    @Test
+    fun `notes reads the list with each author`() = runTest {
+        respond(body = notesJson)
+
+        assertEquals(expectedNotes, library.notes(config, 7))
+
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/api/documents/7/notes/", request.path)
+        assertEquals("Token tok", request.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `a note error answered with 200 is a server error`() = runTest {
+        respond(body = """{"error":"Error retrieving notes, check logs for more detail."}""")
+        val e = expectError(Kind.SERVER) { library.notes(config, 7) }
+        assertEquals("Paperless couldn't load the notes", e.message)
+    }
+
+    @Test
+    fun `notes that aren't a list are a server error`() = runTest {
+        respond(body = """{"detail":"odd"}""")
+        val e = expectError(Kind.SERVER) { library.notes(config, 7) }
+        assertEquals("Paperless sent no notes", e.message)
+    }
+
+    @Test
+    fun `notes without the permission are forbidden`() = runTest {
+        respond(403, noPermission)
+        expectError(Kind.FORBIDDEN) { library.notes(config, 7) }
+    }
+
+    @Test
+    fun `adding a note posts it as JSON and reads the answered list`() = runTest {
+        respond(body = notesJson)
+
+        assertEquals(expectedNotes, library.addNote(config, 7, "Paid in full"))
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/documents/7/notes/", request.path)
+        assertTrue(request.getHeader("Content-Type")!!.startsWith("application/json"))
+        assertEquals("""{"note":"Paid in full"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `a note save error answered with 200 is a server error`() = runTest {
+        respond(body = """{"error":"Error saving note, check logs for more detail."}""")
+        val e = expectError(Kind.SERVER) { library.addNote(config, 7, "x") }
+        assertEquals("Paperless couldn't save the note", e.message)
+    }
+
+    @Test
+    fun `notes are on unless the web interface switched them off`() = runTest {
+        respond(body = """{"user":{"id":1},"settings":{"dark_mode":{"enabled":false}},"permissions":[]}""")
+        assertTrue(library.notesEnabled(config))
+        assertEquals("/api/ui_settings/", server.takeRequest().path)
+
+        respond(body = """{"settings":{"notes_enabled":false}}""")
+        assertFalse(library.notesEnabled(config))
+
+        respond(body = """{"settings":{"notes_enabled":true}}""")
+        assertTrue(library.notesEnabled(config))
+
+        respond(body = """{"settings":{"notes_enabled":"maybe"}}""")
+        assertTrue(library.notesEnabled(config))
+
+        respond(body = """{}""")
+        assertTrue(library.notesEnabled(config))
+    }
+
+    @Test
+    fun `document counts its notes, and a list leaves the count unknown`() = runTest {
+        respond(body = listDoc.dropLast(1) + ""","notes":[{"id":1},{"id":2}]}""")
+        assertEquals(2, library.document(config, 7).noteCount)
+
+        respond(body = """{"count":1,"results":[$listDoc]}""")
+        assertNull(library.documents(config, DocumentQuery()).documents.single().noteCount)
+    }
+
+    // --- more like this ---
+
+    @Test
+    fun `more like this sends more_like_id with the filters, and no ordering or query`() = runTest {
+        respond(body = """{"count":1,"next":null,"results":[$listDoc]}""")
+
+        library.documents(config, DocumentQuery(similarTo = 9, text = "power", tagIds = setOf(1), sort = DocumentSort.TITLE))
+
+        val request = server.takeRequest()
+        assertEquals("9", request.query("more_like_id"))
+        assertNull(request.query("ordering"))
+        assertNull(request.query("query"))
+        assertEquals("1", request.query("tags__id__all"))
+        assertEquals("1", request.query("page"))
+    }
+
+    @Test
+    fun `more like this for a document out of reach is forbidden`() = runTest {
+        respond(403, """{"detail":"Invalid more_like_id"}""")
+        expectError(Kind.FORBIDDEN) { library.documents(config, DocumentQuery(similarTo = 99)) }
     }
 }

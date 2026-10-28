@@ -20,6 +20,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DeleteDocum
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.ExportDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.TrashUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UpdateDocumentUseCase
@@ -280,5 +281,52 @@ class DocumentUseCasesTest {
     @Test(expected = IllegalArgumentException::class)
     fun `a query asks for at most 100 documents`() {
         DocumentQuery(pageSize = 101)
+    }
+
+    // --- notes ---
+
+    @Test
+    fun `notes load, add trimmed text and say whether they're on`() = runTest {
+        val notes = NotesUseCase(library, signedIn)
+
+        assertEquals(library.notes, notes.load(4))
+        val after = notes.add(4, "  Paid  ")
+        assertEquals("Paid", after.first().text)
+        library.notesEnabled = false
+        assertEquals(false, notes.enabled())
+
+        assertEquals(listOf("notes 4", "addNote 4 Paid", "notesEnabled"), library.calls)
+        assertTrue(library.configs.all { it == CONFIG })
+    }
+
+    @Test
+    fun `a blank note is refused without a call`() = runTest {
+        try {
+            NotesUseCase(library, signedIn).add(4, "   ")
+            fail()
+        } catch (e: IllegalArgumentException) {
+            assertTrue(library.addedNotes.isEmpty())
+        }
+    }
+
+    @Test
+    fun `notes signed out are not signed in`() = runTest {
+        expectSignedOut { NotesUseCase(library, signedOut).load(4) }
+        expectSignedOut { NotesUseCase(library, signedOut).add(4, "x") }
+        expectSignedOut { NotesUseCase(library, signedOut).enabled() }
+    }
+
+    @Test
+    fun `notes pass a server error through`() = runTest {
+        expectPassedThrough { NotesUseCase(library, signedIn).load(4) }
+        expectPassedThrough { NotesUseCase(library, signedIn).add(4, "x") }
+        expectPassedThrough { NotesUseCase(library, signedIn).enabled() }
+    }
+
+    @Test
+    fun `browse passes a similar-to query through`() = runTest {
+        val query = DocumentQuery(similarTo = 7)
+        BrowseDocumentsUseCase(library, signedIn)(query)
+        assertEquals(listOf(query), library.queries)
     }
 }
