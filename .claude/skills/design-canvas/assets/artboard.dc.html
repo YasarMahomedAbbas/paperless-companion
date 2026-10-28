@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>__BOARD_TITLE__</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300..600&display=swap">
+<style>
+body{margin:0}
+:root{--bg:#1b2229;--surface:#222b33;--raised:#2a343d;--field:#2a343d;--fg:#e6ebe8;--mfg:#9aa6a1;--primary:#5cbf8b;--pfg:#0e1a13;--ptint:rgba(92,191,139,.14);--border:#36424c;--bmuted:#2c363f;--success:#5cbf8b;--warning:#e2b65c;--destructive:#e4695e;--r-ctl:14px;--r-card:20px;--r-sheet:28px}
+.root{position:relative;font-family:'Figtree',system-ui,sans-serif;background:var(--bg);color:var(--fg);box-sizing:border-box;overflow:hidden}
+.root *{box-sizing:border-box}
+button{font-family:inherit}
+.shim{background:linear-gradient(90deg,var(--surface) 0%,var(--raised) 40%,var(--surface) 80%);background-size:200% 100%;animation:shim 1.8s linear infinite;border-radius:10px}
+@keyframes shim{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.shim{animation:none}}
+</style>
+</helmet>
+<div class="root" style="width: 412px; height: __H__px">
+<div style="height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;color:var(--mfg)"><span>09:41</span><span>●●● ▮</span></div>
+__MAIN__
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 412, "height": __H__}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
