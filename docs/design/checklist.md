@@ -1,7 +1,7 @@
 # Checklist
 
 Run this against the code before a screen is done (`design-recipe` § 4). Every line is a yes;
-a no is fixed or recorded in `README.md` § Open decisions in the same commit.
+a no is fixed or recorded in `README.md` § Decisions in the same commit.
 
 ## Theme and tokens
 

@@ -81,17 +81,18 @@ passes 4.5:1 on `surface` (it was 4.4:1); `on-destructive`, `border-muted`, `scr
 These live in `.claude/skills/design-canvas/assets/artboard.dc.html` for the canvas and in
 `ui/theme/` for the app; change both together.
 
-## Open decisions
+## Decisions
 
-The user reviews these on the canvas (its orange sticky). Until they answer, the canvas draws
-the recommended option.
+Settled by the user on the #6 canvas review (2026-10-28); the canvas's green sticky lists them.
+A screen that can't follow the manual records why here.
 
 - **Offline list.** The list keeps no copy of the documents, so away from the home network or
-  VPN it shows the load-failed state. Drawn: no cache.
-- **Document view lands on the PDF** with details in a pull-up panel, rather than on the
-  details with the PDF below. Drawn: PDF first.
+  VPN it shows the load-failed state. No cache.
+- **Document view lands on the PDF** with quick actions in the details panel. The panel has
+  three stops: swipe down for full screen, up for quick actions, up again for all details
+  (`components.md` § Details panel).
 - **Uploads live in the list**, as cards at the top until they finish or are cleared, with no
-  separate Uploads screen. Drawn: cards in the list.
-- **Unlock again after 5 minutes** in the background (#8 owns the behaviour). Drawn: 5 minutes,
-  changeable in Settings.
-- **Token values** (slate, green, Figtree, corners) are approved with the canvas.
+  separate Uploads screen.
+- **Unlock again after 5 minutes** in the background (#8 owns the behaviour), changeable in
+  Settings.
+- **Token values** (slate, green, Figtree, corners) as in the table above.

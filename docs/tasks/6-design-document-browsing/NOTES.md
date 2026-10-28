@@ -5,7 +5,7 @@ Branch: `docs/6-design-document-browsing`
 ## Design
 
 - **Canvas:** https://claude.ai/artifact/YPcrFxT1joGdxmBHfiMdf6 (private until shared from its
-  Share menu; 45 boards, 412 × 915 each)
+  Share menu; 46 boards, 412 × 915 each)
 - **Manual:** `docs/design/README.md` (rules, tokens), `foundations.md`, `components.md`,
   `layouts.md`, `checklist.md`. The canvas template
   (`.claude/skills/design-canvas/assets/artboard.dc.html`) and `snippets.md` carry the same
@@ -18,7 +18,7 @@ Branch: `docs/6-design-document-browsing`
 1. Documents (home): view, loading more, empty, loading, load failed
 2. Add a document: choose (sheet), uploading, refused, scanner needs camera
 3. Search, filters and sort: searching, no results, filters sheet, filters applied, sort sheet
-4. Document view: view, details, more menu, loading, load failed, photo original
+4. Document view: view, full screen, details, more menu, loading, load failed, photo original
 5. Edit details: view, title error, save failed
 6. Tag and correspondent pickers: tags, tags no match, correspondent, picker load failed
 7. Delete with undo: confirm, undo, failed
@@ -28,19 +28,22 @@ Branch: `docs/6-design-document-browsing`
 11. Unlock (#8): asking (system prompt), cancelled
 12. Sign in: view, error
 
-### Open questions for the user
+### Review (2026-10-28)
 
-1. **Offline list.** The list keeps no copy of the documents, so away from the home network
-   or VPN it shows "Couldn't load". Should it cache the last list (titles and thumbnails) so
-   it opens offline? Drawn: no cache.
-2. **Document view lands on the PDF**, with details in a pull-up panel. Or would you rather
-   land on the details with the PDF below? Drawn: PDF first.
-3. **Uploads in the list.** Uploads in progress show as cards at the top of the document list
-   until they finish or are cleared; there's no separate Uploads screen. OK?
-4. **Unlock delay.** The app locks again after 5 minutes in the background, changeable in
-   Settings (#8 owns it). Right default?
-5. **Tokens.** Slate `#1b2229`, green `#5cbf8b`, Figtree, corners 14 / 20 / 28. Approve or
-   nudge.
+The user's answers to the open questions; the canvas sticky is now a green "Decided" note and
+`docs/design/README.md` § Decisions records them.
+
+1. **Offline list:** no cache, as drawn.
+2. **Document view:** keep landing on the PDF with quick actions, and add full screen. The
+   details panel now has three stops: swipe down for full screen (bar and panel gone, a handle
+   tab left), up for quick actions, up again for all details. New board "Document — full
+   screen"; the hint reads "Swipe up for all details, down for full screen".
+3. **Uploads in the list:** as drawn.
+4. **Unlock delay:** 5 minutes, as drawn.
+5. **Tokens:** as drawn.
+
+Also from the review: the Settings button's simplified gear read as a sun. The ten Documents
+boards that show it now draw a proper gear.
 
 ### Choices made on the user's behalf
 
@@ -77,8 +80,8 @@ Branch: `docs/6-design-document-browsing`
   Paperless refusing a document uses destructive.
 - **Spinners are `mfg`**; only determinate progress bars use green.
 - **Figtree is bundled** in the APK (GrapheneOS without Play can't fetch downloadable fonts).
-- **Icons:** Material Symbols Rounded, outlined. The canvas draws a simplified gear for
-  Settings; the app uses `Icons.Rounded.Settings`.
+- **Icons:** Material Symbols Rounded, outlined. Settings is `Icons.Rounded.Settings` (a
+  gear; the canvas's first, simplified gear looked like a sun and was replaced).
 - **Updates (#13):** copy distinguishes it needs the internet (GitHub), not the home network;
   a refused update says nothing changed and offers Download again plus the release page.
 - **Unlock (#8):** the system BiometricPrompt over a plain lock screen; after cancel, one

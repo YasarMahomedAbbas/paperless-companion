@@ -158,10 +158,18 @@ Trash (destructive). Replaces the action button.
 
 ## Details panel
 
-A pull-up panel over the viewer: `surface`, `r-sheet` top corners. Collapsed (268 high): title
-20/500, `Correspondent · date · type`, tags, then Edit and Download as two `Secondary`
-buttons. Expanded: a definition list (label 14 `mfg` left, value 15 `fg` right, rows divided
-by `border-muted`) with title, date, correspondent, document type, tags, storage path, added.
+A pull-up panel over the viewer: `surface`, `r-sheet` top corners. It has three stops; a
+swipe moves one stop, and the viewer opens on quick actions.
+
+- **Full screen**: the viewer bar, the status bar and the panel slide away; only a 120 × 48
+  tab with the handle stays at the bottom (a button, "Show details"). Tapping the page brings
+  the viewer bar back for a moment. Swipe up (or tap the tab) for quick actions.
+- **Quick actions** (268 high): title 20/500, `Correspondent · date · type`, tags, then Edit
+  and Download as two `Secondary` buttons, and the hint "Swipe up for all details, down for
+  full screen" (13 `mfg`).
+- **All details**: from 180 below the top, a definition list (label 14 `mfg` left, value 15
+  `fg` right, rows divided by `border-muted`) with title, date, correspondent, document type,
+  tags, storage path, added; Edit and Download pinned at the bottom.
 
 ## Notice banner
 

@@ -57,17 +57,21 @@ Document rows, infinite scroll, pull to refresh
 ```
 Viewer bar ................. (←) Title…                      (share) (⋮)
 Rendered PDF page(s), pinch to zoom, page pill "Page 1 of 2"
-Details panel (collapsed, 268) ... title / meta / tags / [Edit] [Download]
+Details panel (quick actions, 268) ... title / meta / tags / [Edit] [Download]
 ```
 
 - The PDF fills the space between the bar and the panel; pages are white paper on `bg` with
-  a small shadow. Swipe up on the panel for all details.
+  a small shadow.
+- The details panel has three stops: swipe down for **full screen** (bar and panel gone, the
+  pages edge to edge with a 16 gutter, a handle tab at the bottom), up for **quick actions**,
+  up again for **all details**. Back from full screen returns to quick actions, then to the
+  list.
 - The title, meta and tags come from the list, so the panel shows at once; only the PDF
   loads (determinate bar with MB).
 - A non-PDF original shows Paperless's PDF version with a notice banner and a "Get photo"
   button for the original.
-- States: view · details expanded · more menu · loading · load failed (panel still shows) ·
-  photo original.
+- States: view · full screen · details expanded · more menu · loading · load failed (panel
+  still shows) · photo original.
 
 ## Form — Edit details
 
