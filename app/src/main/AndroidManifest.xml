@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The app installs its own updates from GitHub Releases; Android asks to confirm each one. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- "Update ready". -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- To check whether Play services, which runs the document scanner, has camera access. -->
     <queries>
@@ -34,6 +38,11 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- Hears how an update's install went; only the system reaches it, through our PendingIntent. -->
+        <receiver
+            android:name=".data.update.InstallResultReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

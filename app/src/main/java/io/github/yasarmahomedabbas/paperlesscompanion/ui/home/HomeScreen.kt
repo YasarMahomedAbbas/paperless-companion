@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,10 +22,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -65,6 +72,7 @@ fun HomeScreen(
     shared: List<DocumentSource>,
     onSharedConsumed: () -> Unit,
     onSignedOut: () -> Unit,
+    onOpenUpdates: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -133,10 +141,29 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Paperless Scan") },
                 actions = {
-                    TextButton(onClick = {
-                        viewModel.signOut()
-                        onSignedOut()
-                    }) { Text("Sign out") }
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Updates") },
+                                onClick = {
+                                    menu = false
+                                    onOpenUpdates()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sign out") },
+                                onClick = {
+                                    menu = false
+                                    viewModel.signOut()
+                                    onSignedOut()
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },

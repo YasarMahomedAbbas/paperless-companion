@@ -1,17 +1,28 @@
 package io.github.yasarmahomedabbas.paperlesscompanion
 
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppInstaller
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import java.io.File
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
@@ -57,6 +68,73 @@ class FakeServer(
     }
 
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
+}
+
+fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =
+    AppRelease(version, versionCode, notes, ApkFile("paperless-scan-$version.apk", 1234, "ab".repeat(32), "https://example.test/$version.apk"))
+
+/** A release source that answers [latest] (or throws [failure]) and counts the calls. */
+class FakeReleases(var latest: AppRelease? = null, var failure: Exception? = null) : ReleaseSource {
+    var calls = 0
+
+    override suspend fun latest(): AppRelease? {
+        calls++
+        failure?.let { throw it }
+        return latest
+    }
+}
+
+class FakeUpdateStore(offer: AppRelease? = null, var notified: Long = Long.MIN_VALUE) : UpdateStore {
+    private val _offer = MutableStateFlow(offer)
+    override val offer: StateFlow<AppRelease?> = _offer
+    var asked = false
+
+    override fun saveOffer(release: AppRelease?) { _offer.value = release }
+    override fun notifiedVersionCode() = notified
+    override fun markNotified(versionCode: Long) { notified = versionCode }
+    override fun askedForNotifications() = asked
+    override fun markAskedForNotifications() { asked = true }
+}
+
+/**
+ * A download that reports [progress], then answers [file] or throws [failure]; with [gate] set it
+ * waits on it in between, so a test can look at (or stop) a download in flight.
+ */
+class FakeDownloader(
+    var file: File = File("paperless-scan-0.2.0.apk"),
+    var failure: Exception? = null,
+    var progress: List<Long> = emptyList(),
+) : ApkDownloader {
+    var gate: CompletableDeferred<Unit>? = null
+    val downloads = mutableListOf<ApkFile>()
+    var cleared = 0
+
+    override suspend fun download(apk: ApkFile, onProgress: (done: Long, total: Long) -> Unit): File {
+        downloads += apk
+        progress.forEach { onProgress(it, apk.size) }
+        gate?.await()
+        failure?.let { throw it }
+        return file
+    }
+
+    override fun clear() { cleared++ }
+}
+
+/** An installer whose [install] throws [failure] or records the file; [events] is driven by the test. */
+class FakeInstaller(var versionCode: Long = 104, var allowed: Boolean = true) : AppInstaller {
+    var failure: Exception? = null
+    val installs = mutableListOf<File>()
+    override val events = MutableStateFlow<InstallEvent?>(null)
+
+    override fun installedVersionCode() = versionCode
+    override fun canInstall() = allowed
+
+    override suspend fun install(apk: File) {
+        failure?.let { throw it }
+        installs += apk
+    }
+
+    override fun clearEvents() { events.value = null }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
