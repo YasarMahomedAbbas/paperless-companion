@@ -6,10 +6,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +47,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -53,6 +56,10 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentThumbnail
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Labels
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SearchHit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
@@ -62,6 +69,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppChip
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppIconButton
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppIcons
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ButtonVariant
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ChipVariant
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ChipRow
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentRowCard
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentRowSkeleton
@@ -111,7 +119,7 @@ fun DocumentsScreen(
     val context = LocalContext.current
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
-    var adding by rememberSaveable { mutableStateOf(false) }
+    var sheet by rememberSaveable { mutableStateOf<DocumentsSheet?>(null) }
 
     LaunchedEffect(pending) {
         if (pending.isNotEmpty()) {
@@ -181,7 +189,14 @@ fun DocumentsScreen(
             onTextChange = documents::onTextChange,
             onSearch = documents::search,
             onClearFilters = documents::clearFilters,
-            onAdd = { adding = true },
+            onStartSearch = documents::startSearch,
+            onStopSearch = documents::stopSearch,
+            onOpenFilters = { sheet = DocumentsSheet.FILTERS },
+            onOpenSort = { sheet = DocumentsSheet.SORT },
+            onRemoveTag = documents::removeTag,
+            onRemoveCorrespondent = documents::removeCorrespondent,
+            onRemoveDocumentType = documents::removeDocumentType,
+            onAdd = { sheet = DocumentsSheet.ADD },
             onOpenSettings = onOpenSettings,
             onClearFinished = uploads::clearFinished,
             onRetryUpload = uploads::retry,
@@ -196,24 +211,51 @@ fun DocumentsScreen(
         ),
     )
 
-    if (adding) {
-        AddSheet(
-            onDismiss = { adding = false },
+    when (sheet) {
+        DocumentsSheet.ADD -> AddSheet(
+            onDismiss = { sheet = null },
             onScan = {
-                adding = false
+                sheet = null
                 scan()
             },
             onTakePhoto = {
-                adding = false
+                sheet = null
                 takePhoto()
             },
             onChooseFile = {
-                adding = false
+                sheet = null
                 fileLauncher.launch(arrayOf("application/pdf", "image/*"))
             },
         )
+        DocumentsSheet.SORT -> SortSheet(
+            selected = state.sort,
+            onSelect = {
+                sheet = null
+                documents.setSort(it)
+            },
+            onDismiss = { sheet = null },
+        )
+        DocumentsSheet.FILTERS -> FiltersSheet(
+            applied = state.filters,
+            labels = state.labels,
+            previewCount = state.filterPreviewCount,
+            onPreview = documents::previewFilters,
+            onApply = {
+                sheet = null
+                documents.setFilters(it)
+            },
+            onRetry = documents::refresh,
+            onDismiss = {
+                sheet = null
+                documents.stopPreview()
+            },
+        )
+        null -> Unit
     }
 }
+
+/** The sheets Documents opens over itself. */
+enum class DocumentsSheet { ADD, SORT, FILTERS }
 
 /** What the Documents screen can be asked to do; a class so the previews can pass no-ops. */
 class DocumentsScreenActions(
@@ -222,6 +264,13 @@ class DocumentsScreenActions(
     val onTextChange: (String) -> Unit = {},
     val onSearch: () -> Unit = {},
     val onClearFilters: () -> Unit = {},
+    val onStartSearch: () -> Unit = {},
+    val onStopSearch: () -> Unit = {},
+    val onOpenFilters: () -> Unit = {},
+    val onOpenSort: () -> Unit = {},
+    val onRemoveTag: (Int) -> Unit = {},
+    val onRemoveCorrespondent: () -> Unit = {},
+    val onRemoveDocumentType: () -> Unit = {},
     val onAdd: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onClearFinished: () -> Unit = {},
@@ -241,6 +290,12 @@ private fun DocumentsContent(
     listState: LazyListState = rememberLazyListState(),
 ) {
     val colors = MaterialTheme.colorScheme
+    val focus = LocalFocusManager.current
+    val stopSearching = {
+        focus.clearFocus()
+        actions.onStopSearch()
+    }
+    BackHandler(enabled = state.searching, onBack = stopSearching)
     val rowCount by rememberUpdatedState(state.rows.size)
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -260,16 +315,32 @@ private fun DocumentsContent(
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
     ) {
         Column(Modifier.fillMaxSize()) {
-            LargeTitleBar("Documents") {
-                AppIconButton(AppIcons.Settings, "Settings", actions.onOpenSettings, variant = IconButtonVariant.Tonal)
+            // Searching swaps the title row for a back arrow beside the field; the field stays put, so it keeps focus.
+            if (!state.searching) {
+                LargeTitleBar("Documents") {
+                    AppIconButton(AppIcons.Settings, "Settings", actions.onOpenSettings, variant = IconButtonVariant.Tonal)
+                }
             }
-            Row(Modifier.padding(start = Spacing.gutter, end = Spacing.gutter, top = Spacing.s4, bottom = Spacing.s12)) {
-                SearchField(state.text, actions.onTextChange, onSearch = actions.onSearch)
+            Row(
+                Modifier.padding(
+                    start = if (state.searching) Spacing.s8 else Spacing.gutter,
+                    end = Spacing.gutter,
+                    top = if (state.searching) Spacing.s12 else Spacing.s4,
+                    bottom = Spacing.s12,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+            ) {
+                if (state.searching) AppIconButton(AppIcons.Back, "Stop searching", stopSearching)
+                SearchField(
+                    state.text,
+                    actions.onTextChange,
+                    Modifier.weight(1f),
+                    onSearch = actions.onSearch,
+                    onFocusChange = { focused -> if (focused) actions.onStartSearch() },
+                )
             }
-            ChipRow(Modifier.padding(bottom = Spacing.s8)) {
-                AppChip("Filters", {}, leadingIcon = AppIcons.Filters)
-                AppChip(state.sortLabel, {}, leadingIcon = AppIcons.Sort)
-            }
+            FilterChips(state, actions, Modifier.padding(bottom = Spacing.s12))
             val pull = rememberPullToRefreshState()
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
@@ -297,6 +368,43 @@ private fun DocumentsContent(
                 .padding(end = Spacing.gutter, bottom = Spacing.actionBottom),
         )
     }
+}
+
+/** Filters (with how many are on), one removable chip per applied filter, then the sort order. */
+@Composable
+private fun FilterChips(state: DocumentsUiState, actions: DocumentsScreenActions, modifier: Modifier = Modifier) {
+    val filters = state.filters
+    val labels = state.labels
+    ChipRow(modifier) {
+        if (filters.isEmpty) {
+            AppChip("Filters", actions.onOpenFilters, leadingIcon = AppIcons.Filters)
+        } else {
+            AppChip("Filters · ${filters.count}", actions.onOpenFilters, variant = ChipVariant.Selected, leadingIcon = AppIcons.Filters)
+        }
+        if (labels != null) {
+            filters.tagIds.forEach { id ->
+                labels.tags.firstOrNull { it.id == id }?.let { RemovableChip(it.name) { actions.onRemoveTag(id) } }
+            }
+            filters.correspondentId?.let { id ->
+                labels.correspondents.firstOrNull { it.id == id }?.let { RemovableChip(it.name, actions.onRemoveCorrespondent) }
+            }
+            filters.documentTypeId?.let { id ->
+                labels.documentTypes.firstOrNull { it.id == id }?.let { RemovableChip(it.name, actions.onRemoveDocumentType) }
+            }
+        }
+        // While searching, results come by relevance, so there is no order to choose.
+        AppChip(
+            state.sortLabel,
+            actions.onOpenSort,
+            leadingIcon = if (state.text.isBlank()) AppIcons.Sort else null,
+            enabled = state.text.isBlank(),
+        )
+    }
+}
+
+@Composable
+private fun RemovableChip(name: String, onRemove: () -> Unit) {
+    AppChip(name, onRemove, variant = ChipVariant.Removable, contentDescription = "Remove filter $name")
 }
 
 @Composable
@@ -486,6 +594,46 @@ private fun DocumentsUploadingPreview() =
 @Composable
 private fun DocumentsLoadingMorePreview() =
     DocumentsPreview(DocumentsUiState(rows = previewRows, total = 60, status = ListStatus.Loaded, loadingMore = true))
+
+private val previewLabels = Labels(
+    tags = listOf(Tag(1, "Bills", null, null, false, null), Tag(2, "House", null, null, false, null)),
+    correspondents = listOf(Label(1, "City Power", null)),
+    documentTypes = emptyList(),
+    storagePaths = emptyList(),
+)
+
+@Preview(name = "Search — searching", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSearchingPreview() = DocumentsPreview(
+    DocumentsUiState(
+        text = "rates",
+        searching = true,
+        rows = previewRows.take(3).map {
+            it.copy(snippet = SearchHit(1.0, "…property rates for erf 4127, valuation R 1 850 000, due 15 Sept…", listOf(10..14)))
+        },
+        total = 12,
+        status = ListStatus.Loaded,
+    ),
+)
+
+@Preview(name = "Filters — applied", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsFilteredPreview() = DocumentsPreview(
+    DocumentsUiState(filters = DocumentFilters(tagIds = setOf(1, 2)), labels = previewLabels, rows = previewRows, total = 23, status = ListStatus.Loaded),
+)
+
+@Preview(name = "Search — no results", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsNoResultsPreview() = DocumentsPreview(
+    DocumentsUiState(
+        text = "pool service",
+        searching = true,
+        filters = DocumentFilters(tagIds = setOf(2)),
+        labels = previewLabels,
+        total = 0,
+        status = ListStatus.Empty,
+    ),
+)
 
 @Preview(name = "Documents — scanner needs camera", widthDp = 360, heightDp = 800)
 @Composable

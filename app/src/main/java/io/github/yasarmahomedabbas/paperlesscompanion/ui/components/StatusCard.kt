@@ -45,7 +45,8 @@ enum class StatusTone {
 /**
  * The empty / error / done card of docs/design/components.md § Status card: a 64 circle with a
  * 28dp icon, one statement, one line of what to do, and one `Secondary` button. The caller
- * places it (20 from the sides).
+ * places it (20 from the sides). [inSheet] steps it up a tone, `raised` with a `surface`
+ * circle, for a sheet's no-match or load-failed state (no card on a card of the same tone).
  */
 @Composable
 fun StatusCard(
@@ -56,6 +57,7 @@ fun StatusCard(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
+    inSheet: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val tint = when (tone) {
@@ -67,7 +69,7 @@ fun StatusCard(
     Column(
         modifier
             .fillMaxWidth()
-            .background(colors.surfaceContainer, MaterialTheme.shapes.medium)
+            .background(if (inSheet) colors.surfaceContainerHigh else colors.surfaceContainer, MaterialTheme.shapes.medium)
             .semantics(mergeDescendants = false) { liveRegion = LiveRegionMode.Polite }
             .padding(horizontal = Spacing.s24, vertical = Spacing.s32),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -77,7 +79,14 @@ fun StatusCard(
             Modifier
                 .padding(bottom = Spacing.s8)
                 .size(64.dp)
-                .background(if (tone == StatusTone.Done) colors.primaryContainer else colors.surfaceContainerHigh, CircleShape),
+                .background(
+                    when {
+                        tone == StatusTone.Done -> colors.primaryContainer
+                        inSheet -> colors.surfaceContainer
+                        else -> colors.surfaceContainerHigh
+                    },
+                    CircleShape,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))

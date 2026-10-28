@@ -44,7 +44,7 @@ Goal: everything the Documents screen shows exists as tested state, with no UI y
 ### [x] 1.1 — Sort options
 
 File: `ui/documents/SortOption.kt` (new)
-`enum class SortOption(val label: String, val sort: DocumentSort, val descending: Boolean)`: `NEWEST("Newest first", CREATED, true)` (the default), `OLDEST("Oldest first", CREATED, false)`, `RECENTLY_ADDED("Recently added", ADDED, true)`, `TITLE("Title A–Z", TITLE, false)`, `CORRESPONDENT("Correspondent A–Z", CORRESPONDENT, false)`. `const val BEST_MATCH = "Best match"` is the chip label while searching. Test: `ui/SortOptionTest.kt`.
+`enum class SortOption(val label: String, val sort: DocumentSort, val descending: Boolean)`: `NEWEST("Newest first", CREATED, true)` (the default), `OLDEST("Oldest first", CREATED, false)`, `RECENTLY_ADDED("Recently added", ADDED, true)`, `TITLE("Title, A to Z", TITLE, false)`, `CORRESPONDENT("Correspondent, A to Z", CORRESPONDENT, false)`. `const val BEST_MATCH = "Best match"` is the chip label while searching. Test: `ui/SortOptionTest.kt`.
 
 ### [x] 1.2 — UI state and row mapping
 
@@ -161,30 +161,30 @@ Files: `AppContainer.kt`, `MainActivity.kt`
 
 Goal: the "Search, filters and sort" row works end to end.
 
-### [ ] 4.1 — Searching mode
+### [x] 4.1 — Searching mode
 
 File: `ui/documents/DocumentsScreen.kt`
-Focusing the search field calls `startSearch()`: the title row gives way to a back arrow ("Stop searching", which calls `stopSearch()` and clears focus; `BackHandler` too). `onValueChange` goes to `onTextChange`, the IME Search key to `search()`. Rows show their snippet via `SearchHit.highlighted()`. The sort chip reads `state.sortLabel` and is disabled while searching. No results shows "No documents match" with Clear filters (clears the text too).
+Focusing the search field calls `startSearch()`: the title row gives way to a back arrow ("Stop searching", which calls `stopSearch()` and clears focus; `BackHandler` too). The field stays in the same row, so it keeps focus. `onValueChange` goes to `onTextChange`, the IME Search key to `search()`. Rows show their snippet via `SearchHit.highlighted(searchMatch)`. The sort chip reads `state.sortLabel` and is disabled while there is search text (results come by relevance). No results shows "No documents match" with Clear filters (clears the text too).
 
-### [ ] 4.2 — Sort sheet
+### [x] 4.2 — Sort sheet
 
 File: `ui/documents/SortSheet.kt` (new)
-A short sheet "Sort by" with a `SingleChoiceRow` per `SortOption`. Tapping one calls `setSort` and closes.
+A short sheet "Sort by" with a `SingleChoiceRow` per `SortOption` and the canvas's hint that "Newest first" goes by the document's date. Tapping one calls `setSort` and closes. The labels follow the canvas: "Title, A to Z" and "Correspondent, A to Z" (1.1's "A–Z" changed with them).
 
-### [ ] 4.3 — Filters sheet
+### [x] 4.3 — Filters sheet
 
 File: `ui/documents/FiltersSheet.kt` (new)
 A list sheet "Filters" holding a local draft `DocumentFilters` (starting from `state.filters`):
 - Tags as `Selected` / `Unselected` chips (all-of), with the inbox tag first.
-- Correspondent as a picker row opening a single-choice list sheet with search and "None" first.
-- Document type as single-choice chips.
-- The pinned bar has Clear (`Text`) and the primary "Show N documents" ("Show documents" while `filterPreviewCount` is null). Each draft change calls `previewFilters(draft)`; Show calls `setFilters(draft)` and closes; dismissing calls `stopPreview()`.
-- When `state.labels` is null, the sheet shows the load-failed state with Try again (`refresh()`).
+- Correspondent as a `PickerField` (new in `ui/components/PickerField.kt`, the manual's picker field) opening a single-choice list sheet with search, "Any correspondent" first and a no-match card.
+- Document type as single-choice chips, "Any" first.
+- The pinned bar has "Clear all" (`Text`, as on the canvas) and the primary "Show N documents" ("Show documents" while `filterPreviewCount` is null). Each draft change calls `previewFilters(draft)`; Show calls `setFilters(draft)` and closes; dismissing calls `stopPreview()`.
+- When `state.labels` is null, the sheet shows the load-failed state with Try again (`refresh()`), on a `StatusCard(inSheet = true)` (`raised`, so no card on a card of the same tone).
 
-### [ ] 4.4 — Chip row
+### [x] 4.4 — Chip row
 
 File: `ui/documents/DocumentsScreen.kt`
-Filters chip is `Action` with no filters on, `Selected` "Filters · N" with some. Then the sort chip, then one `Removable` chip per applied filter, with content description "Remove filter <name>", calling `removeTag` / `removeCorrespondent` / `removeDocumentType`. A horizontally scrolling row.
+Filters chip is `Action` with no filters on, `Selected` "Filters · N" with some. Then one `Removable` chip per applied filter, with content description "Remove filter <name>", calling `removeTag` / `removeCorrespondent` / `removeDocumentType`, then the sort chip (the "Filters — applied" board's order). A horizontally scrolling row.
 
 ### Verify
 

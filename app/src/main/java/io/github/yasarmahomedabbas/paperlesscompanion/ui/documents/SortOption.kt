@@ -7,8 +7,8 @@ enum class SortOption(val label: String, val sort: DocumentSort, val descending:
     NEWEST("Newest first", DocumentSort.CREATED, true),
     OLDEST("Oldest first", DocumentSort.CREATED, false),
     RECENTLY_ADDED("Recently added", DocumentSort.ADDED, true),
-    TITLE("Title A–Z", DocumentSort.TITLE, false),
-    CORRESPONDENT("Correspondent A–Z", DocumentSort.CORRESPONDENT, false),
+    TITLE("Title, A to Z", DocumentSort.TITLE, false),
+    CORRESPONDENT("Correspondent, A to Z", DocumentSort.CORRESPONDENT, false),
 }
 
 /** The sort chip's label while searching: results come in relevance order whatever the sort. */

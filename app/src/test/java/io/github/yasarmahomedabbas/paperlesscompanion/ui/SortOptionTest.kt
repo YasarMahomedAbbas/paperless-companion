@@ -14,8 +14,8 @@ class SortOptionTest {
                 Triple("Newest first", DocumentSort.CREATED, true),
                 Triple("Oldest first", DocumentSort.CREATED, false),
                 Triple("Recently added", DocumentSort.ADDED, true),
-                Triple("Title A–Z", DocumentSort.TITLE, false),
-                Triple("Correspondent A–Z", DocumentSort.CORRESPONDENT, false),
+                Triple("Title, A to Z", DocumentSort.TITLE, false),
+                Triple("Correspondent, A to Z", DocumentSort.CORRESPONDENT, false),
             ),
             SortOption.entries.map { Triple(it.label, it.sort, it.descending) },
         )
