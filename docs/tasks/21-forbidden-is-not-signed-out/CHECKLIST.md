@@ -43,7 +43,7 @@ Problem: when Paperless refuses an action because the user lacks a permission (f
 
 Goal: every signed-in 403 surfaces as FORBIDDEN with its own message, while sign-in failures and 401s are unchanged.
 
-### [ ] 1.1 — Domain kind and message
+### [x] 1.1 — Domain kind and message
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Models.kt`
 Add `FORBIDDEN` to `ServerException.Kind`, after `UNAUTHORIZED`: `enum class Kind { UNREACHABLE, NO_ANSWER, UNAUTHORIZED, FORBIDDEN, UNREADABLE, NOT_FOUND, SERVER }`. Extend the KDoc with "UNAUTHORIZED: the server doesn't accept the login. FORBIDDEN: signed in, but the server refused this action for this user."
@@ -51,7 +51,7 @@ Add `FORBIDDEN` to `ServerException.Kind`, after `UNAUTHORIZED`: `enum class Kin
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/UploadDocumentUseCase.kt`
 In `userMessage()`, add `Kind.FORBIDDEN -> "You don't have permission to do that in Paperless."`.
 
-### [ ] 1.2 — HTTP mapping
+### [x] 1.2 — HTTP mapping
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessHttp.kt`
 Rename the parameter `badRequestIsAuth` to `signIn` in `call`, `callUnless` and `httpError` (KDoc on `call`: "[signIn]: the request is a sign-in, so 400 and 403 mean wrong credentials"). New mapping:
@@ -66,7 +66,7 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Pap
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/EditDocumentsUseCase.kt`
 Line 10 comment: "Every one throws ServerException: UNAUTHORIZED when signed out, FORBIDDEN when the user may not change it."
 
-### [ ] 1.3 — Tests
+### [x] 1.3 — Tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessLibraryTest.kt`
 Next to `an expired token is unauthorized`, add:
