@@ -41,12 +41,12 @@ Paths below are under `app/src/main/java/io/github/yasarmahomedabbas/paperlessco
 
 Goal: everything the Documents screen shows exists as tested state, with no UI yet.
 
-### [ ] 1.1 — Sort options
+### [x] 1.1 — Sort options
 
 File: `ui/documents/SortOption.kt` (new)
 `enum class SortOption(val label: String, val sort: DocumentSort, val descending: Boolean)`: `NEWEST("Newest first", CREATED, true)` (the default), `OLDEST("Oldest first", CREATED, false)`, `RECENTLY_ADDED("Recently added", ADDED, true)`, `TITLE("Title A–Z", TITLE, false)`, `CORRESPONDENT("Correspondent A–Z", CORRESPONDENT, false)`. `const val BEST_MATCH = "Best match"` is the chip label while searching. Test: `ui/SortOptionTest.kt`.
 
-### [ ] 1.2 — UI state and row mapping
+### [x] 1.2 — UI state and row mapping
 
 File: `ui/documents/DocumentsUiState.kt` (new)
 - `data class DocumentFilters(val tagIds: Set<Int> = emptySet(), val correspondentId: Int? = null, val documentTypeId: Int? = null) { val count: Int; val isEmpty: Boolean }`. `count` is the number of filters on (each tag counts once).
@@ -55,25 +55,25 @@ File: `ui/documents/DocumentsUiState.kt` (new)
 - `sealed interface ListStatus { Loading; Loaded; Empty; data class Failed(val message: String, val unreachable: Boolean) }`.
 - `data class DocumentsUiState(val text: String = "", val searching: Boolean = false, val filters: DocumentFilters = DocumentFilters(), val sort: SortOption = SortOption.NEWEST, val labels: Labels? = null, val rows: List<DocumentRow> = emptyList(), val total: Int? = null, val status: ListStatus = ListStatus.Loading, val refreshing: Boolean = false, val loadingMore: Boolean = false, val loadMoreFailed: String? = null, val filterPreviewCount: Int? = null)`, with `val sortLabel` (`BEST_MATCH` when `text` is not blank), and `val showResultLine` (`text` not blank or filters on).
 
-### [ ] 1.3 — DocumentsViewModel
+### [x] 1.3 — DocumentsViewModel
 
 File: `ui/documents/DocumentsViewModel.kt` (new)
 `class DocumentsViewModel(private val browse: BrowseDocumentsUseCase, private val loadLabels: LoadLabelsUseCase, private val debounceMillis: Long = 400) : ViewModel()`, `val state: StateFlow<DocumentsUiState>`. It loads on `init`.
 - `fun refresh()`: reloads labels and page 1 side by side (`coroutineScope { async … }`), keeping the rows on screen with `refreshing = true`. The first load uses `status = Loading` instead. Either failure gives `Failed(e.userMessage(), kind == UNREACHABLE || kind == NO_ANSWER)` for a `ServerException`, or a generic message for anything else. A failure during a pull-to-refresh with rows already loaded also goes to `Failed` (no cache, per the manual).
 - `fun loadMore()`: no-op when `loadingMore`, the status isn't `Loaded`, or the last page had `hasMore == false`. Otherwise it fetches `page + 1` and appends. A failure sets `loadMoreFailed` and keeps the rows; calling `loadMore()` again retries.
 - `fun onTextChange(text: String)`: updates `text` and restarts a debounced job (`delay(debounceMillis)`) that reloads page 1. `fun search()` (keyboard Search key) cancels the debounce and reloads now. `fun startSearch()` / `fun stopSearch()` toggle `searching`; `stopSearch` also clears `text` and reloads if it wasn't blank.
-- `fun setSort(option: SortOption)`, `fun setFilters(filters: DocumentFilters)`, `fun removeTag(id: Int)`, `fun removeCorrespondent()`, `fun removeDocumentType()`, `fun clearFilters()`: each reloads page 1.
+- `fun setSort(option: SortOption)`, `fun setFilters(filters: DocumentFilters)`, `fun removeTag(id: Int)`, `fun removeCorrespondent()`, `fun removeDocumentType()`, `fun clearFilters()`: each reloads page 1 (showing `Loading`, and loading the labels too if they never loaded). `clearFilters()` also clears the search text, since its only caller is "No documents match" → Clear filters.
 - `fun previewFilters(draft: DocumentFilters)`: debounced; queries with `pageSize = 1` and sets `filterPreviewCount = page.total`. A failure sets it to null. `fun stopPreview()` cancels it and clears the count.
 - One `loadJob` for page loads: a new page-1 load cancels the running one (and any load-more), so an older search never overwrites a newer one.
 - Query building: `DocumentQuery(text = text.takeIf { it.isNotBlank() }, tagIds, correspondentId, documentTypeId, sort = sort.sort, descending = sort.descending, page, pageSize = 25)`.
 - Status after a page-1 load: `Empty` when the page has no documents, else `Loaded`.
 
-### [ ] 1.4 — Fake library that pages and blocks
+### [x] 1.4 — Fake library that pages and blocks
 
 File: `Fakes.kt` (test)
-Extend `FakeLibrary` without breaking its current users: `var pages: ((DocumentQuery) -> DocumentPage)? = null`, used by `documents()` when set; `var documentsGate: CompletableDeferred<Unit>?` awaited before answering, for in-flight and cancel tests; `var labelsFailure: Exception?`, thrown only by the label calls.
+Extend `FakeLibrary` without breaking its current users: `var pages: ((DocumentQuery) -> DocumentPage)? = null`, used by `documents()` when set; `var documentsGate: CompletableDeferred<Unit>?` awaited before answering, for in-flight and cancel tests; `var labelsFailure: Exception?`, thrown only by the label calls; `val queries`, every `documents()` query recorded before it waits or fails.
 
-### [ ] 1.5 — Tests
+### [x] 1.5 — Tests
 
 File: `ui/DocumentsViewModelTest.kt` (new), `ui/SortOptionTest.kt` (new)
 The cases in the test plan's first and fourth bullets, on `MainDispatcherRule` and virtual time (`advanceTimeBy(399)` makes no call, `advanceTimeBy(1)` makes one).

@@ -171,8 +171,16 @@ class FakeLibrary : DocumentLibrary {
     var storagePaths = listOf(Label(4, "Bills", 6))
     var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
     var failure: Exception? = null
+    /** When set, documents() answers with what it returns for the query (and throws what it throws) instead of [page]. */
+    var pages: ((DocumentQuery) -> DocumentPage)? = null
+    /** When set, documents() waits on it before answering, so a test can look at a load in flight. */
+    var documentsGate: CompletableDeferred<Unit>? = null
+    /** Thrown by the four label calls only. */
+    var labelsFailure: Exception? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
+    /** Every documents() query, recorded before it waits or fails. */
+    val queries = mutableListOf<DocumentQuery>()
 
     private fun <T> answer(config: ServerConfig, call: String, value: T): T {
         calls += call
@@ -181,12 +189,24 @@ class FakeLibrary : DocumentLibrary {
         return value
     }
 
-    override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
+    private fun <T> label(config: ServerConfig, call: String, value: T): T {
+        labelsFailure?.let { calls += call; configs += config; throw it }
+        return answer(config, call, value)
+    }
+
+    override suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage {
+        calls += "documents $query"
+        configs += config
+        queries += query
+        documentsGate?.await()
+        failure?.let { throw it }
+        return pages?.invoke(query) ?: page
+    }
     override suspend fun document(config: ServerConfig, id: Int) = answer(config, "document $id", document)
-    override suspend fun tags(config: ServerConfig) = answer(config, "tags", tags)
-    override suspend fun correspondents(config: ServerConfig) = answer(config, "correspondents", correspondents)
-    override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
-    override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
+    override suspend fun tags(config: ServerConfig) = label(config, "tags", tags)
+    override suspend fun correspondents(config: ServerConfig) = label(config, "correspondents", correspondents)
+    override suspend fun documentTypes(config: ServerConfig) = label(config, "documentTypes", documentTypes)
+    override suspend fun storagePaths(config: ServerConfig) = label(config, "storagePaths", storagePaths)
     override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
     override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
     override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
