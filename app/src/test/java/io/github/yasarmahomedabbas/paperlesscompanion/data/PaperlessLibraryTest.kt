@@ -623,6 +623,20 @@ class PaperlessLibraryTest {
     }
 
     @Test
+    fun `notes sent oldest first, as Paperless 3 does, come newest first`() = runTest {
+        val oldestFirst = """[""" +
+            """{"id":1,"note":"Old","created":"2026-10-01T09:00:00Z","user":null},""" +
+            """{"id":2,"note":"Asked for a copy","created":"2026-10-02T08:00:00+02:00","user":{"id":2,"username":"bob","first_name":"","last_name":""}},""" +
+            """{"id":3,"note":"Paid in full","created":"2026-10-03T09:14:00Z","user":{"id":1,"username":"ann","first_name":"Ann","last_name":"Lee"}}""" +
+            """]"""
+        respond(body = oldestFirst)
+        assertEquals(expectedNotes, library.notes(config, 7))
+
+        respond(body = oldestFirst)
+        assertEquals(expectedNotes, library.addNote(config, 7, "Paid in full"))
+    }
+
+    @Test
     fun `a note error answered with 200 is a server error`() = runTest {
         respond(body = """{"error":"Error retrieving notes, check logs for more detail."}""")
         val e = expectError(Kind.SERVER) { library.notes(config, 7) }

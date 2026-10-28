@@ -62,7 +62,8 @@ class PaperlessViewsTest {
         assertEquals("-added", viewFilter(emptyList(), "added", true).ordering)
         assertEquals("title", viewFilter(emptyList(), "title", false).ordering)
         assertEquals("-created", viewFilter(emptyList(), null, true).ordering)
-        assertEquals("created", viewFilter(emptyList(), null, false).ordering)
+        // The web interface sends no ordering then, and Paperless's default is newest first.
+        assertEquals("-created", viewFilter(emptyList(), null, false).ordering)
     }
 
     @Test

@@ -36,7 +36,8 @@ internal fun viewFilter(rules: List<ViewRule>, sortField: String?, sortReverse: 
             else -> params[type.filtervar] = value
         }
     }
-    return ViewFilter(params, (if (sortReverse) "-" else "") + (sortField ?: "created"))
+    // Without a sort field the web interface sends no ordering, and Paperless lists newest first.
+    return ViewFilter(params, if (sortField == null) "-created" else (if (sortReverse) "-" else "") + sortField)
 }
 
 /** A saved view's `filter_rules`; a number value is read as its digits, a missing or odd one as null. */

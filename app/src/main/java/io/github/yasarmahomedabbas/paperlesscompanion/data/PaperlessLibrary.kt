@@ -312,7 +312,9 @@ class PaperlessLibrary(
             (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.booleanOrNull
 
         fun notesFrom(json: JsonElement, failed: String): List<Note> = when {
+            // Paperless 3 lists them oldest first (the note model's order); earlier versions sent newest first.
             json is JsonArray -> json.filterIsInstance<JsonObject>().map { it.toNote() }
+                .sortedWith(compareByDescending<Note> { it.created }.thenByDescending { it.id })
             json is JsonObject && "error" in json -> throw ServerException(Kind.SERVER, failed)
             else -> throw ServerException(Kind.SERVER, "Paperless sent no notes")
         }

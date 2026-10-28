@@ -47,3 +47,15 @@ Branch: `feat/12-saved-views-and-notes`
   - The planning notes gave the simple title/text rules as 40 and 41. At v3.3.4 (`filter-rule-type.ts`) they are 48 (`title_search`) and 49 (`text`); 40/41 are `custom_fields__id__none` and `has_custom_fields`. The table follows the source, and the checklist's References and test plan were corrected.
   - The web UI leaves out any parameter whose value is null (`abstract-paperless-service.ts` `list`), so a null value on a rule without an `isnull` parameter is dropped rather than sent.
   - Small shape changes, written back into the checklist: `NotesViewModel.count` is `Int?` (null before the notes load); `clearSimilar(alsoFilters)` serves the "Show all documents" empty state; the Notes row reads "Open" when the server gave no count; an empty saved view has its own state ("Nothing in <view>").
+
+## Review
+
+- Fixed:
+  - Notes came out in the server's order, but Paperless 3.3.4 answers `GET`/`POST api/documents/{id}/notes/` from the document serializer, whose notes follow the note model's order (`created`, oldest first); earlier versions sent newest first. A document with notes 1, 2, 3 showed the oldest at the top, against "newest first". `notesFrom` now sorts by `created` descending (then id), with a test that sends them oldest first (`PaperlessLibraryTest`).
+  - A saved view with no `sort_field` and `sort_reverse` false was listed with `ordering=created` (oldest first). The web UI sends no ordering then, and Paperless's default document order is `-created`, so the app showed the view upside down. A null sort field now always gives `-created` (`PaperlessViewsTest`).
+- Raised: none
+- API:
+  - `GET api/saved_views/`, `GET api/saved_views/{id}/`, `GET api/ui_settings/`: match the v3.3.4 source (serializer, `query-params.ts`, `filter-rule-type.ts`, `abstract-paperless-service.ts` for the null-ordering case). Live schema not read here (`verify.env` absent); self-verification must.
+  - `GET api/documents/` with a view's parameters and with `more_like_id`: match the source; the rule translation was re-checked line by line against `queryParamsFromFilterRules` at v3.3.4.
+  - `GET` / `POST api/documents/{id}/notes/`: bare list, 200 + `{"error"}` on failure, 403 without permission, as in `views.py` v3.3.4; order differs by version (fixed above).
+- Layers: clean
