@@ -6,6 +6,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
 import io.github.yasarmahomedabbas.paperlesscompanion.doc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
@@ -15,6 +16,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SearchHit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
@@ -793,5 +795,307 @@ class DocumentsViewModelTest {
         val ids = vm.s.rows.map { it.id }
         assertEquals(ids.distinct(), ids)
         assertEquals(1, ids.count { it == 3 })
+    }
+
+    // A change that moves documents in the list (#32)
+
+    /**
+     * A server holding [docs] by id, as Paperless lists them: only those carrying every one of the
+     * query's tags, a search matching titles that hold its text, ordered by the query's sort (ties by
+     * id), then paged.
+     */
+    private fun serving(docs: MutableMap<Int, Document>) {
+        answer = { q ->
+            val matching = docs.values
+                .filter { d -> d.tagIds.containsAll(q.tagIds) }
+                .filter { d -> q.text == null || d.title.contains(q.text!!, ignoreCase = true) }
+            val ordered = when {
+                q.text != null -> matching.sortedBy { it.id }
+                q.sort == DocumentSort.TITLE -> matching.sortedWith(compareBy<Document> { it.title }.thenBy { it.id })
+                q.sort == DocumentSort.CREATED && q.descending ->
+                    matching.sortedWith(compareByDescending<Document> { it.created }.thenBy { it.id })
+                else -> matching.sortedBy { it.id }
+            }
+            val from = (q.page - 1) * q.pageSize
+            DocumentPage(ordered.size, ordered.drop(from).take(q.pageSize), hasMore = from + q.pageSize < ordered.size)
+        }
+    }
+
+    private fun documents(count: Int, made: (Int) -> Document = { doc(it) }) =
+        (1..count).associateWithTo(mutableMapOf()) { made(it) }
+
+    /** Scrolls to the end of the list. */
+    private fun TestScope.loadAll(vm: DocumentsViewModel) {
+        repeat(20) {
+            vm.loadMore()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
+    fun `taking the filtered tag off loaded documents skips none of the rest`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it).copy(tagIds = listOf(7)) }
+        serving(server)
+        val vm = loaded()
+        vm.setFilters(DocumentFilters(tagIds = setOf(7)))
+        advanceUntilIdle()
+
+        val edit = BulkEdit.ModifyTags(add = emptySet(), remove = setOf(7))
+        listOf(1, 2, 3).forEach { server[it] = server.getValue(it).with(edit) }
+        vm.apply(listOf(1, 2, 3), edit)
+        advanceUntilIdle()
+        loadAll(vm)
+
+        assertEquals((4..60).toList(), vm.s.rows.map { it.id })
+        assertEquals(57, vm.s.total)
+    }
+
+    @Test
+    fun `renaming a document in a title sort skips none and repeats none`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+
+        // It now sorts last, past page 1.
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        vm.patch(renamed)
+        advanceUntilIdle()
+        loadAll(vm)
+
+        assertEquals((1..60).filter { it != 2 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `changing the date in a date sort skips none and repeats none`() = runTest(main.dispatcher) {
+        val day = LocalDate.of(2026, 1, 1)
+        val server = documents(60) { doc(it).copy(created = day.minusDays(it.toLong())) }
+        serving(server)
+        val vm = loaded()
+
+        val redated = server.getValue(2).copy(created = day.minusYears(5))
+        server[2] = redated
+        vm.patch(redated)
+        advanceUntilIdle()
+        loadAll(vm)
+
+        assertEquals((1..60).filter { it != 2 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a change the list neither filters nor sorts by asks the server nothing`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it).copy(tagIds = listOf(7)) }
+        serving(server)
+        val vm = loaded()
+        vm.setFilters(DocumentFilters(tagIds = setOf(7)))
+        advanceUntilIdle()
+        val asked = queries.size
+
+        vm.apply(listOf(1, 2), BulkEdit.SetStoragePath(4))
+        vm.apply(listOf(3), BulkEdit.ModifyTags(add = setOf(1), remove = emptySet()))
+        vm.patch(server.getValue(4).copy(title = "Renamed", correspondentId = 2))
+        advanceUntilIdle()
+
+        assertEquals(asked, queries.size)
+        assertEquals(4, vm.documents(listOf(2)).single().storagePathId)
+        assertEquals("Renamed", vm.s.rows[3].title)
+    }
+
+    @Test
+    fun `a change during a search asks for the shown results again`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "Bill $it") }
+        serving(server)
+        val vm = loaded()
+        vm.startSearch()
+        vm.onTextChange("bill")
+        vm.search()
+        advanceUntilIdle()
+        val asked = queries.size
+
+        vm.apply(listOf(1), BulkEdit.SetCorrespondent(2))
+        advanceUntilIdle()
+
+        assertEquals(asked + 1, queries.size)
+        assertEquals(DocumentQuery(text = "bill", page = 1, pageSize = 100), queries.last())
+        assertEquals(25, vm.s.rows.size)
+    }
+
+    @Test
+    fun `a window of more than 100 is asked in pages of 100, and paging carries on after it`() = runTest(main.dispatcher) {
+        val server = documents(160) { doc(it, "A%03d".format(it)) }
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+        repeat(4) {
+            vm.loadMore()
+            advanceUntilIdle()
+        }
+        assertEquals(125, vm.s.rows.size)
+        val asked = queries.size
+
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        vm.patch(renamed)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1 to 100, 2 to 100), queries.drop(asked).map { it.page to it.pageSize })
+        assertEquals((1..126).filter { it != 2 }, vm.s.rows.map { it.id })
+        assertFalse(vm.s.refreshing)
+
+        vm.loadMore()
+        advanceUntilIdle()
+        assertEquals(6 to 25, queries.last().let { it.page to it.pageSize })
+        loadAll(vm)
+        assertEquals((1..160).filter { it != 2 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a failed re-fetch keeps the patched rows, and Retry asks again before paging on`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+        val e = ServerException(Kind.UNREACHABLE, "down")
+        library.failure = e
+
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        vm.patch(renamed)
+        advanceUntilIdle()
+
+        assertEquals(25, vm.s.rows.size)
+        assertEquals("Z", vm.s.rows[1].title)
+        assertEquals(e.userMessage(), vm.s.loadMoreFailed)
+        assertFalse(vm.s.refreshing)
+        assertEquals(ListStatus.Loaded, vm.s.status)
+
+        library.failure = null
+        val asked = queries.size
+        vm.loadMore()
+        advanceUntilIdle()
+
+        assertEquals(DocumentQuery(sort = DocumentSort.TITLE, descending = false, page = 1, pageSize = 100), queries.drop(asked).single())
+        assertNull(vm.s.loadMoreFailed)
+        assertEquals((1..26).filter { it != 2 }, vm.s.rows.map { it.id })
+
+        loadAll(vm)
+        assertEquals((1..60).filter { it != 2 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a refresh while the re-fetch runs cancels it`() = runTest(main.dispatcher) {
+        val server = documents(160) { doc(it, "A%03d".format(it)) }
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+        repeat(4) {
+            vm.loadMore()
+            advanceUntilIdle()
+        }
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        library.documentsGate = CompletableDeferred()
+        vm.patch(renamed)
+        runCurrent()
+        assertTrue(vm.s.refreshing)
+        val asked = queries.size
+
+        vm.refresh()
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        // The re-fetch never asked for its second page, and the refresh's page 1 stands.
+        assertEquals(listOf(1 to 25), queries.drop(asked).map { it.page to it.pageSize })
+        assertEquals((1..26).filter { it != 2 }, vm.s.rows.map { it.id })
+        assertFalse(vm.s.refreshing)
+        vm.loadMore()
+        advanceUntilIdle()
+        assertEquals(2 to 25, queries.last().let { it.page to it.pageSize })
+    }
+
+    /**
+     * Starts a re-fetch, by renaming document 2 in a title sort, and holds it in flight. The server
+     * answers it as it stood when it was asked, unless a newer request has been sent since.
+     */
+    private fun TestScope.refetchInFlight(server: MutableMap<Int, Document>): DocumentsViewModel {
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        serving(server.toMutableMap())
+        val asAsked = answer
+        serving(server)
+        val now = answer
+        library.documentsGate = CompletableDeferred()
+        vm.patch(renamed)
+        runCurrent()
+        val sent = queries.size
+        answer = { q -> if (queries.size == sent) asAsked(q) else now(q) }
+        return vm
+    }
+
+    @Test
+    fun `a trash while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+
+        server.remove(5)
+        vm.remove(listOf(5))
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(5 in vm.s.rows.map { it.id })
+        loadAll(vm)
+        assertEquals((1..60).filter { it != 2 && it != 5 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `an Undo while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+        val trashed = server.remove(5)!!
+        vm.remove(listOf(5))
+        // The next re-fetch is held, then the Undo lands while it waits.
+        library.documentsGate = CompletableDeferred()
+        vm.patch(server.getValue(10).copy(title = "Zy").also { server[10] = it })
+        runCurrent()
+        serving(server.toMutableMap())
+        val asAsked = answer
+        serving(server)
+        val now = answer
+        val sent = queries.size
+        answer = { q -> if (queries.size == sent) asAsked(q) else now(q) }
+
+        server[5] = trashed
+        vm.putBack(listOf(5))
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(5 in vm.s.rows.map { it.id })
+        loadAll(vm)
+        assertEquals((1..60).filter { it != 2 && it != 10 } + listOf(2, 10), vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `an edit while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+
+        val edited = server.getValue(4).copy(storagePathId = 9)
+        server[4] = edited
+        vm.patch(edited)
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(9, vm.documents(listOf(4)).single().storagePathId)
     }
 }
