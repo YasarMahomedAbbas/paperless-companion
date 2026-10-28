@@ -115,6 +115,6 @@ class MainActivity : FragmentActivity() {
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
-        gate.addPending(uris.map { container.documents.from(it, "Shared document") })
+        gate.addPending(uris.map { container.documents.from(it.toString(), "Shared document") })
     }
 }

@@ -12,9 +12,11 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsStore
 import io.github.yasarmahomedabbas.paperlesscompanion.data.SealedSettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
@@ -31,17 +33,17 @@ class AppContainer(context: Context) {
     )
     val settings: SettingsRepository = sealed
     val lock: AppLockRepository = sealed
-    val documents = UriDocuments(context.contentResolver)
-    private val paperless: PaperlessRepository = PaperlessApi()
+    val documents: DocumentFiles = UriDocuments(context.contentResolver)
+    private val server: DocumentServer = PaperlessApi()
 
     val gateViewModelFactory = viewModelFactory {
         initializer { GateViewModel(settings, lock, AppLock(lock, SystemClock::elapsedRealtime)) }
     }
     val loginViewModelFactory = viewModelFactory {
-        initializer { LoginViewModel(LoginUseCase(paperless, settings)) }
+        initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
     val homeViewModelFactory = viewModelFactory {
-        initializer { HomeViewModel(UploadDocumentUseCase(paperless, settings), settings) }
+        initializer { HomeViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings), settings) }
     }
 }
 

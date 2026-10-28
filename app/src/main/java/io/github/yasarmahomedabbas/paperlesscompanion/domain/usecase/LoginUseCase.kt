@@ -1,12 +1,12 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase
 
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 
 class LoginUseCase(
-    private val paperless: PaperlessRepository,
+    private val server: DocumentServer,
     private val settings: SettingsRepository,
 ) {
     suspend operator fun invoke(serverUrl: String, username: String, password: String): Result<ServerConfig> {
@@ -16,9 +16,9 @@ class LoginUseCase(
             return Result.failure(IllegalArgumentException("Enter your username and password"))
         }
         return try {
-            val token = paperless.login(baseUrl, username.trim(), password)
+            val token = server.login(baseUrl, username.trim(), password)
             ServerConfig(baseUrl, token).also(settings::save).let { Result.success(it) }
-        } catch (e: PaperlessException) {
+        } catch (e: ServerException) {
             Result.failure(e)
         }
     }

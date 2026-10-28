@@ -26,7 +26,7 @@ Paperless-ngx 2.x or 3.x: the app reads both API v9 and v10 answers. Paperless o
 
 ## Architecture
 
-Three layers, each depending only on the one below it:
+Three layers; `ui` and `data` both depend on `domain`, never on each other:
 
 ```
 ui/       Compose screens + ViewModels (state as StateFlow)
@@ -36,13 +36,14 @@ domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
 data/     PaperlessApi (OkHttp + paperless-ngx REST), SealedSettingsRepository + KeystoreTokenVault, UriDocuments
 ```
 
-`data` implements the interfaces `domain` defines, so the use cases never see HTTP or Android. `AppContainer` wires the layers together by hand, without a DI framework.
+`data` implements the interfaces `domain` defines, so the use cases never see HTTP or Android. `AppContainer` wires the layers together by hand, without a DI framework, and is the only file outside `data` that names a `data` class. `ArchitectureTest` fails the build when an import crosses these lines.
 
 | Use case | What it does |
 |---|---|
 | `LoginUseCase` | Normalizes the server address, exchanges username and password for a token via `POST /api/token/`, saves it |
 | `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
 | `AppLock` | Locks the app again (and forgets the unlocked token) after a minute or more in the background, while the lock is on |
+| `DocumentLinkUseCase` | Gives the web address of an uploaded document on the signed-in server, for the link shown after an upload |
 
 Any change to a Paperless call follows the current [API docs](https://docs.paperless-ngx.com/api/) and the server's own schema at `<server>/api/schema/view/` (see `CLAUDE.md`).
 
