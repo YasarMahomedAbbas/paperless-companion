@@ -61,3 +61,14 @@ Branch: `feat/7-document-data-layer`
 - Skipped: Coil 3.0.4 dependency — `libs.versions.toml` says it; the README now names Coil.
 - Skipped: `.claude/skills/start-ticket` still points at `PaperlessApi.kt` as the example for a call — skills are outside this stage's scope, and the example is still valid.
 - Stale, fixed separately: README.md:Development — said only Compose screens and the Keystore code are left out of coverage; kover on main also excludes the content-URI, preference, installer, WorkManager and notification glue (ddedb9d).
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green — 275 tests passed / 0 failed / 0 skipped, line coverage 96.2% (koverVerify, ≥80%), lint 0 errors (23 warnings, none blocking), debug APK built. `ArchitectureTest` green.
+- Server: not run (`~/.config/paperless-companion/verify.env` is absent, so there is no server address or token).
+- Verified: every call against MockWebServer only (`PaperlessLibraryTest`, `PaperlessHttpTest`, `PaperlessJsonTest`, `ThumbnailsTest`), v9 and v10 shapes, plus the server source at v3.3.4 and v2.20.15 (start-ticket and self-review).
+- Not run against a real server (still open from planning): live `/api/schema/` check of every path, param and field; the read calls (document list with a sort and a tag filter, `query=` search, one document, thumb/preview/download, the four label lists, trash list, `X-Api-Version`); and the write calls (PATCH, DELETE, restore, bulk edit, `/api/documents/delete/` with its 405/404 fallback on 2.x), which would also need `PAPERLESS_ALLOW_WRITES=1`.
+- Failed: none
+- Not self-verifiable: thumbnails show in a list and survive an app restart from the disk cache (check on the phone once #9 adds the first screen that shows them; also confirm a changed document gets a fresh thumbnail).
