@@ -138,3 +138,9 @@ Settled while building the Documents list (#9):
   tags' place, as the "Search — searching" board draws it.
 - **A failed next page** is an `Unreachable` notice banner at the foot of the list with Try
   again, so the rows already loaded stay put.
+- **Documents is the home**, replacing the upload-first home above: Scan document, Take photo
+  and Choose file moved into the Add sheet, and the ⋮ menu is gone (its Updates, fingerprint
+  switch and Sign out are in Settings).
+- **Settings is partial.** It shows the server address, the fingerprint switch, Updates and
+  Sign out. "Signed in as", the lock-again delay (the code still locks after 1 minute) and
+  Source and licences from `layouts.md` § Settings are follow-ups.

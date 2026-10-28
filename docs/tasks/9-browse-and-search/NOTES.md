@@ -47,3 +47,14 @@ Branch: `feat/9-browse-and-search`
 - Raised: none.
 - API: no endpoint touched; `data/` and `domain/` are unchanged on this branch. The list, search, filter, label and thumbnail calls go through #7's `DocumentLibrary` as they are; self-verification still has to try them against a real server.
 - Layers: clean. No `ui/` import of `data/` and no Paperless field, path or query name in `ui/`; only `AppContainer` names `data/` classes.
+
+## Doc drift
+
+- Applied: README.md § intro features — new **Documents** bullet (browse, full-text search as you type, filters by tags/correspondent/type, sort, Add for uploads) (rung 3: using the app).
+- Applied: README.md § features and Install — the fingerprint switch is "Unlock with fingerprint" in Settings, not "Lock with fingerprint" in the home screen's menu; Updates is **Settings → Updates**, not **⋮ → Updates**; "Scan document explains that" instead of "the Scan button" (rung 3; claims this branch made false).
+- Applied: docs/design/README.md § Decisions (#9) — Documents replaced the upload-first home and the ⋮ menu (the #6 lines above it are now history), and Settings is partial: "signed in as", the lock-again delay (code: 1 minute in `AppLock`) and Source and licences from `layouts.md` § Settings are follow-ups (rung 4: a session building Settings would otherwise assume the manual's layout is shipped).
+- Skipped: README architecture block — names only `data/` classes and layer roles; the new `ui/documents`, `ui/settings` and `ui/components` packages need no listing, `fd` finds them.
+- Skipped: README use-case table — no use case added or changed (`domain/` untouched).
+- Skipped: CLAUDE.md — no new cross-cutting rule; hand-rolled navigation and paging are visible in `MainActivity` and `DocumentsViewModel`.
+- Skipped: `ArchitectureTest`'s `ui/home/HomeScreen.kt` strings — synthetic paths fed to the checker, not a doc claim.
+- Stale, fixed separately: none.
