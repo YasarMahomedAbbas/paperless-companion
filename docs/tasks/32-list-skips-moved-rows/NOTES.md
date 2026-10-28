@@ -28,3 +28,10 @@ Branch: `fix/32-list-skips-moved-rows`
 - Tests: `DocumentsViewModelTest` 61 passed / 0 failed; seven of the eight new ones failed before the change (the no-request one passes either way, as it should). Full check (`testDebugUnitTest koverVerify lintDebug assembleDebug`) green: 457 passed / 0 failed / 0 skipped, Kover bound held.
 - Outstanding: the device-only scroll feel check and the real-server `page_size=100` read are left to self-verification.
 - Contradicted the plan: none. One guard added beyond 1.2: a change during a pull to refresh doesn't start a re-fetch (it would cancel the refresh and its label reload); the checklist text says so.
+
+## Review
+
+- Fixed: a re-fetch in flight could land an answer the server gave before a change made since, undoing it. A trash while it ran brought the trashed row back. An Undo while it ran dropped the restored document, and load more then skipped it. An edit that moves nothing reverted to the old values. `patch`, `apply`, `remove` and `putBack` now start the re-fetch again while one is on its way, and a re-fetch with nothing left shown cancels the one in flight (`DocumentsViewModel.kt`, `refetching`). Three tests in `DocumentsViewModelTest` (`… while the re-fetch runs isn't undone by its answer`) fail without it. Full check green: 460 passed / 0 failed / 0 skipped, Kover bound held.
+- Raised: none.
+- API: `GET /api/documents/` (no change but `page_size=100`). Matches the paperless-ngx source (`StandardPagination`, max 100000) as planning found. docs.paperless-ngx.com answered 403 at planning, and `verify.env` is absent, so the live schema wasn't read. That is left to self-verification.
+- Layers: clean (a `ui/` change only, in domain terms).

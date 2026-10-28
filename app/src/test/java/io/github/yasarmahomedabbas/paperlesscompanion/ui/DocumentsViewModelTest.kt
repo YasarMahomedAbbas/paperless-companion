@@ -1017,4 +1017,85 @@ class DocumentsViewModelTest {
         advanceUntilIdle()
         assertEquals(2 to 25, queries.last().let { it.page to it.pageSize })
     }
+
+    /**
+     * Starts a re-fetch, by renaming document 2 in a title sort, and holds it in flight. The server
+     * answers it as it stood when it was asked, unless a newer request has been sent since.
+     */
+    private fun TestScope.refetchInFlight(server: MutableMap<Int, Document>): DocumentsViewModel {
+        serving(server)
+        val vm = loaded()
+        vm.setSort(SortOption.TITLE)
+        advanceUntilIdle()
+        val renamed = server.getValue(2).copy(title = "Z")
+        server[2] = renamed
+        serving(server.toMutableMap())
+        val asAsked = answer
+        serving(server)
+        val now = answer
+        library.documentsGate = CompletableDeferred()
+        vm.patch(renamed)
+        runCurrent()
+        val sent = queries.size
+        answer = { q -> if (queries.size == sent) asAsked(q) else now(q) }
+        return vm
+    }
+
+    @Test
+    fun `a trash while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+
+        server.remove(5)
+        vm.remove(listOf(5))
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(5 in vm.s.rows.map { it.id })
+        loadAll(vm)
+        assertEquals((1..60).filter { it != 2 && it != 5 } + 2, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `an Undo while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+        val trashed = server.remove(5)!!
+        vm.remove(listOf(5))
+        // The next re-fetch is held, then the Undo lands while it waits.
+        library.documentsGate = CompletableDeferred()
+        vm.patch(server.getValue(10).copy(title = "Zy").also { server[10] = it })
+        runCurrent()
+        serving(server.toMutableMap())
+        val asAsked = answer
+        serving(server)
+        val now = answer
+        val sent = queries.size
+        answer = { q -> if (queries.size == sent) asAsked(q) else now(q) }
+
+        server[5] = trashed
+        vm.putBack(listOf(5))
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(5 in vm.s.rows.map { it.id })
+        loadAll(vm)
+        assertEquals((1..60).filter { it != 2 && it != 10 } + listOf(2, 10), vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `an edit while the re-fetch runs isn't undone by its answer`() = runTest(main.dispatcher) {
+        val server = documents(60) { doc(it, "A%02d".format(it)) }
+        val vm = refetchInFlight(server)
+
+        val edited = server.getValue(4).copy(storagePathId = 9)
+        server[4] = edited
+        vm.patch(edited)
+        library.documentsGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(9, vm.documents(listOf(4)).single().storagePathId)
+    }
 }

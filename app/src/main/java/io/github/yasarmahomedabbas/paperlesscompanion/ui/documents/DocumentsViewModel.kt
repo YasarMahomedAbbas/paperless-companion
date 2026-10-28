@@ -195,7 +195,7 @@ class DocumentsViewModel(
         val old = loaded[index]
         loaded = loaded.toMutableList().also { it[index] = document.copy(searchHit = old.searchHit) }
         showLoaded()
-        if (moves(old, document)) refetchWindow()
+        if (moves(old, document) || refetching) refetchWindow()
     }
 
     /**
@@ -208,8 +208,14 @@ class DocumentsViewModel(
         val moved = loaded.any { it.id in wanted && moves(it, it.with(edit)) }
         loaded = loaded.map { if (it.id in wanted) it.with(edit) else it }
         showLoaded()
-        if (moved) refetchWindow()
+        if (moved || refetching) refetchWindow()
     }
+
+    /**
+     * A re-fetch is on its way. Its answer may predate a change made since (the server may have
+     * served it before the change), so that change starts it again rather than let it land.
+     */
+    private val refetching get() = stale && loadJob?.isActive == true
 
     /** Whether going from [before] to [after] may change where the document stands in the list, or whether it is in it. */
     private fun moves(before: Document, after: Document): Boolean {
@@ -240,7 +246,15 @@ class DocumentsViewModel(
      */
     private fun refetchWindow() {
         val labels = _state.value.labels ?: return
-        if (consumed == 0) return
+        if (consumed == 0) {
+            // Nothing shown is left to catch up; a re-fetch on its way would bring back what went.
+            if (stale) {
+                loadJob?.cancel()
+                stale = false
+                _state.update { it.copy(refreshing = false) }
+            }
+            return
+        }
         // A refresh is bringing page 1 fresh already.
         if (_state.value.refreshing && !stale) return
         stale = true
@@ -295,6 +309,7 @@ class DocumentsViewModel(
         loaded = loaded.filter { it.id !in wanted }
         consumed = (consumed - gone.size).coerceAtLeast(0)
         showLoaded(totalChange = -gone.size)
+        if (refetching) refetchWindow()
     }
 
     /** Undo brought [ids] back from the trash: each remembered one returns to its old place. */
@@ -306,6 +321,7 @@ class DocumentsViewModel(
         loaded = list
         consumed += back.size
         showLoaded(totalChange = back.size)
+        if (refetching) refetchWindow()
     }
 
     /** Re-draws the rows from [loaded], keeping everything else; [totalChange] moves the count. */
