@@ -6,6 +6,7 @@ An Android app for scanning paper documents straight into a self-hosted [Paperle
 - **Take photo** and **Choose file**: for phones without Google Play services, or for PDFs you already have.
 - **Share to Paperless Scan**: send PDFs and images from any other app.
 - Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and links to the new document.
+- **Lock with fingerprint**: when the phone has a screen lock, the app opens only after a fingerprint or the phone's PIN/pattern, and locks again after a minute in the background. The switch is in the home screen's menu.
 
 The app talks only to your own server. It's built for a server reached over the home network or a VPN such as Tailscale, so plain `http://` addresses are allowed.
 
@@ -13,7 +14,7 @@ The app talks only to your own server. It's built for a server reached over the 
 
 1. On the phone, open the [latest release](../../releases/latest) and download `paperless-scan-<version>.apk`.
 2. Open it and allow installing from your browser when Android asks.
-3. Sign in with the server address (for example `http://paperless:8000`) and your Paperless username and password. The app swaps them for an API token, which it keeps encrypted with the Android Keystore. The password itself isn't stored.
+3. Sign in with the server address (for example `http://paperless:8000`) and your Paperless username and password. The app swaps them for an API token, which it keeps encrypted with the Android Keystore, behind the phone's lock while Lock with fingerprint is on. The password itself isn't stored. If the phone's screen lock is removed, the key goes with it and the app asks you to sign in again.
 
 To get updates automatically, add this repository's URL to [Obtainium](https://github.com/ImranR98/Obtainium).
 
@@ -32,7 +33,7 @@ ui/       Compose screens + ViewModels (state as StateFlow)
   ↓
 domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
   ↑
-data/     PaperlessApi (OkHttp + paperless-ngx REST), KeystoreSettingsRepository, UriDocuments
+data/     PaperlessApi (OkHttp + paperless-ngx REST), SealedSettingsRepository + KeystoreTokenVault, UriDocuments
 ```
 
 `data` implements the interfaces `domain` defines, so the use cases never see HTTP or Android. `AppContainer` wires the layers together by hand, without a DI framework.
@@ -41,6 +42,7 @@ data/     PaperlessApi (OkHttp + paperless-ngx REST), KeystoreSettingsRepository
 |---|---|
 | `LoginUseCase` | Normalizes the server address, exchanges username and password for a token via `POST /api/token/`, saves it |
 | `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
+| `AppLock` | Locks the app again (and forgets the unlocked token) after a minute or more in the background, while the lock is on |
 
 Any change to a Paperless call follows the current [API docs](https://docs.paperless-ngx.com/api/) and the server's own schema at `<server>/api/schema/view/` (see `CLAUDE.md`).
 

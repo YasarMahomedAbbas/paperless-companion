@@ -49,3 +49,15 @@ Branch: `feat/8-fingerprint-unlock`
 - Raised: https://github.com/YasarMahomedAbbas/paperless-companion/issues/16 (Sign out bounces straight back to Home; pre-existing, noted during implementation).
 - API: none touched (no Paperless call added or changed).
 - Layers: clean. `data/` holds the Keystore and prefs; `domain/` has `StoredSignIn`, `AppLockRepository`, `AppLock` in the app's words; `ui/` only sees domain. Security: the token isn't logged or put in a URL; it's stored only AES-GCM-sealed by a Keystore key in private prefs; no manifest change.
+
+## Doc drift
+
+- Applied: README.md:features — new "Lock with fingerprint" bullet (rung 3, using the app).
+- Applied: README.md:Install step 3 — the token sits behind the phone's lock while the lock is on; removing the screen lock means signing in again (rung 3).
+- Applied: README.md:Architecture — data/ block named the deleted `KeystoreSettingsRepository`; now `SealedSettingsRepository + KeystoreTokenVault` (rung 3, claim the branch broke).
+- Applied: README.md:use-case table — added `AppLock` (rung 3).
+- Skipped: "never decrypt the token on a bare read()" — enforced by SealedSettingsRepositoryTest, and the class comments say it; a session can't miss it.
+- Skipped: README's "Keystore code isn't counted" — still true (kover excludes `KeystoreTokenVault`, `PrefsStore`).
+- Skipped: docs/design/README.md — the branch already recorded its open decisions (no warning colour, no previews).
+- Skipped: CLAUDE.md — no new cross-cutting rule; the Keystore stays in data/, which the layer rules already say.
+- Stale, fixed separately: none
