@@ -184,8 +184,14 @@ class FakeLibrary : DocumentLibrary {
     /** With a gate set, file() waits on it (after reporting progress), so a test can look at a fetch in flight. */
     var fileGate: CompletableDeferred<Unit>? = null
     var failure: Exception? = null
+    /** When set, documents() answers with what it returns for the query (and throws what it throws) instead of [page]. */
+    var pages: ((DocumentQuery) -> DocumentPage)? = null
+    /** When set, documents() waits on it before answering, so a test can look at a load in flight. */
+    var documentsGate: CompletableDeferred<Unit>? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
+    /** Every documents() query, recorded before it waits or fails. */
+    val queries = mutableListOf<DocumentQuery>()
 
     private fun <T> answer(config: ServerConfig, call: String, value: T): T {
         calls += call
@@ -194,7 +200,14 @@ class FakeLibrary : DocumentLibrary {
         return value
     }
 
-    override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
+    override suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage {
+        calls += "documents $query"
+        configs += config
+        queries += query
+        documentsGate?.await()
+        failure?.let { throw it }
+        return pages?.invoke(query) ?: page
+    }
     override suspend fun document(config: ServerConfig, id: Int): Document {
         documentFailure?.let { calls += "document $id"; throw it }
         return answer(config, "document $id", document)
@@ -205,7 +218,7 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun storagePaths(config: ServerConfig) = label(config, "storagePaths", storagePaths)
 
     private fun <T> label(config: ServerConfig, call: String, value: T): T {
-        labelFailure?.let { calls += call; throw it }
+        labelFailure?.let { calls += call; configs += config; throw it }
         return answer(config, call, value)
     }
 

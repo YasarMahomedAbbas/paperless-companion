@@ -1,5 +1,6 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,31 @@ fun LargeTitleBar(title: String, modifier: Modifier = Modifier, actions: @Compos
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         actions()
+    }
+}
+
+/**
+ * The back bar of a pushed screen (components.md § Top bars): the back icon button ("Back")
+ * and the 22/500 title.
+ */
+@Composable
+fun BackBar(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.s4, end = Spacing.gutter, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        AppIconButton(AppIcons.Back, "Back", onBack)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
     }
 }
 

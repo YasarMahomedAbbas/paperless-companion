@@ -48,6 +48,8 @@ enum class StatusTone {
  * The empty / error / done card of docs/design/components.md § Status card: a `surface` card,
  * `r-card`, with a 64 circle holding the icon, one statement (17/500), one line of what to do
  * (14 `mfg`) and one `Secondary` button. Centre it in the space it fills; it keeps 20 from the sides.
+ * [inSheet] steps it up a tone, `raised` with a `surface` circle, for a sheet's no-match or
+ * load-failed state (no card on a card of the same tone).
  */
 @Composable
 fun StatusCard(
@@ -58,19 +60,21 @@ fun StatusCard(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
+    inSheet: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
+    val plain = if (inSheet) colors.surfaceContainer else colors.surfaceContainerHigh
     val (tint, circle) = when (tone) {
-        StatusTone.Empty -> colors.onSurfaceVariant to colors.surfaceContainerHigh
-        StatusTone.Unreachable -> AppTheme.extendedColors.warning to colors.surfaceContainerHigh
-        StatusTone.Refused -> colors.error to colors.surfaceContainerHigh
+        StatusTone.Empty -> colors.onSurfaceVariant to plain
+        StatusTone.Unreachable -> AppTheme.extendedColors.warning to plain
+        StatusTone.Refused -> colors.error to plain
         StatusTone.Done -> colors.primary to colors.primaryContainer
     }
     Column(
         modifier
             .padding(horizontal = Spacing.s20)
             .fillMaxWidth()
-            .background(colors.surfaceContainer, MaterialTheme.shapes.medium)
+            .background(if (inSheet) colors.surfaceContainerHigh else colors.surfaceContainer, MaterialTheme.shapes.medium)
             .semantics(mergeDescendants = false) { liveRegion = LiveRegionMode.Polite }
             .padding(horizontal = Spacing.s24, vertical = Spacing.s32),
         horizontalAlignment = Alignment.CenterHorizontally,
