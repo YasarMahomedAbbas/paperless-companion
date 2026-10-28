@@ -159,26 +159,26 @@ Files in `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/
 
 Goal: Updates is reachable from the home overflow menu and the notification, shows the installed version, the offer's version and notes, and installs it; the notification permission is asked once.
 
-### [ ] 4.1 — `UpdatesViewModel`
+### [x] 4.1 — `UpdatesViewModel`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/updates/UpdatesViewModel.kt`
 `data class UpdatesUiState(val installedVersion: String, val offer: AppRelease?, val phase: Phase = Idle, val checking: Boolean = false, val checkFailed: Boolean = false)`;
-`sealed interface Phase { Idle; Downloading(done, total); Installing; NeedsPermission; Failed(reason: String) }`.
+`sealed interface Phase { Idle; Downloading(done, total); Installing; NeedsPermission; Failed(reason: String) }` (top level in `ui/updates/`); `UpdatesUiState.busy` while downloading or installing.
 `class UpdatesViewModel(installedVersion: String, store: UpdateStore, downloader: ApkDownloader, installer: AppInstaller, check: CheckForUpdateUseCase)`;
 `install()`, `stop()`, `resumed()`, `checkNow()` with the assistant `UpdateViewModel`'s rules for one package: an offer counts only while newer than `installer.installedVersionCode()`; a kept download waits for the permission and installs on `resumed()` when allowed; `Installed` → Idle and offer gone; `Failed(detail)` → `Failed`. Reasons in words, by `UpdateException.Kind`: CHECKSUM "The download didn't match the release, so it wasn't installed.", NOT_OURS "This update isn't signed with the app's key, so it wasn't installed.", OFFLINE "Couldn't reach GitHub. Check the connection and try again.", STORAGE "Not enough space to download the update.", SERVER "GitHub didn't send the update. Try again later.", REFUSED "Android didn't install the update" + detail.
 
-### [ ] 4.2 — `UpdatesScreen`
+### [x] 4.2 — `UpdatesScreen`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/updates/UpdatesScreen.kt`
-Built with the `design-recipe` skill and `docs/design/README.md` (first pass; #6 may restyle): top bar with back and "Updates"; one card: "Paperless Scan", "Version <installed>" muted, then "Up to date" or "Version <new> is ready" + the release notes (plain text, scrollable) + one green *Install*; downloading: progress line, megabytes, *Stop*; "Installing…" while Android confirms; failure in words with *Install* again; needs permission: the sentence and *Allow* (opens `permissionIntent()`); *Check now* as a text button. Keeps the screen on while busy; `ON_RESUME` → `resumed()`.
+Built with the `design-recipe` skill and `docs/design/README.md` (first pass; #6 may restyle): top bar with back and "Updates"; one card: "Paperless Scan", "Version <installed>" muted, then "Up to date" or "Version <new> is ready" + the release notes (plain text, scrollable) + one green *Install*; downloading: progress line, megabytes, *Stop*; "Installing…" while Android confirms; failure in words with *Install* again; needs permission: the sentence and *Allow* (opens `permissionIntent()`); *Check now* as a text button. Keeps the screen on while busy; `ON_RESUME` → `resumed()` (`LifecycleEventEffect`). Split into `UpdatesScreen` (ViewModel, effects) and a stateless `UpdatesContent` with a `@Preview` per state (adds `ui-tooling-preview`, and `ui-tooling` for debug). The manual's gaps for this screen are recorded in `docs/design/README.md` § Open decisions.
 
-### [ ] 4.3 — Home overflow menu, navigation, permission, confirmation
+### [x] 4.3 — Home overflow menu, navigation, permission, confirmation
 
 - `HomeScreen.kt`: replace the *Sign out* text button with an overflow icon button (content description "More") opening a `DropdownMenu` with "Updates" and "Sign out"; new parameter `onOpenUpdates: () -> Unit`.
-- `MainActivity.kt`: `var showUpdates by mutableStateOf(false)` set by the menu and by `EXTRA_OPEN_UPDATES` in `receive(intent)` (onCreate and onNewIntent); back returns home (`BackHandler`). Collects `container.installer.confirmation` and starts it with `startActivity`, then consumes it. On create, release builds only: `UpdateSchedule.now(this)`; on API 33+, if `!updateStore.askedForNotifications()`, request `POST_NOTIFICATIONS` once via `registerForActivityResult(RequestPermission())` and mark asked. Updates is only reachable when signed in: the notification's extra is ignored on the login screen.
+- `MainActivity.kt`: `var showUpdates by mutableStateOf(false)` set by the menu and by `EXTRA_OPEN_UPDATES` in `receive(intent)` (onCreate and onNewIntent); back returns home (`BackHandler`). Collects `container.installer.confirmation` and starts it with `startActivity`, then consumes it. On a fresh create (`savedInstanceState == null`), release builds only: `UpdateSchedule.now(this)`; on API 33+, if `!updateStore.askedForNotifications()`, request `POST_NOTIFICATIONS` once via `registerForActivityResult(RequestPermission())` and mark asked. Updates is only reachable when signed in: the notification's extra is ignored on the login screen.
 - `AppContainer`: `updatesViewModelFactory` (installed version name from `PackageManager`).
 
-### [ ] 4.4 — Tests
+### [x] 4.4 — Tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/UpdatesViewModelTest.kt` with `FakeDownloader`, `FakeInstaller` in `Fakes.kt`; cases as in the test plan. Mirror the assistant's `UpdateViewModelTest`.
 

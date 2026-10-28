@@ -23,10 +23,11 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCas
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
 import java.io.File
 
 /** Wires the data layer into the domain use cases, and those into the ViewModels. */
-class AppContainer(context: Context) {
+class AppContainer(private val context: Context) {
     val settings: SettingsRepository = KeystoreSettingsRepository(context)
     val documents = UriDocuments(context.contentResolver)
     private val paperless: PaperlessRepository = PaperlessApi()
@@ -44,6 +45,12 @@ class AppContainer(context: Context) {
     }
     val homeViewModelFactory = viewModelFactory {
         initializer { HomeViewModel(UploadDocumentUseCase(paperless, settings), settings) }
+    }
+    val updatesViewModelFactory = viewModelFactory {
+        initializer {
+            val installed = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+            UpdatesViewModel(installed, updateStore, downloader, installer, checkForUpdate)
+        }
     }
 }
 
