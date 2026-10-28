@@ -128,3 +128,13 @@ Settled when #6 met #8 and #13 on `main`:
   "Up to date" is the empty state. A failed *Check now* is its error, with *Check now* as Try
   again; it says to check the connection rather than the home network or VPN, since GitHub
   isn't on the home network.
+
+Settled while building the Documents list (#9):
+
+- **More drawn icons.** Search, close, back, plus, chevron, the Settings gear, filters, sort,
+  scan, camera, file, person and server are drawn in `AppIcons.kt` from the canvas's strokes,
+  for the same reason as the first set.
+- **The search row drops its tags.** A row's search variant shows the two-line snippet in the
+  tags' place, as the "Search — searching" board draws it.
+- **A failed next page** is an `Unreachable` notice banner at the foot of the list with Try
+  again, so the rows already loaded stay put.

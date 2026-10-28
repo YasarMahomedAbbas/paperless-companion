@@ -88,32 +88,32 @@ The cases in the test plan's first and fourth bullets, on `MainDispatcherRule` a
 
 Goal: every part the Documents, sheet and Settings screens need exists once in `ui/components/`, built to `components.md` with the `design-recipe` skill, each with a `@Preview`. No call site passes a colour, shape or size.
 
-### [ ] 2.1 — Document row
+### [x] 2.1 — Document row
 
 File: `ui/components/DocumentRow.kt` (new)
-`DocumentRowCard(title: String, meta: String, tags: List<String>, moreTags: Int, thumbnail: Any?, snippet: AnnotatedString?, onClick: () -> Unit)`. 56 × 72 `AsyncImage` (`r-thumb`, crop) with a `raised` placeholder, tag pills, and a search variant with a two-line snippet. Put the snippet builder `fun SearchHit.highlighted(): AnnotatedString` (`primary-tint` background on `fg` per match range, ranges clamped to the excerpt) here and unit-test it (`ui/HighlightTest.kt`). Components take plain values, not `DocumentRow`, so they keep no dependency on `ui/documents`.
+`DocumentRowCard(title: String, meta: String, tags: List<String>, moreTags: Int, thumbnail: Any?, snippet: AnnotatedString?, onClick: () -> Unit)`. 56 × 72 `AsyncImage` (`r-thumb`, crop) with a `raised` placeholder, `TagPill`s, and a search variant with a two-line snippet in the tags' place (as the canvas draws it). Put the snippet builder `fun SearchHit.highlighted(match: SpanStyle): AnnotatedString` here, with `searchMatch` (`primary-tint` background on `fg`) as the style the screen passes, ranges clamped to the excerpt; the style is a parameter so the test needs no theme. Unit-tested in `ui/HighlightTest.kt`. Components take plain values, not `DocumentRow`, so they keep no dependency on `ui/documents`.
 
-### [ ] 2.2 — Search field, chips, icon button, action button
+### [x] 2.2 — Search field, chips, icon button, action button
 
 Files: `ui/components/SearchField.kt`, `ui/components/Chips.kt`, `ui/components/Buttons.kt` (extend)
-- `SearchField(value, onValueChange, onSearch, onFocus, focused, modifier)`: 52 high, fully round, Clear icon button once there is text, IME action Search.
-- `AppChip(text, variant: ChipVariant { Action, Selected, Unselected, Removable }, onClick, leadingIcon?, contentDescription?)`.
-- `AppIconButton(icon, contentDescription, variant: IconButtonVariant { Plain, Tonal }, onClick)` (48 × 48).
+- `SearchField(value, onValueChange, modifier, placeholder, variant: SearchFieldVariant { Page, Sheet }, onSearch, onFocusChange)`: 52 high (48 in a sheet), fully round, a 2dp ring while focused (tracked inside), Clear icon button once there is text, IME action Search.
+- `AppChip(text, onClick, variant: ChipVariant { Action, Selected, Unselected, Removable }, leadingIcon?, contentDescription?, enabled)`, and `ChipRow` (scrolls sideways on the page gutter).
+- `AppIconButton(icon, contentDescription, onClick, variant: IconButtonVariant { Plain, Tonal }, iconSize)` (48 × 48).
 - `AddButton(onClick)`: the extended FAB "Add".
-- A gear icon in `AppIcons.kt` if `material-icons-core`'s `Settings` doesn't match the canvas gear.
+- The canvas's icons in `AppIcons.kt` (gear, search, close, back, plus, chevron, filters, sort, scan, camera, file, person, server): `material-icons-core` has only filled shapes, and #6 already draws the outlined ones (recorded in `docs/design/README.md` § Decisions).
 
-### [ ] 2.3 — Status card, skeleton, footer
+### [x] 2.3 — Status card, skeleton, footer
 
 Files: `ui/components/StatusCard.kt`, `ui/components/Skeleton.kt`
 - `StatusCard(icon, tone: StatusTone { Empty, Unreachable, Refused, Done }, title, body, actionLabel, onAction)`.
-- `DocumentRowSkeleton()` (the row's shapes in shim blocks, a 1.8 s sweep) and `LoadingMoreFooter()` (one skeleton row + spinner + "Loading more"); `LoadMoreFailedFooter(message, onRetry)`.
+- `DocumentRowSkeleton()` (the row's shapes in shim blocks, a 1.8 s sweep) and `LoadingMoreFooter()` (one skeleton row + spinner + "Loading more"); `LoadMoreFailedFooter(message, onRetry)`, an `Unreachable` notice banner with Try again.
 
-### [ ] 2.4 — Bottom sheet, option list, settings row
+### [x] 2.4 — Bottom sheet, option list, settings row
 
 Files: `ui/components/Sheets.kt`, `ui/components/SettingsRow.kt`
-- `AppBottomSheet(title, onDismiss, content)` on M3 `ModalBottomSheet` with the manual's shape, handle and scrim; `ListSheetActionBar(content)`, pinned above a `border-muted` divider.
+- `AppBottomSheet(title, onDismiss, variant: SheetVariant { Short, List }, actionBar?, content)` on M3 `ModalBottomSheet` with the manual's shape, handle and scrim; a list sheet is 85% high and its content scrolls itself; `ListSheetActionBar(content)`, pinned above a `border-muted` divider.
 - `ActionOptionRow(icon, title, subtitle, main: Boolean, onClick)` (the Add sheet), `SingleChoiceRow(text, selected, onClick, muted = false)`, `MultiChoiceRow(text, checked, onClick)`.
-- `SettingsCard { … }`, `SettingsRow(label, secondary?, trailing: SettingsTrailing { Chevron, Switch(checked, onChange), None })`.
+- `SettingsCard { … }`, `SettingsDivider()`, `SettingsRow(label, secondary?, icon?, pill?, trailing: SettingsTrailing { Chevron, Switch(checked, onChange), None }, onClick?)`.
 
 ### Verify
 
