@@ -9,7 +9,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppInstaller
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
@@ -37,12 +37,12 @@ class FakeSettings(var config: ServerConfig? = null) : SettingsRepository {
     override fun clear() { config = null }
 }
 
-/** Scripted Paperless: login and upload results are fixed, task() replays [tasks] then repeats the last one. */
-class FakePaperless(
+/** Scripted server: login and upload results are fixed, task() replays [tasks] then repeats the last one. */
+class FakeServer(
     var loginResult: () -> String = { "token-123" },
     var uploadResult: () -> String = { "task-1" },
     val tasks: MutableList<TaskInfo> = mutableListOf(TaskInfo(TaskStatus.SUCCESS, "ok", 42)),
-) : PaperlessRepository {
+) : DocumentServer {
     /** Thrown by task() before it replays [tasks]: the first ones once each, [taskAlwaysFails] every time. */
     val taskFailures = mutableListOf<Exception>()
     var taskAlwaysFails: Exception? = null
@@ -66,6 +66,8 @@ class FakePaperless(
         if (taskFailures.isNotEmpty()) throw taskFailures.removeAt(0)
         return if (tasks.size > 1) tasks.removeAt(0) else tasks.first()
     }
+
+    override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =

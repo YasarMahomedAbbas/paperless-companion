@@ -108,6 +108,6 @@ class MainActivity : ComponentActivity() {
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
-        if (uris.isNotEmpty()) shared = shared + uris.map { container.documents.from(it, "Shared document") }
+        if (uris.isNotEmpty()) shared = shared + uris.map { container.documents.from(it.toString(), "Shared document") }
     }
 }

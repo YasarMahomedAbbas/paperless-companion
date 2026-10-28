@@ -14,11 +14,13 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.update.PrefsUpdateSto
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateNotifier
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateSchedule
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.CheckForUpdateUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
@@ -29,8 +31,8 @@ import java.io.File
 /** Wires the data layer into the domain use cases, and those into the ViewModels. */
 class AppContainer(private val context: Context) {
     val settings: SettingsRepository = KeystoreSettingsRepository(context)
-    val documents = UriDocuments(context.contentResolver)
-    private val paperless: PaperlessRepository = PaperlessApi()
+    val documents: DocumentFiles = UriDocuments(context.contentResolver)
+    private val server: DocumentServer = PaperlessApi()
 
     // Self-update from GitHub Releases.
     val updateStore: UpdateStore = PrefsUpdateStore(context)
@@ -41,10 +43,10 @@ class AppContainer(private val context: Context) {
     val checkForUpdate = CheckForUpdateUseCase(releases, updateStore, installer::installedVersionCode, notifier::announce)
 
     val loginViewModelFactory = viewModelFactory {
-        initializer { LoginViewModel(LoginUseCase(paperless, settings)) }
+        initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
     val homeViewModelFactory = viewModelFactory {
-        initializer { HomeViewModel(UploadDocumentUseCase(paperless, settings), settings) }
+        initializer { HomeViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings), settings) }
     }
     val updatesViewModelFactory = viewModelFactory {
         initializer {
