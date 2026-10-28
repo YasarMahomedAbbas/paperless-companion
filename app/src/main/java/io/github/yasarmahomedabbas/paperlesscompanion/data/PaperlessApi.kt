@@ -10,27 +10,19 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.Document
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import okhttp3.FormBody
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.net.ConnectException
-import java.net.NoRouteToHostException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /** DocumentServer over the paperless-ngx REST API (token auth). */
@@ -39,6 +31,8 @@ class PaperlessApi(
     private val io: CoroutineDispatcher = Dispatchers.IO,
     pollTimeoutMillis: Long = 15_000,
 ) : DocumentServer {
+    private val http = PaperlessHttp(client, io)
+
     // A status check is small and repeated every few seconds, so a stuck one is dropped quickly and retried.
     private val pollClient = client.newBuilder().readTimeout(pollTimeoutMillis, TimeUnit.MILLISECONDS).build()
 
@@ -100,53 +94,19 @@ class PaperlessApi(
     /** The document's details page in the Paperless web UI (not an API endpoint). */
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId/details"
 
-    private fun authed(config: ServerConfig, path: String) = authed(config, url(config.baseUrl, path))
+    private fun url(baseUrl: String, path: String) = PaperlessHttp.url(baseUrl, path)
 
-    private fun authed(config: ServerConfig, url: HttpUrl) =
-        Request.Builder().url(url).header("Authorization", "Token ${config.token}")
+    private fun authed(config: ServerConfig, path: String) = http.authed(config, path)
+
+    private fun authed(config: ServerConfig, url: HttpUrl) = http.authed(config, url)
 
     private suspend fun call(
         request: Request,
         client: OkHttpClient = this.client,
         badRequestIsAuth: Boolean = false,
-    ): JsonElement = withContext(io) {
-        val (code, text) = try {
-            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
-        } catch (e: IOException) {
-            throw networkError(request.url.host, e)
-        }
-        when {
-            code in 200..299 -> runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
-            code == 401 || code == 403 || (badRequestIsAuth && code == 400) ->
-                throw ServerException(Kind.UNAUTHORIZED, "Wrong username or password")
-            else -> throw ServerException(Kind.SERVER, "Paperless returned HTTP $code: ${text.take(200)}")
-        }
-    }
-
-    /** Tells "couldn't connect" (wrong network, server down) apart from "connected, but no complete answer". */
-    private fun networkError(host: String, e: IOException): ServerException {
-        val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-        val connecting = e is ConnectException || e is UnknownHostException || e is NoRouteToHostException ||
-            (e is SocketTimeoutException && detail.startsWith("connect", ignoreCase = true))
-        return if (connecting) {
-            ServerException(Kind.UNREACHABLE, "can't connect to $host: $detail", e)
-        } else {
-            ServerException(Kind.NO_ANSWER, "no answer from $host: $detail", e)
-        }
-    }
+    ): JsonElement = http.call(request, client, badRequestIsAuth)
 
     companion object {
-        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(2, TimeUnit.MINUTES)
-            .readTimeout(1, TimeUnit.MINUTES)
-            .build()
-
-        private fun url(baseUrl: String, path: String): HttpUrl =
-            "${baseUrl.trimEnd('/')}/$path".toHttpUrlOrNull()
-                ?: throw ServerException(Kind.UNREACHABLE, "Invalid server address: $baseUrl")
-
-        private fun JsonObject.string(key: String): String? =
-            (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.contentOrNull
+        fun defaultClient(): OkHttpClient = PaperlessHttp.defaultClient()
     }
 }
