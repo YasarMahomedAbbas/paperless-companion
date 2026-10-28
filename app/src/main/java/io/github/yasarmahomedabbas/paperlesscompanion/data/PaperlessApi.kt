@@ -27,13 +27,20 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /** PaperlessRepository over the paperless-ngx REST API (token auth). */
 class PaperlessApi(
     private val client: OkHttpClient = defaultClient(),
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    pollTimeoutMillis: Long = 15_000,
 ) : PaperlessRepository {
+    // A status check is small and repeated every few seconds, so a stuck one is dropped quickly and retried.
+    private val pollClient = client.newBuilder().readTimeout(pollTimeoutMillis, TimeUnit.MILLISECONDS).build()
 
     override suspend fun login(baseUrl: String, username: String, password: String): String {
         val body = FormBody.Builder().add("username", username).add("password", password).build()
@@ -67,7 +74,7 @@ class PaperlessApi(
         val url = url(config.baseUrl, "api/tasks/").newBuilder().addQueryParameter("task_id", taskId).build()
         val request = authed(config, url).get().build()
         // Paperless 2.x (API v9) answers with a bare list; 3.x (API v10) with a paginated object.
-        val json = call(request)
+        val json = call(request, pollClient)
         val tasks = json as? JsonArray ?: (json as? JsonObject)?.get("results") as? JsonArray
         val task = tasks?.firstOrNull()?.jsonObject
             ?: return TaskInfo(TaskStatus.PENDING, null, null)
@@ -95,20 +102,33 @@ class PaperlessApi(
     private fun authed(config: ServerConfig, url: HttpUrl) =
         Request.Builder().url(url).header("Authorization", "Token ${config.token}")
 
-    private suspend fun call(request: Request, badRequestIsAuth: Boolean = false): JsonElement = withContext(io) {
-        val response = try {
-            client.newCall(request).execute()
+    private suspend fun call(
+        request: Request,
+        client: OkHttpClient = this.client,
+        badRequestIsAuth: Boolean = false,
+    ): JsonElement = withContext(io) {
+        val (code, text) = try {
+            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
         } catch (e: IOException) {
-            throw PaperlessException(Kind.UNREACHABLE, "Can't reach ${request.url.host}", e)
+            throw networkError(request.url.host, e)
         }
-        response.use {
-            val text = it.body?.string().orEmpty()
-            when {
-                it.isSuccessful -> runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
-                it.code == 401 || it.code == 403 || (badRequestIsAuth && it.code == 400) ->
-                    throw PaperlessException(Kind.UNAUTHORIZED, "Wrong username or password")
-                else -> throw PaperlessException(Kind.SERVER, "Paperless returned HTTP ${it.code}: ${text.take(200)}")
-            }
+        when {
+            code in 200..299 -> runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
+            code == 401 || code == 403 || (badRequestIsAuth && code == 400) ->
+                throw PaperlessException(Kind.UNAUTHORIZED, "Wrong username or password")
+            else -> throw PaperlessException(Kind.SERVER, "Paperless returned HTTP $code: ${text.take(200)}")
+        }
+    }
+
+    /** Tells "couldn't connect" (wrong network, server down) apart from "connected, but no complete answer". */
+    private fun networkError(host: String, e: IOException): PaperlessException {
+        val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+        val connecting = e is ConnectException || e is UnknownHostException || e is NoRouteToHostException ||
+            (e is SocketTimeoutException && detail.startsWith("connect", ignoreCase = true))
+        return if (connecting) {
+            PaperlessException(Kind.UNREACHABLE, "can't connect to $host: $detail", e)
+        } else {
+            PaperlessException(Kind.NO_ANSWER, "no answer from $host: $detail", e)
         }
     }
 

@@ -32,6 +32,9 @@ class FakePaperless(
     var uploadResult: () -> String = { "task-1" },
     val tasks: MutableList<TaskInfo> = mutableListOf(TaskInfo(TaskStatus.SUCCESS, "ok", 42)),
 ) : PaperlessRepository {
+    /** Thrown by task() before it replays [tasks]: the first ones once each, [taskAlwaysFails] every time. */
+    val taskFailures = mutableListOf<Exception>()
+    var taskAlwaysFails: Exception? = null
     val logins = mutableListOf<Triple<String, String, String>>()
     val uploads = mutableListOf<String>()
     var taskPolls = 0
@@ -48,6 +51,8 @@ class FakePaperless(
 
     override suspend fun task(config: ServerConfig, taskId: String): TaskInfo {
         taskPolls++
+        taskAlwaysFails?.let { throw it }
+        if (taskFailures.isNotEmpty()) throw taskFailures.removeAt(0)
         return if (tasks.size > 1) tasks.removeAt(0) else tasks.first()
     }
 }

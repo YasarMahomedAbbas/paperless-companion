@@ -72,6 +72,53 @@ class UploadDocumentUseCaseTest {
     }
 
     @Test
+    fun `a dropped status check is retried, because the file is already uploaded`() = runTest {
+        paperless.taskFailures += PaperlessException(Kind.NO_ANSWER, "no answer from paperless: timeout")
+        paperless.taskFailures += PaperlessException(Kind.UNREACHABLE, "can't connect to paperless: refused")
+
+        val states = upload(document()).toList()
+
+        assertEquals(UploadState.Done(42), states.last())
+        assertEquals(1, paperless.uploads.size)
+        assertEquals(3, paperless.taskPolls)
+    }
+
+    @Test
+    fun `status checks that keep failing end in a failure that keeps the task and the cause`() = runTest {
+        paperless.taskAlwaysFails = PaperlessException(Kind.NO_ANSWER, "no answer from paperless: timeout")
+
+        val last = upload(document()).toList().last() as UploadState.Failed
+
+        assertEquals("task-1", last.taskId)
+        assertTrue(last.message.startsWith("Uploaded, but"))
+        assertTrue(last.message.contains("no answer from paperless: timeout"))
+    }
+
+    @Test
+    fun `a login problem while checking ends straight away but keeps the task`() = runTest {
+        paperless.taskAlwaysFails = PaperlessException(Kind.UNAUTHORIZED, "Wrong username or password")
+
+        val last = upload(document()).toList().last() as UploadState.Failed
+
+        assertEquals("task-1", last.taskId)
+        assertEquals(1, paperless.taskPolls)
+    }
+
+    @Test
+    fun `with a task id it only checks on the upload, without uploading again`() = runTest {
+        val states = upload(document(), uploadedTaskId = "task-9").toList()
+
+        assertEquals(listOf(UploadState.Processing("task-9"), UploadState.Done(42)), states)
+        assertTrue(paperless.uploads.isEmpty())
+    }
+
+    @Test
+    fun `a refused document can be uploaded again`() = runTest {
+        paperless.tasks[0] = TaskInfo(TaskStatus.FAILURE, "nope", null)
+        assertEquals(null, (upload(document()).toList().last() as UploadState.Failed).taskId)
+    }
+
+    @Test
     fun `fails straight away when not signed in`() = runTest {
         settings.config = null
 
@@ -86,6 +133,8 @@ class UploadDocumentUseCaseTest {
         val last = upload(document()).toList().last() as UploadState.Failed
 
         assertTrue(last.message.contains("VPN"))
+        assertTrue(last.message.contains("boom"))
+        assertEquals(null, last.taskId)
     }
 
     @Test

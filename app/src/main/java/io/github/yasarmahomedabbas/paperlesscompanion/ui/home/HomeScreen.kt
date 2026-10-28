@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +68,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() }
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
 
@@ -145,7 +147,7 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp)
                 .fillMaxSize(),
         ) {
-            Text(state.serverUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(listOfNotNull(state.serverUrl, version?.let { "v$it" }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
             Button(onClick = ::scan, modifier = Modifier.fillMaxWidth().height(64.dp)) {
                 Text("Scan document", style = MaterialTheme.typography.titleMedium)

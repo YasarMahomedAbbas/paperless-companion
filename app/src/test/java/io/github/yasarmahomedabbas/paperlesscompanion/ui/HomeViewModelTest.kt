@@ -63,6 +63,21 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `retry after a failed status check checks again instead of uploading again`() = runTest(main.dispatcher) {
+        paperless.taskAlwaysFails = PaperlessException(PaperlessException.Kind.NO_ANSWER, "timeout")
+        viewModel.upload(listOf(document()))
+        advanceUntilIdle()
+        assertEquals("task-1", (uploads.single().state as UploadState.Failed).taskId)
+
+        paperless.taskAlwaysFails = null
+        viewModel.retry(uploads.single().id)
+        advanceUntilIdle()
+
+        assertEquals(UploadState.Done(42), uploads.single().state)
+        assertEquals(1, paperless.uploads.size)
+    }
+
+    @Test
     fun `retry ignores uploads that did not fail`() = runTest(main.dispatcher) {
         viewModel.upload(listOf(document()))
         advanceUntilIdle()

@@ -10,6 +10,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -189,6 +190,31 @@ class PaperlessApiTest {
     fun `an unreachable server is reported as unreachable`() = runTest {
         server.shutdown()
         expectError(Kind.UNREACHABLE) { api.task(config, "t") }
+    }
+
+    @Test
+    fun `an unreachable server says why`() = runTest {
+        server.shutdown()
+        try {
+            api.task(config, "t")
+            fail()
+        } catch (e: PaperlessException) {
+            assertTrue(e.message!!.startsWith("can't connect to ${server.hostName}: "))
+        }
+    }
+
+    @Test
+    fun `a status check that gets no answer is a no-answer error, not unreachable`() = runTest {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        val quick = PaperlessApi(pollTimeoutMillis = 200)
+
+        try {
+            quick.task(config, "t")
+            fail()
+        } catch (e: PaperlessException) {
+            assertEquals(Kind.NO_ANSWER, e.kind)
+            assertTrue(e.message!!.contains("timeout"))
+        }
     }
 
     @Test

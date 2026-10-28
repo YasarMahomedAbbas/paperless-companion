@@ -2,6 +2,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
@@ -15,7 +16,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Uploads one document and follows its consume task until Paperless accepts or refuses it.
- * Emits Uploading, then Processing, then exactly one of Done or Failed.
+ * Emits Uploading, then Processing, then exactly one of Done or Failed. With [uploadedTaskId] the file is
+ * already on the server, so it skips the upload and only follows the task.
  */
 class UploadDocumentUseCase(
     private val paperless: PaperlessRepository,
@@ -23,46 +25,64 @@ class UploadDocumentUseCase(
     private val pollInterval: Duration = 2.seconds,
     private val timeout: Duration = 5.minutes,
 ) {
-    operator fun invoke(document: DocumentSource): Flow<UploadState> = flow {
+    operator fun invoke(document: DocumentSource, uploadedTaskId: String? = null): Flow<UploadState> = flow {
         val config = settings.load()
         if (config == null) {
             emit(UploadState.Failed("Not signed in"))
             return@flow
         }
-        emit(UploadState.Uploading)
-        try {
-            val taskId = paperless.upload(config, document)
-            emit(UploadState.Processing(taskId))
-            var waited = Duration.ZERO
-            while (true) {
-                val task = paperless.task(config, taskId)
-                when (task.status) {
-                    TaskStatus.SUCCESS -> {
-                        emit(UploadState.Done(task.documentId))
-                        return@flow
-                    }
-                    TaskStatus.FAILURE -> {
-                        emit(UploadState.Failed(task.message ?: "Paperless refused the document"))
-                        return@flow
-                    }
-                    TaskStatus.PENDING, TaskStatus.RUNNING -> Unit
-                }
-                if (waited >= timeout) {
-                    emit(UploadState.Failed("Uploaded, but Paperless is still processing it. Check Paperless later."))
-                    return@flow
-                }
-                delay(pollInterval)
-                waited += pollInterval
-            }
+        val taskId = uploadedTaskId ?: try {
+            emit(UploadState.Uploading)
+            paperless.upload(config, document)
         } catch (e: PaperlessException) {
             emit(UploadState.Failed(e.userMessage()))
+            return@flow
+        }
+        emit(UploadState.Processing(taskId))
+        var waited = Duration.ZERO
+        var lastError: PaperlessException? = null
+        while (true) {
+            val task = try {
+                paperless.task(config, taskId).also { lastError = null }
+            } catch (e: PaperlessException) {
+                // The file is already on the server, so a dropped or slow check is tried again, not reported.
+                if (e.kind != Kind.UNREACHABLE && e.kind != Kind.NO_ANSWER) {
+                    emit(UploadState.Failed(notConfirmed(e), taskId))
+                    return@flow
+                }
+                lastError = e
+                null
+            }
+            when (task?.status) {
+                TaskStatus.SUCCESS -> {
+                    emit(UploadState.Done(task.documentId))
+                    return@flow
+                }
+                TaskStatus.FAILURE -> {
+                    emit(UploadState.Failed(task.message ?: "Paperless refused the document"))
+                    return@flow
+                }
+                else -> Unit
+            }
+            if (waited >= timeout) {
+                val message = lastError?.let(::notConfirmed)
+                    ?: "Uploaded, but Paperless is still processing it. Tap Retry to check again."
+                emit(UploadState.Failed(message, taskId))
+                return@flow
+            }
+            delay(pollInterval)
+            waited += pollInterval
         }
     }
+
+    private fun notConfirmed(e: PaperlessException) =
+        "Uploaded, but checking whether Paperless accepted it failed: ${e.userMessage()} Tap Retry to check again."
 }
 
 fun PaperlessException.userMessage(): String = when (kind) {
-    PaperlessException.Kind.UNREACHABLE -> "Can't reach Paperless. Are you on the home network or the VPN?"
-    PaperlessException.Kind.UNAUTHORIZED -> "Paperless rejected the login. Sign out and sign in again."
-    PaperlessException.Kind.UNREADABLE -> "Couldn't read the file on the phone"
-    PaperlessException.Kind.SERVER -> message ?: "Paperless returned an error"
+    Kind.UNREACHABLE -> "Can't reach Paperless ($message). Are you on the home network or the VPN?"
+    Kind.NO_ANSWER -> "Paperless didn't answer ($message)."
+    Kind.UNAUTHORIZED -> "Paperless rejected the login. Sign out and sign in again."
+    Kind.UNREADABLE -> "Couldn't read the file on the phone"
+    Kind.SERVER -> message ?: "Paperless returned an error"
 }

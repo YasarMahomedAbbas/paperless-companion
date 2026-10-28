@@ -44,8 +44,8 @@ class HomeViewModel(
 
     fun retry(id: Long) {
         val document = sources[id] ?: return
-        if (_state.value.uploads.firstOrNull { it.id == id }?.state !is UploadState.Failed) return
-        start(id, document)
+        val failed = _state.value.uploads.firstOrNull { it.id == id }?.state as? UploadState.Failed ?: return
+        start(id, document, failed.taskId)
     }
 
     fun clearFinished() {
@@ -59,9 +59,9 @@ class HomeViewModel(
         _state.update { it.copy(uploads = emptyList()) }
     }
 
-    private fun start(id: Long, document: DocumentSource) {
+    private fun start(id: Long, document: DocumentSource, uploadedTaskId: String? = null) {
         viewModelScope.launch {
-            uploadDocument(document)
+            uploadDocument(document, uploadedTaskId)
                 .catch { e -> emit(UploadState.Failed(e.message ?: "Upload failed")) }
                 .collect { state -> setState(id, state) }
         }
