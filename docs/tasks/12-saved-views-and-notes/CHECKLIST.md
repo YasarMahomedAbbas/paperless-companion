@@ -275,7 +275,7 @@ Files: `ui/DocumentsViewModelTest.kt`, `docs/design/README.md`
 
 Goal: the viewer's More menu has More like this. It closes the viewer and shows the list in a "similar to" mode with a removable "Like: <title>" chip.
 
-### [ ] 4.1 — List state
+### [x] 4.1 — List state
 
 Files: `ui/documents/DocumentsUiState.kt`, `ui/documents/DocumentsViewModel.kt`
 - `data class Similar(val id: Int, val title: String)`, and `DocumentsUiState.similar: Similar? = null`. `sortLabel` gives `BEST_MATCH` when `similar != null`, and `showResultLine` is true.
@@ -284,21 +284,21 @@ Files: `ui/documents/DocumentsUiState.kt`, `ui/documents/DocumentsViewModel.kt`
   - stop searching (`searching = false`, `text = ""`);
   - `view = null`, `viewOrder = false`, `filters = DocumentFilters()`, `similar = Similar(id, title.ifBlank { "Untitled" })`;
   - `reload()`.
-- `clearSimilar()` sets `similar = null` and reloads.
+- `clearSimilar(alsoFilters: Boolean = false)` sets `similar = null` (and with `alsoFilters` clears the filters) and reloads.
 - `startSearch()` and `chooseView()` clear `similar`.
 - `setFilters` keeps `similar`.
 - `query()` passes `similarTo = s.similar?.id`.
 - The sort chip is disabled while `similar` is on.
 
-### [ ] 4.2 — Screen and wiring
+### [x] 4.2 — Screen and wiring
 
 Files: `ui/documents/DocumentsScreen.kt`, `ui/viewer/ViewerScreen.kt`, `MainActivity.kt`. Apply `design-recipe`.
 - Chip row: while `similar` is on, a `Removable` chip "Like: <title>" comes first (ellipsised at 24 chars, content description "Stop showing documents like <title>"). It calls `clearSimilar`, and the view chips hide.
 - `ViewerScreen`: a `MenuItem("More like this", AppIcons.<similar icon>, …)` after Open in Paperless and before the trash divider, enabled once `state.document != null`. A new `onMoreLikeThis: (Document) -> Unit` parameter.
 - `MainActivity`: `onMoreLikeThis` closes the viewer (as trash does) and calls `list.showSimilar(document.id, document.title)`, where `list` is the `DocumentsViewModel` that `MainActivity` already holds for `patch` and `remove`.
-- Empty state while similar is on: the existing "no results" card with "Clear filters" relabelled "Show all documents", which calls `clearSimilar` (and clears the filters).
+- Empty state while similar is on: a "no results" card, "Nothing like "<title>"", with "Show all documents", which calls `clearSimilar(alsoFilters = true)`.
 
-### [ ] 4.3 — Tests and manual
+### [x] 4.3 — Tests and manual
 
 - The `DocumentsViewModelTest` similar cases from the test plan.
 - `docs/design/README.md` § Decisions (#12): the menu item's place, the "Like:" chip, the sort chip disabled, and the empty-state wording.

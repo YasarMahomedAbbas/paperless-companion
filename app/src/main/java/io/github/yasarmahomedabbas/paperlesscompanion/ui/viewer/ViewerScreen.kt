@@ -94,6 +94,8 @@ fun ViewerScreen(
     onEdit: (Document) -> Unit,
     /** Move to trash was confirmed. */
     onTrash: () -> Unit,
+    /** More like this, from the More menu. */
+    onMoreLikeThis: (Document) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(viewModel) {
@@ -124,6 +126,7 @@ fun ViewerScreen(
         onRetry = viewModel::retry,
         onEdit = { state.document?.let(onEdit) },
         onTrash = onTrash,
+        onMoreLikeThis = { state.document?.let(onMoreLikeThis) },
     )
 }
 
@@ -141,6 +144,7 @@ fun ViewerContent(
     onRetry: () -> Unit,
     onEdit: () -> Unit,
     onTrash: () -> Unit,
+    onMoreLikeThis: () -> Unit = {},
     panel: AnchoredDraggableState<PanelStop> = rememberDetailsPanelState(),
     menuOpenAtStart: Boolean = false,
     confirmTrashAtStart: Boolean = false,
@@ -174,7 +178,7 @@ fun ViewerContent(
     Box(Modifier.fillMaxSize().background(colors.background)) {
         Column(Modifier.fillMaxSize()) {
             AnimatedVisibility(visible = !fullScreen, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
-                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null }) }
+                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, onMoreLikeThis.takeIf { state.document != null }, askTrash.takeIf { state.document != null }) }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (val file = state.file) {
@@ -204,7 +208,7 @@ fun ViewerContent(
         // In full screen a tap on the page brings the bar back for a moment.
         AnimatedVisibility(visible = fullScreen && peek, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
             Box(Modifier.background(colors.background).statusBarsPadding()) {
-                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null })
+                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, onMoreLikeThis.takeIf { state.document != null }, askTrash.takeIf { state.document != null })
             }
         }
         DetailsPanel(
@@ -239,7 +243,8 @@ private fun Bar(
     onMenuOpenChange: (Boolean) -> Unit,
     onDownload: () -> Unit,
     onOpenInPaperless: () -> Unit,
-    /** Null until the document has loaded. */
+    /** Null until the document has loaded, as is [onTrash]. */
+    onMoreLikeThis: (() -> Unit)?,
     onTrash: (() -> Unit)?,
 ) {
     ViewerBar(
@@ -252,6 +257,7 @@ private fun Bar(
     ) {
         MenuItem("Download", AppIcons.Download, { onMenuOpenChange(false); onDownload() }, enabled = canExport)
         MenuItem("Open in Paperless", AppIcons.OpenExternal, { onMenuOpenChange(false); onOpenInPaperless() })
+        MenuItem("More like this", AppIcons.Similar, { onMenuOpenChange(false); onMoreLikeThis?.invoke() }, enabled = onMoreLikeThis != null)
         MenuDivider()
         MenuItem("Move to trash", AppIcons.Trash, { onMenuOpenChange(false); onTrash?.invoke() }, enabled = onTrash != null, destructive = true)
     }

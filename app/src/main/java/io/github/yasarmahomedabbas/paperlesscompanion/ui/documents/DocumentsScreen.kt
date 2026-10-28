@@ -253,6 +253,8 @@ fun DocumentsScreen(
             onChooseView = documents::chooseView,
             onClearView = documents::clearView,
             onOpenViews = { sheet = DocumentsSheet.VIEWS },
+            onClearSimilar = { documents.clearSimilar() },
+            onShowAll = { documents.clearSimilar(alsoFilters = true) },
             onAdd = { sheet = DocumentsSheet.ADD },
             onOpenSettings = onOpenSettings,
             onClearFinished = uploads::clearFinished,
@@ -405,6 +407,10 @@ class DocumentsScreenActions(
     val onChooseView: (SavedView) -> Unit = {},
     val onClearView: () -> Unit = {},
     val onOpenViews: () -> Unit = {},
+    /** Ends "More like this" (its chip). */
+    val onClearSimilar: () -> Unit = {},
+    /** Ends "More like this" and drops the filters (its empty state). */
+    val onShowAll: () -> Unit = {},
     val onAdd: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onClearFinished: () -> Unit = {},
@@ -539,16 +545,26 @@ private fun DocumentsContent(
 private val SNACKBAR_LIFT = 64.dp
 
 /**
- * The home saved views (the chosen one marked), a chosen view that isn't a home one, Views, then Filters
- * (with how many are on), one removable chip per applied filter, and the sort order.
+ * "Like: <title>" while showing similar documents, else the home saved views (the chosen one marked) and
+ * a chosen view that isn't a home one; then Views, Filters (with how many are on), one removable chip per
+ * applied filter, and the sort order.
  */
 @Composable
 private fun FilterChips(state: DocumentsUiState, actions: DocumentsScreenActions, modifier: Modifier = Modifier) {
     val filters = state.filters
     val labels = state.labels
     val views = state.views
+    val similar = state.similar
     ChipRow(modifier) {
-        views?.home?.forEach { view ->
+        if (similar != null) {
+            AppChip(
+                "Like: ${similar.title.ellipsised(SIMILAR_TITLE_MAX)}",
+                actions.onClearSimilar,
+                variant = ChipVariant.Removable,
+                contentDescription = "Stop showing documents like ${similar.title}",
+            )
+        }
+        if (similar == null) views?.home?.forEach { view ->
             val chosen = state.view?.id == view.id
             AppChip(
                 view.name,
@@ -576,15 +592,21 @@ private fun FilterChips(state: DocumentsUiState, actions: DocumentsScreenActions
                 labels.documentTypes.firstOrNull { it.id == id }?.let { RemovableChip(it.name, actions.onRemoveDocumentType) }
             }
         }
-        // While searching, results come by relevance, so there is no order to choose.
+        // While searching or showing similar documents, results come by relevance, so there is no order to choose.
+        val sortable = state.text.isBlank() && similar == null
         AppChip(
             state.sortLabel,
             actions.onOpenSort,
-            leadingIcon = if (state.text.isBlank()) AppIcons.Sort else null,
-            enabled = state.text.isBlank(),
+            leadingIcon = if (sortable) AppIcons.Sort else null,
+            enabled = sortable,
         )
     }
 }
+
+/** How much of a title the "Like:" chip shows before an ellipsis. */
+private const val SIMILAR_TITLE_MAX = 24
+
+private fun String.ellipsised(max: Int) = if (length <= max) this else take(max - 1).trimEnd() + "…"
 
 @Composable
 private fun RemovableChip(name: String, onRemove: () -> Unit) {
@@ -661,7 +683,24 @@ private fun DocumentList(
             ListStatus.Empty -> item(key = "empty") {
                 val filtered = state.text.isNotBlank() || !state.filters.isEmpty
                 val view = state.view
+                val similar = state.similar
                 val emptyView = view != null && !filtered
+                if (similar != null) {
+                    StatusCard(
+                        icon = AppIcons.Search,
+                        tone = StatusTone.Empty,
+                        statement = "Nothing like \"${similar.title}\"",
+                        hint = if (filtered) {
+                            "No document like this one carries every one of these filters."
+                        } else {
+                            "Paperless found no other document like this one."
+                        },
+                        actionLabel = "Show all documents",
+                        onAction = actions.onShowAll,
+                        modifier = Modifier.padding(vertical = Spacing.s24),
+                    )
+                    return@item
+                }
                 StatusCard(
                     icon = if (filtered || emptyView) AppIcons.Search else AppIcons.File,
                     tone = StatusTone.Empty,
@@ -882,4 +921,22 @@ private fun DocumentsViewChosenPreview() = DocumentsPreview(
 @Composable
 private fun DocumentsViewEmptyPreview() = DocumentsPreview(
     DocumentsUiState(views = previewViews, view = previewViews.all[1], viewOrder = true, total = 0, status = ListStatus.Empty),
+)
+
+@Preview(name = "More like this", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSimilarPreview() = DocumentsPreview(
+    DocumentsUiState(
+        views = previewViews,
+        similar = Similar(1, "Electricity bill — October 2026, City Power"),
+        rows = previewRows.drop(1),
+        total = 4,
+        status = ListStatus.Loaded,
+    ),
+)
+
+@Preview(name = "More like this — nothing", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSimilarEmptyPreview() = DocumentsPreview(
+    DocumentsUiState(similar = Similar(1, "Car licence renewal"), total = 0, status = ListStatus.Empty),
 )

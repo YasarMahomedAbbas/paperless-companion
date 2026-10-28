@@ -23,6 +23,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.BEST_MATCH
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentFilters
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.ListStatus
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.Similar
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.SortOption
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.VIEW_ORDER
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.toRow
@@ -917,5 +918,111 @@ class DocumentsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(DocumentQuery(page = 2, pageSize = 25, view = 7, viewOrder = true), queries.last())
+    }
+
+    // More like this
+
+    @Test
+    fun `more like this ends the search, the view and the filters and lists similar documents`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        vm.setFilters(DocumentFilters(tagIds = setOf(1)))
+        vm.startSearch()
+        vm.onTextChange("power")
+        advanceUntilIdle()
+
+        vm.showSimilar(9, "Power bill")
+        assertEquals(ListStatus.Loading, vm.s.status)
+        advanceUntilIdle()
+
+        assertEquals(Similar(9, "Power bill"), vm.s.similar)
+        assertFalse(vm.s.searching)
+        assertEquals("", vm.s.text)
+        assertNull(vm.s.view)
+        assertFalse(vm.s.viewOrder)
+        assertTrue(vm.s.filters.isEmpty)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25, similarTo = 9), queries.last())
+        assertEquals(BEST_MATCH, vm.s.sortLabel)
+        assertTrue(vm.s.showResultLine)
+    }
+
+    @Test
+    fun `an untitled document is liked as Untitled`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "  ")
+        assertEquals("Untitled", vm.s.similar?.title)
+    }
+
+    @Test
+    fun `filters narrow similar documents and keep them`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+
+        assertEquals(Similar(9, "Power bill"), vm.s.similar)
+        assertEquals(DocumentQuery(correspondentId = 2, page = 1, pageSize = 25, similarTo = 9), queries.last())
+    }
+
+    @Test
+    fun `clearing similar goes back to the list, keeping or dropping the filters`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+
+        vm.clearSimilar()
+        advanceUntilIdle()
+        assertNull(vm.s.similar)
+        assertEquals(DocumentQuery(correspondentId = 2, page = 1, pageSize = 25), queries.last())
+
+        vm.showSimilar(9, "Power bill")
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+        vm.clearSimilar(alsoFilters = true)
+        advanceUntilIdle()
+        assertNull(vm.s.similar)
+        assertTrue(vm.s.filters.isEmpty)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25), queries.last())
+    }
+
+    @Test
+    fun `starting a search ends similar`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+        val before = queries.size
+
+        vm.startSearch()
+        advanceUntilIdle()
+
+        assertNull(vm.s.similar)
+        assertTrue(vm.s.searching)
+        assertEquals(before + 1, queries.size)
+        assertNull(queries.last().similarTo)
+    }
+
+    @Test
+    fun `starting a search while not similar loads nothing`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val before = queries.size
+        vm.startSearch()
+        advanceUntilIdle()
+        assertEquals(before, queries.size)
+    }
+
+    @Test
+    fun `choosing a view ends similar`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+
+        assertNull(vm.s.similar)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25, view = 7, viewOrder = true), queries.last())
     }
 }

@@ -79,16 +79,21 @@ data class DocumentsUiState(
     val view: SavedView? = null,
     /** With [view], its own order applies until the user picks a [sort]. */
     val viewOrder: Boolean = false,
+    /** The list shows the documents most like this one ("More like this"), narrowed by [filters]. */
+    val similar: Similar? = null,
 ) {
     val sortLabel: String
         get() = when {
-            text.isNotBlank() -> BEST_MATCH
+            text.isNotBlank() || similar != null -> BEST_MATCH
             view != null && viewOrder -> VIEW_ORDER
             else -> sort.label
         }
 
-    /** "23 documents" shows only when searching, filtering or in a saved view. */
-    val showResultLine: Boolean get() = text.isNotBlank() || !filters.isEmpty || view != null
+    /** "23 documents" shows only when searching, filtering, in a saved view or showing similar documents. */
+    val showResultLine: Boolean get() = text.isNotBlank() || !filters.isEmpty || view != null || similar != null
 }
+
+/** The document "More like this" started from: its [id] and its [title] for the chip. */
+data class Similar(val id: Int, val title: String)
 
 const val VIEW_ORDER = "View's order"

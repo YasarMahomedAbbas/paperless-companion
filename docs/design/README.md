@@ -216,3 +216,13 @@ Settled while building saved views, notes and more like this (#12):
   a view clears the filters; filters and search then narrow it.
 - **An empty view** says "Nothing in <view>" / "No document is in this saved view right now."
   with "Show all documents", which clears the view.
+- **More like this** is a More menu item after Open in Paperless and before the trash divider,
+  with a two-documents icon drawn in `AppIcons.kt` (`Similar`); it is disabled until the
+  document has loaded. It closes the viewer and shows the list in a "similar" mode.
+- **The "Like:" chip** is a `Removable` chip first in the chip row, "Like: <title>" with the
+  title cut at 24 characters ("Stop showing documents like …" to TalkBack). The view chips hide
+  while it shows, and the sort chip reads "Best match" and is disabled, as when searching.
+  Searching or choosing a view ends it; filters narrow it.
+- **Nothing similar** says "Nothing like "<title>"" with "Paperless found no other document
+  like this one." (or, with filters on, "No document like this one carries every one of these
+  filters.") and "Show all documents", which ends the mode and clears the filters.

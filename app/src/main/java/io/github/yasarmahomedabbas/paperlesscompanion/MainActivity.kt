@@ -209,6 +209,10 @@ class MainActivity : FragmentActivity() {
                                                 editing = true
                                             },
                                             onTrash = { trash.trash(listOf(documentId)) },
+                                            onMoreLikeThis = { document ->
+                                                openDocumentId = null
+                                                list.showSimilar(document.id, document.title)
+                                            },
                                         )
                                     }
                                 }

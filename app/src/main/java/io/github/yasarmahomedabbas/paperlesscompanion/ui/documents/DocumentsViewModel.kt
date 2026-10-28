@@ -119,7 +119,12 @@ class DocumentsViewModel(
     /** The keyboard's Search key: no waiting for the debounce. */
     fun search() = reload()
 
-    fun startSearch() = _state.update { it.copy(searching = true) }
+    /** Searching ends "More like this", which can't be combined with a text search. */
+    fun startSearch() {
+        val wasSimilar = _state.value.similar != null
+        _state.update { it.copy(searching = true, similar = null) }
+        if (wasSimilar) reload()
+    }
 
     /** Leaves searching and goes back to browsing in the chosen sort. */
     fun stopSearch() {
@@ -140,12 +145,37 @@ class DocumentsViewModel(
     fun chooseView(view: SavedView) {
         if (_state.value.view?.id == view.id) return clearView()
         stopPreview()
-        _state.update { it.copy(view = view, viewOrder = true, filters = DocumentFilters()) }
+        _state.update { it.copy(view = view, viewOrder = true, filters = DocumentFilters(), similar = null) }
         reload()
     }
 
     fun clearView() {
         _state.update { it.copy(view = null, viewOrder = false) }
+        reload()
+    }
+
+    /**
+     * "More like this" from the viewer: the documents most like [id], most alike first. It starts
+     * from all documents, so the search, the view and the filters go; filters can then narrow it.
+     */
+    fun showSimilar(id: Int, title: String) {
+        stopPreview()
+        _state.update {
+            it.copy(
+                searching = false,
+                text = "",
+                view = null,
+                viewOrder = false,
+                filters = DocumentFilters(),
+                similar = Similar(id, title.ifBlank { "Untitled" }),
+            )
+        }
+        reload()
+    }
+
+    /** Ends "More like this"; with [alsoFilters] the filters go too (the empty state's "Show all documents"). */
+    fun clearSimilar(alsoFilters: Boolean = false) {
+        _state.update { it.copy(similar = null, filters = if (alsoFilters) DocumentFilters() else it.filters) }
         reload()
     }
 
@@ -332,6 +362,7 @@ class DocumentsViewModel(
             pageSize = PAGE_SIZE,
             view = s.view?.id,
             viewOrder = s.viewOrder,
+            similarTo = s.similar?.id,
         )
     }
 }
