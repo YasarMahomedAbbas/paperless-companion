@@ -24,6 +24,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppInstaller
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentExports
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
@@ -170,6 +171,16 @@ class FakeLibrary : DocumentLibrary {
     var documentTypes = listOf(Label(3, "Invoice", 5))
     var storagePaths = listOf(Label(4, "Bills", 6))
     var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
+    /** Per-kind answers for file(); a kind not in here gets [file]. */
+    var files = mapOf<DocumentFileKind, DocumentFile>()
+    /** What file() reports to its onProgress before it answers. */
+    var progress = listOf<Pair<Long, Long?>>()
+    /** Thrown by file() alone, so a test can fail the file while the document loads. */
+    var fileFailure: Exception? = null
+    /** Thrown by the four label lists alone. */
+    var labelFailure: Exception? = null
+    /** With a gate set, file() waits on it (after reporting progress), so a test can look at a fetch in flight. */
+    var fileGate: CompletableDeferred<Unit>? = null
     var failure: Exception? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
@@ -183,16 +194,56 @@ class FakeLibrary : DocumentLibrary {
 
     override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
     override suspend fun document(config: ServerConfig, id: Int) = answer(config, "document $id", document)
-    override suspend fun tags(config: ServerConfig) = answer(config, "tags", tags)
-    override suspend fun correspondents(config: ServerConfig) = answer(config, "correspondents", correspondents)
-    override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
-    override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
-    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
+    override suspend fun tags(config: ServerConfig) = label(config, "tags", tags)
+    override suspend fun correspondents(config: ServerConfig) = label(config, "correspondents", correspondents)
+    override suspend fun documentTypes(config: ServerConfig) = label(config, "documentTypes", documentTypes)
+    override suspend fun storagePaths(config: ServerConfig) = label(config, "storagePaths", storagePaths)
+
+    private fun <T> label(config: ServerConfig, call: String, value: T): T {
+        labelFailure?.let { calls += call; throw it }
+        return answer(config, call, value)
+    }
+
+    override suspend fun file(
+        config: ServerConfig,
+        id: Int,
+        kind: DocumentFileKind,
+        onProgress: (done: Long, total: Long?) -> Unit,
+    ): DocumentFile {
+        progress.forEach { (done, total) -> onProgress(done, total) }
+        fileGate?.await()
+        fileFailure?.let { calls += "file $id $kind"; throw it }
+        return answer(config, "file $id $kind", files[kind] ?: file)
+    }
     override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
     override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
     override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)
     override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit)
+}
+
+/** Records each export as "<call> <name>[ <location>]", answering [savedAs] or throwing [failure]. */
+class FakeExports(override var canSaveDirectly: Boolean = true) : DocumentExports {
+    var failure: Exception? = null
+    var savedAs: String? = null
+    val calls = mutableListOf<String>()
+
+    override fun shareLocation(file: DocumentFile): String {
+        calls += "share ${file.name}"
+        failure?.let { throw it }
+        return "content://test/${file.name}"
+    }
+
+    override suspend fun saveToDownloads(file: DocumentFile): String {
+        calls += "downloads ${file.name}"
+        failure?.let { throw it }
+        return savedAs ?: file.name
+    }
+
+    override suspend fun saveTo(file: DocumentFile, location: String) {
+        calls += "saveTo ${file.name} $location"
+        failure?.let { throw it }
+    }
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =

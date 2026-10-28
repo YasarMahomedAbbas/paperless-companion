@@ -107,6 +107,33 @@ class PaperlessHttpTest {
     }
 
     @Test
+    fun `download reports progress up to the full size, with the total from Content-Length`() = runTest {
+        server.enqueue(MockResponse().setBody("x".repeat(200_000)))
+        val into = File(temp.root, "big.pdf")
+        val heard = mutableListOf<Pair<Long, Long?>>()
+
+        http.download(http.authed(config, "x/").build(), into) { done, total -> heard += done to total }
+
+        assertEquals(0L to 200_000L, heard.first())
+        assertEquals(200_000L to 200_000L, heard.last())
+        assertTrue("reported along the way", heard.size > 2)
+        assertEquals(heard.map { it.first }.sorted(), heard.map { it.first })
+        assertTrue(heard.all { it.second == 200_000L })
+    }
+
+    @Test
+    fun `a chunked download reports no total`() = runTest {
+        server.enqueue(MockResponse().setChunkedBody("x".repeat(10_000), 1024))
+        val into = File(temp.root, "big.pdf")
+        val heard = mutableListOf<Pair<Long, Long?>>()
+
+        http.download(http.authed(config, "x/").build(), into) { done, total -> heard += done to total }
+
+        assertEquals(listOf(0L to null, 10_000L to null), heard)
+        assertEquals(10_000L, into.length())
+    }
+
+    @Test
     fun `a failed download leaves no file`() = runTest {
         respond(500, "kaputt")
         val into = File(temp.root, "bill.pdf")

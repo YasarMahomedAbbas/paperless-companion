@@ -22,6 +22,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -93,9 +95,15 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
 
     /**
      * Streams [request]'s answer into [into] (through `<into>.part`, renamed on success; nothing is left
-     * on any failure) and returns its Content-Disposition and Content-Type.
+     * on any failure) and returns its Content-Disposition and Content-Type. [onProgress] hears the bytes
+     * written so far: first (0, total), then every [PROGRESS_STEP] bytes, and once at the end. The total
+     * comes from Content-Length and is null when the server doesn't send one.
      */
-    suspend fun download(request: Request, into: File): Pair<String?, String?> = withContext(io) {
+    suspend fun download(
+        request: Request,
+        into: File,
+        onProgress: (done: Long, total: Long?) -> Unit = { _, _ -> },
+    ): Pair<String?, String?> = withContext(io) {
         val part = File(into.parentFile, "${into.name}.part")
         try {
             val response: Response = try {
@@ -105,9 +113,10 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
             }
             response.use {
                 if (it.code !in 200..299) throw httpError(it.code, it.body?.string().orEmpty(), false)
+                val body = it.body ?: throw ServerException(Kind.SERVER, "Paperless sent no file")
+                val total = body.contentLength().takeIf { length -> length >= 0 }
                 try {
-                    it.body?.byteStream()?.use { input -> part.outputStream().use { out -> input.copyTo(out) } }
-                        ?: throw ServerException(Kind.SERVER, "Paperless sent no file")
+                    body.byteStream().use { input -> part.outputStream().use { out -> copy(input, out, total, onProgress) } }
                 } catch (e: IOException) {
                     throw networkError(request.url.host, e)
                 }
@@ -148,6 +157,25 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
 
     companion object {
         private val JSON = "application/json".toMediaType()
+        private const val PROGRESS_STEP = 64 * 1024L
+
+        private fun copy(input: InputStream, out: OutputStream, total: Long?, onProgress: (Long, Long?) -> Unit) {
+            val buffer = ByteArray(8 * 1024)
+            var done = 0L
+            var reported = 0L
+            onProgress(0, total)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                out.write(buffer, 0, read)
+                done += read
+                if (done - reported >= PROGRESS_STEP) {
+                    reported = done
+                    onProgress(done, total)
+                }
+            }
+            if (reported != done) onProgress(done, total)
+        }
         private const val MAX_PAGES = 1000
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()

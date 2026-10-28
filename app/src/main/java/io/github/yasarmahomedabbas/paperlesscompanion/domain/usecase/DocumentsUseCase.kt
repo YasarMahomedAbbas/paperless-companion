@@ -25,7 +25,11 @@ class GetDocumentUseCase(private val library: DocumentLibrary, private val setti
     suspend operator fun invoke(id: Int): Document = library.document(settings.signedIn(), id)
 }
 
-/** Fetches a document's preview, archived or original file into the app's cache. Throws ServerException. */
+/** Fetches a document's preview, archived or original file into the app's cache, reporting progress. Throws ServerException. */
 class OpenDocumentFileUseCase(private val library: DocumentLibrary, private val settings: SettingsRepository) {
-    suspend operator fun invoke(id: Int, kind: DocumentFileKind): DocumentFile = library.file(settings.signedIn(), id, kind)
+    suspend operator fun invoke(
+        id: Int,
+        kind: DocumentFileKind,
+        onProgress: (done: Long, total: Long?) -> Unit = { _, _ -> },
+    ): DocumentFile = library.file(settings.signedIn(), id, kind, onProgress)
 }

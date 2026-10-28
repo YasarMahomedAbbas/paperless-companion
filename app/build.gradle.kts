@@ -73,6 +73,7 @@ kover {
                     "*.data.KeystoreTokenVault*",
                     "*.data.PrefsStore*",
                     "*.data.UriDocuments*",
+                    "*.data.PhoneExports*",
                     "*.data.update.PackageInstallerUpdates*",
                     "*.data.update.InstallResultReceiver*",
                     "*.data.update.PrefsUpdateStore*",

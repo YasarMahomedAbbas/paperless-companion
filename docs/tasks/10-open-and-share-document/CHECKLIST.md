@@ -86,7 +86,7 @@ Decisions:
 
 Goal: a file fetch reports its progress, and the domain can share a cached document file and save it to the phone, without anything visible yet.
 
-### [ ] 1.1 — Progress through the file fetch
+### [x] 1.1 — Progress through the file fetch
 
 - `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessHttp.kt`: `download(request, into, onProgress: (done: Long, total: Long?) -> Unit = { _, _ -> })`.
   - Total is `body.contentLength()`, null when it is -1.
@@ -96,7 +96,7 @@ Goal: a file fetch reports its progress, and the domain can share a cached docum
 - `domain/usecase/DocumentsUseCase.kt`: `OpenDocumentFileUseCase.invoke(id, kind, onProgress = { _, _ -> })`.
 - `app/src/test/.../Fakes.kt`: `FakeLibrary.file` records the call, calls `onProgress` with a scripted `progress: List<Pair<Long, Long?>>`, and answers per kind (`files: Map<DocumentFileKind, DocumentFile>`, falling back to `file`).
 
-### [ ] 1.2 — `DocumentExports` port and use case
+### [x] 1.2 — `DocumentExports` port and use case
 
 - `domain/repository/Repositories.kt`: `interface DocumentExports`. KDoc: puts a fetched document file where the user and other apps can reach it; failures throw `ServerException(UNREADABLE, …)`. Members:
   - `fun shareLocation(file: DocumentFile): String`: a location another app may be granted to read.
@@ -106,7 +106,7 @@ Goal: a file fetch reports its progress, and the domain can share a cached docum
 - `domain/usecase/ExportDocumentUseCase.kt` (new): `class ExportDocumentUseCase(private val exports: DocumentExports)` with `fun shareLocation(file)`, `val canSaveDirectly`, `suspend fun saveToDownloads(file)` and `suspend fun saveTo(file, location)`.
 - `Fakes.kt`: `FakeExports` with a recorded call list, `canSaveDirectly` and `failure`.
 
-### [ ] 1.3 — Android implementation
+### [x] 1.3 — Android implementation
 
 - `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PhoneExports.kt` (new): `class PhoneExports(private val context: Context, private val authority: String, private val io: CoroutineDispatcher = Dispatchers.IO) : DocumentExports`.
   - `shareLocation`: `FileProvider.getUriForFile(context, authority, file.file).toString()`.
@@ -116,7 +116,7 @@ Goal: a file fetch reports its progress, and the domain can share a cached docum
 - `app/src/main/res/xml/file_paths.xml`: add `<cache-path name="documents" path="documents/" />`, matching `AppContainer`'s `File(context.cacheDir, "documents")`.
 - `app/build.gradle.kts`: kover excludes `"*.data.PhoneExports*"`, since it needs a device, like `UriDocuments`.
 
-### [ ] 1.4 — Tests
+### [x] 1.4 — Tests
 
 - `PaperlessHttpTest`: progress with `Content-Length`, ending at the full size; chunked → total null.
 - `PaperlessLibraryTest`: `file` forwards progress.
