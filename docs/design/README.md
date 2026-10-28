@@ -4,9 +4,20 @@ The house style, written as recipes, so every screen built without a designer in
 still looks like one app. The `design-recipe` skill applies it in code; `design-canvas` draws
 it as mockups.
 
-**Status: first pass.** The rules below are settled with the user. The token values are a
-first proposal; #6 settles them on the design canvas and adds `foundations.md`,
-`components.md`, `layouts.md` and `checklist.md`.
+**Status: settled by #6, waiting on the user's approval of the canvas.** The rules and tokens
+below are what the #6 design canvas is drawn with. `ui/theme/` implements them once the canvas
+is approved (the last step of #6), and #9, #10 and #11 build on that theme.
+
+| File | What it holds |
+| --- | --- |
+| `README.md` (this) | the rules and the tokens |
+| [`foundations.md`](foundations.md) | colour, type, shape, space, elevation, icons, motion, copy: the values and how to use them |
+| [`components.md`](components.md) | one recipe per part: buttons, fields, rows, chips, sheets, dialogs, snackbars, states |
+| [`layouts.md`](layouts.md) | the screen shapes and the navigation between screens |
+| [`checklist.md`](checklist.md) | what to check before a screen is done |
+
+Canvas: https://claude.ai/artifact/YPcrFxT1joGdxmBHfiMdf6 (one row per screen, one board per
+state).
 
 ## The style in one paragraph
 
@@ -14,23 +25,25 @@ A calm slate ground with **one** accent, a soft green, spent sparingly: the main
 selected thing, the "it worked". Corners are round everywhere: soft on what you press, rounder
 on the panels around it, fully round on chips and the search field. Surfaces are flat and step
 up in one order (page → card → field), separated by tone rather than lines or shadows. One
-typeface, in two or three weights. Space is generous, so a list of documents reads at a glance.
+typeface, Figtree, in three weights. Space is generous, so a list of documents reads at a
+glance.
 
 ## The rules
 
-1. **One theme.** No light and dark variants, no `isSystemInDarkTheme()` branch. The app
-   always looks the same.
-2. **Tokens only.** Every colour is a theme colour; no `Color(0x…)` outside `ui/theme/`.
-3. **One green.** The accent marks the one main action on a screen, the selected chip or tab,
-   success. Not body text, not icons at rest, not decoration. Two filled green buttons on one
-   screen means one is wrong.
+1. **One theme.** No light and dark variants, no `isSystemInDarkTheme()` branch, no Material
+   You dynamic colour. The app always looks the same.
+2. **Tokens only.** Every colour is a theme colour; no `Color(0x…)` outside `ui/theme/`. The
+   one exception is document imagery (thumbnails, rendered pages), which is the document's own.
+3. **One green.** The accent marks the one main action on a screen, the selected chip, row or
+   option, and success. Not body text, not icons at rest, not decoration. Two filled green
+   buttons on one screen means one is wrong.
 4. **Surfaces step up in one order**: page (`bg`) < card (`surface`) < field and raised parts
    (`raised`). Never a card on a card at the same tone.
-5. **Round corners**: controls (buttons, fields) `r-ctl`; cards and rows `r-card`; sheets
-   `r-sheet` on their top corners; chips, the search field and icon buttons fully round.
-   Nothing sharp.
+5. **Round corners**: controls (buttons, fields, menu items) `r-ctl`; cards, rows and the
+   action button `r-card`; sheets `r-sheet` on their top corners, dialogs on all four; chips,
+   tags, the search field and icon buttons fully round. Nothing sharp.
 6. **Flat.** Separation is by tone. Shadows only on what floats: the action button, sheets,
-   dialogs, menus.
+   dialogs, menus, snackbars.
 7. **One button weight per role**: one filled green primary; secondary is an outline in the
    border colour; anything further is a text button. Destructive is red and always confirmed
    (with Undo where the server can restore it).
@@ -39,27 +52,46 @@ typeface, in two or three weights. Space is generous, so a list of documents rea
    home network or VPN.
 9. **Touch targets are at least 48dp**, and every icon-only button has a content description.
 
-## Tokens (first proposal)
+## Tokens
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `bg` | `#1b2229` | the page ground (slate) |
-| `surface` | `#222b33` | cards, rows, sheets |
-| `raised` / `field` | `#2a343d` | fields, tags, the skeleton highlight |
-| `fg` | `#e6ebe8` | text |
-| `mfg` | `#9aa6a1` | secondary text, icons at rest |
-| `primary` | `#5cbf8b` | the accent (green) |
-| `on-primary` | `#0e1a13` | text on the accent |
-| `primary-tint` | `primary` at 14% | selected chip, selected row |
-| `border` | `#36424c` | outlines, the sheet handle |
-| `destructive` | `#e4695e` | delete, errors at the field |
-| `warning` | `#e2b65c` | can't reach the server, unsaved |
-| `r-ctl` / `r-card` / `r-sheet` | 14 / 20 / 28 dp | corners |
-| Type | Figtree 400 / 500 / 600 | one family |
+| Token | Value | Compose (`ColorScheme` / theme) | Use |
+| --- | --- | --- | --- |
+| `bg` | `#1b2229` | `background`, `surface` | the page ground (slate) |
+| `surface` | `#222b33` | `surfaceContainer` | cards, rows, sheets, dialogs, menus |
+| `raised` / `field` | `#2a343d` | `surfaceContainerHigh` | fields, tags, snackbars, the skeleton highlight |
+| `fg` | `#e6ebe8` | `onBackground`, `onSurface` | text, icons you can press |
+| `mfg` | `#9aa6a1` | `onSurfaceVariant` | secondary text, icons at rest, spinners |
+| `primary` | `#5cbf8b` | `primary` | the accent (green) |
+| `on-primary` | `#0e1a13` | `onPrimary` | text and icons on the accent |
+| `primary-tint` | `primary` at 14% (`#5cbf8b24`) | `primaryContainer` | selected chip, row, option; search match |
+| `border` | `#36424c` | `outline` | outlines, the sheet handle, focus ring |
+| `border-muted` | `#2c363f` | `outlineVariant` | dividers inside a card |
+| `destructive` | `#ec7166` | `error` | delete, errors at the field |
+| `on-destructive` | `#1f0d0b` | `onError` | text on a filled red button |
+| `warning` | `#e2b65c` | `ExtendedColors.warning` | can't reach the server, unsaved, warning icons |
+| `scrim` | `#080c0f` at 60% | `scrim` | behind sheets and dialogs |
+| `r-ctl` / `r-card` / `r-sheet` | 14 / 20 / 28 dp | `Shapes.small` / `.medium` / `.large` | corners |
+| `r-thumb` | 10 dp | `Shapes.extraSmall` | thumbnails, skeleton blocks |
+| Type | Figtree 400 / 500 / 600, bundled | `Typography` | one family; scale in `foundations.md` |
+
+Changes from the first proposal: `destructive` moved from `#e4695e` to `#ec7166` so red text
+passes 4.5:1 on `surface` (it was 4.4:1); `on-destructive`, `border-muted`, `scrim` and
+`r-thumb` were added because the canvas needed them.
 
 These live in `.claude/skills/design-canvas/assets/artboard.dc.html` for the canvas and in
 `ui/theme/` for the app; change both together.
 
 ## Open decisions
 
-- The token values, the typeface and the screen shapes: settled by #6.
+The user reviews these on the canvas (its orange sticky). Until they answer, the canvas draws
+the recommended option.
+
+- **Offline list.** The list keeps no copy of the documents, so away from the home network or
+  VPN it shows the load-failed state. Drawn: no cache.
+- **Document view lands on the PDF** with details in a pull-up panel, rather than on the
+  details with the PDF below. Drawn: PDF first.
+- **Uploads live in the list**, as cards at the top until they finish or are cleared, with no
+  separate Uploads screen. Drawn: cards in the list.
+- **Unlock again after 5 minutes** in the background (#8 owns the behaviour). Drawn: 5 minutes,
+  changeable in Settings.
+- **Token values** (slate, green, Figtree, corners) are approved with the canvas.
