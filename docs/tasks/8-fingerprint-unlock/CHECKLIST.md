@@ -118,7 +118,7 @@ Files: `app/src/test/java/.../data/SealedSettingsRepositoryTest.kt` (new), `app/
 
 Goal: the domain policy for the timeout and a `GateViewModel` that turns the stored sign-in and the lifecycle into a single screen state, all unit-tested.
 
-### [ ] 2.1 — Domain: `AppLock`
+### [x] 2.1 — Domain: `AppLock`
 
 File (new): `app/src/main/java/.../domain/usecase/AppLock.kt`
 ```kotlin
@@ -134,7 +134,7 @@ class AppLock(
 }
 ```
 
-### [ ] 2.2 — UI: `GateViewModel`
+### [x] 2.2 — UI: `GateViewModel`
 
 File (new): `app/src/main/java/.../ui/lock/GateViewModel.kt`
 ```kotlin
@@ -149,11 +149,11 @@ class GateViewModel(private val settings: SettingsRepository, private val lock: 
 `state: StateFlow<GateState>`. Functions: `onUnlocked()` (calls `lock.unlock()`: Ready → Home, Locked → stays Locked with message "Unlock with your PIN or pattern", Voided → SignIn(VOIDED_NOTICE), None → SignIn()), `onUnlockFailed(message: String?)` (stays Locked, shows message), `onSignedIn(config)` (lock active and `read()` not Ready-and-saved → Locked(protect = true); else Home), `onBackground()` / `onForeground()` (Home → Locked(overlay = true) when `appLock.onForeground()`), `setLockEnabled(enabled)` (called after a successful prompt; updates Home), `onSignedOut()` → SignIn().
 `VOIDED_NOTICE = "Your fingerprints or screen lock changed, so sign in again."`
 Initial state from `settings.read()`: None → SignIn(), Voided → SignIn(VOIDED_NOTICE), Locked → Locked(), Ready → Home.
-To tell a protect-pending save from a sealed one, add `fun hasUnsavedSignIn(): Boolean` to `AppLockRepository` (true while `unsaved`), implemented in `SealedSettingsRepository` and the fake.
+To tell a protect-pending save from a sealed one, `onSignedIn` asks `lock.hasUnsavedSignIn()` (added in 1.4). `setLockEnabled` swallows the repository's `IllegalStateException` and shows the unchanged setting. `UNLOCK_WITH_CREDENTIAL` holds the PIN message.
 
-### [ ] 2.3 — Tests
+### [x] 2.3 — Tests
 
-Files (new): `app/src/test/java/.../domain/AppLockTest.kt`, `app/src/test/java/.../ui/GateViewModelTest.kt`. Add `FakeLock : AppLockRepository` to `Fakes.kt` (scripted `canLock`, `enabled`, `unlockResult`, counts `forget()` calls). Cover the Test plan's `AppLock` and `GateViewModel` lines.
+Files (new): `app/src/test/java/.../domain/AppLockTest.kt`, `app/src/test/java/.../ui/GateViewModelTest.kt`. Add `FakeLock : AppLockRepository` to `Fakes.kt` (scripted `canLock`, `switchOn`, `unlockResult`, `unsaved`, `refuseSwitch`; counts `forget()` and `unlock()` calls); `FakeSettings.stored` scripts `read()`. Cover the Test plan's `AppLock` and `GateViewModel` lines.
 
 ### Verify
 
