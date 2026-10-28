@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
@@ -24,11 +26,16 @@ import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 25
 
+/** The page size the shown window is asked again in after a change that moves documents. */
+private const val WINDOW_PAGE_SIZE = 100
+
 /**
  * The Documents list: pages of documents with their labels, searched as you type, filtered and
  * sorted. Paging is by hand: [loadMore] fetches the next page while the last one said there is
  * more. Every change to the text, filters or sort reloads from page 1, and a newer load cancels
- * the older one, so a slow search never overwrites a newer one.
+ * the older one, so a slow search never overwrites a newer one. An edit or bulk change patches the
+ * rows in place; when it touches what the list is filtered or sorted by, or a search is on, it may
+ * move documents across the server's pages, so the rows shown so far are asked for again.
  */
 class DocumentsViewModel(
     private val browse: BrowseDocumentsUseCase,
@@ -45,10 +52,14 @@ class DocumentsViewModel(
     /**
      * How many of the server's documents, in list order, come before the next one not shown yet. It
      * follows trash and Undo, which move the server's pages under the list, so [loadMore] neither
-     * skips a document nor shows one twice.
+     * skips a document nor shows one twice. An edit that moves documents can't be followed this way:
+     * [refetchWindow] asks for the first [consumed] positions again and sets it from the answer.
      */
     private var consumed = 0
     private var hasMore = false
+
+    /** The shown rows are out of step with the server's pages until [refetchWindow] succeeds. */
+    private var stale = false
 
     /** The search text the shown list was loaded with. */
     private var loadedText: String? = null
@@ -69,7 +80,10 @@ class DocumentsViewModel(
     fun loadMore() {
         val s = _state.value
         val labels = s.labels ?: return
-        if (s.loadingMore || s.refreshing || s.status != ListStatus.Loaded || !hasMore) return
+        if (s.loadingMore || s.refreshing || s.status != ListStatus.Loaded) return
+        // Paging on from an out-of-step window would skip documents: catch up first (Retry lands here too).
+        if (stale) return refetchWindow()
+        if (!hasMore) return
         // The page holding the next unseen document; the ones before it on that page are shown already.
         val query = query(page = consumed / PAGE_SIZE + 1)
         val seen = consumed % PAGE_SIZE
@@ -172,21 +186,95 @@ class DocumentsViewModel(
 
     /**
      * Edit details saved [document]: its row shows the change where it is, without a reload. A
-     * document that isn't loaded is left alone. The search match it was found by stays.
+     * document that isn't loaded is left alone. The search match it was found by stays. A change
+     * that may move it in the list asks for the shown rows again.
      */
     fun patch(document: Document) {
         val index = loaded.indexOfFirst { it.id == document.id }
         if (index < 0) return
-        loaded = loaded.toMutableList().also { it[index] = document.copy(searchHit = loaded[index].searchHit) }
+        val old = loaded[index]
+        loaded = loaded.toMutableList().also { it[index] = document.copy(searchHit = old.searchHit) }
         showLoaded()
+        if (moves(old, document)) refetchWindow()
     }
 
-    /** A bulk change went through for [ids]: the loaded ones show it, as the server now has them. */
+    /**
+     * A bulk change went through for [ids]: the loaded ones show it, as the server now has them. A
+     * change that may move them in the list asks for the shown rows again.
+     */
     fun apply(ids: Collection<Int>, edit: BulkEdit) {
         val wanted = ids.toSet()
         if (loaded.none { it.id in wanted }) return
+        val moved = loaded.any { it.id in wanted && moves(it, it.with(edit)) }
         loaded = loaded.map { if (it.id in wanted) it.with(edit) else it }
         showLoaded()
+        if (moved) refetchWindow()
+    }
+
+    /** Whether going from [before] to [after] may change where the document stands in the list, or whether it is in it. */
+    private fun moves(before: Document, after: Document): Boolean {
+        // The search index covers the title, tags, correspondent and type, and ranks by them.
+        if (loadedText != null) return before.copy(searchHit = null) != after.copy(searchHit = null)
+        val s = _state.value
+        val tags = s.filters.tagIds
+        if (tags.isNotEmpty() && before.tagIds.toSet().intersect(tags) != after.tagIds.toSet().intersect(tags)) return true
+        if (s.filters.correspondentId != null && before.correspondentId != after.correspondentId) return true
+        if (s.filters.documentTypeId != null && before.documentTypeId != after.documentTypeId) return true
+        return when (s.sort.sort) {
+            DocumentSort.CREATED -> before.created != after.created
+            DocumentSort.TITLE -> before.title != after.title
+            DocumentSort.CORRESPONDENT -> before.correspondentId != after.correspondentId
+            // No edit changes when a document was added.
+            DocumentSort.ADDED -> false
+            DocumentSort.DOCUMENT_TYPE -> before.documentTypeId != after.documentTypeId
+            DocumentSort.ARCHIVE_SERIAL_NUMBER -> before.archiveSerialNumber != after.archiveSerialNumber
+            // Every edit changes it.
+            DocumentSort.MODIFIED -> true
+        }
+    }
+
+    /**
+     * Asks the server again for the first [consumed] positions, in pages of [WINDOW_PAGE_SIZE], and
+     * shows its answer in place of the rows, keyed by id so the scroll holds. A failure keeps the
+     * patched rows and offers Retry on the load-more footer, which comes back here.
+     */
+    private fun refetchWindow() {
+        val labels = _state.value.labels ?: return
+        if (consumed == 0) return
+        // A refresh is bringing page 1 fresh already.
+        if (_state.value.refreshing && !stale) return
+        stale = true
+        loadJob?.cancel()
+        _state.update { it.copy(refreshing = true, loadingMore = false, loadMoreFailed = null) }
+        val count = consumed
+        loadJob = viewModelScope.launch {
+            try {
+                val collected = mutableListOf<Document>()
+                var page = 1
+                var last: DocumentPage
+                do {
+                    last = browse(query(page = page++).copy(pageSize = WINDOW_PAGE_SIZE))
+                    collected += last.documents
+                } while (collected.size < count && last.hasMore && last.documents.isNotEmpty())
+                val taken = collected.take(count)
+                consumed = taken.size
+                hasMore = last.hasMore || collected.size > taken.size
+                loaded = taken.distinctBy { it.id }
+                stale = false
+                _state.update {
+                    it.copy(
+                        rows = loaded.map { d -> d.toRow(labels) },
+                        total = last.total,
+                        status = if (loaded.isEmpty()) ListStatus.Empty else ListStatus.Loaded,
+                        refreshing = false,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(refreshing = false, loadMoreFailed = e.failure().message) }
+            }
+        }
     }
 
     /** The loaded documents among [ids], in list order (the bulk Tags sheet marks their tags). */
@@ -242,6 +330,8 @@ class DocumentsViewModel(
     private fun loadFirstPage(withLabels: Boolean, keepRows: Boolean) {
         typingJob?.cancel()
         loadJob?.cancel()
+        // A fresh page 1 is in step with the server.
+        stale = false
         _state.update {
             if (keepRows) {
                 it.copy(refreshing = true, loadingMore = false, loadMoreFailed = null)

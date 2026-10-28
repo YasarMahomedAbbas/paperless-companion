@@ -17,3 +17,14 @@ Branch: `fix/32-list-skips-moved-rows`
 - Open risks:
   - Paperless updates its search index for a bulk edit in a background task, so a re-fetch straight after a bulk change during a search may still see the old ranking. Paging stays consistent with whatever the server answers, so nothing is skipped relative to that answer.
   - A long session with many loaded rows re-fetches several pages of 100 after each such change.
+
+## Implementation
+
+- Shipped:
+  - `DocumentsViewModel.moves` (`ui/documents/DocumentsViewModel.kt:215`): a change moves a document when a search is on (any difference but the search hit), when it changes the filtered tags, correspondent or type, or when it changes the field the list is sorted by (`ADDED` never, `MODIFIED` always).
+  - `DocumentsViewModel.refetchWindow` (`DocumentsViewModel.kt:241`): asks for the first `consumed` positions again in pages of 100, replaces `loaded` and the rows, and resets `consumed`, `hasMore` and `total` from the answer. It shows the refreshing indicator; a failure keeps the patched rows and sets `loadMoreFailed`. It is skipped while a pull to refresh is already bringing page 1.
+  - `patch` and `apply` (`DocumentsViewModel.kt:192`, `:205`) call it when `moves` says so; `loadMore` re-runs it first while the window is `stale` (`:85`), so Retry catches up before paging on; `loadFirstPage` clears `stale` (`:334`).
+  - Eight tests in `DocumentsViewModelTest` (from `:800`) with a document-holding `serving(MutableMap<Int, Document>)` fake that filters by tags and search text and sorts by title or date.
+- Tests: `DocumentsViewModelTest` 61 passed / 0 failed; seven of the eight new ones failed before the change (the no-request one passes either way, as it should). Full check (`testDebugUnitTest koverVerify lintDebug assembleDebug`) green: 457 passed / 0 failed / 0 skipped, Kover bound held.
+- Outstanding: the device-only scroll feel check and the real-server `page_size=100` read are left to self-verification.
+- Contradicted the plan: none. One guard added beyond 1.2: a change during a pull to refresh doesn't start a re-fetch (it would cancel the refresh and its label reload); the checklist text says so.

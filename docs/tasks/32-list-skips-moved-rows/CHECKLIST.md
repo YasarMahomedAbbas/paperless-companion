@@ -42,7 +42,7 @@ Problem: after Edit details or a bulk change moves documents out of the list's f
 
 Goal: `patch` and `apply` re-fetch the shown window when the change touches the active filter or sort, or a search is active, so load more skips nothing.
 
-### [ ] 1.1 — Decide whether a change moves the document
+### [x] 1.1 — Decide whether a change moves the document
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsViewModel.kt`
 Add `private fun moves(before: Document, after: Document): Boolean`, reading `_state.value.filters`, `_state.value.sort` and `loadedText`:
@@ -51,15 +51,15 @@ Add `private fun moves(before: Document, after: Document): Boolean`, reading `_s
 - `filters.correspondentId != null` and the correspondent changed; the same for `documentTypeId`.
 - The sort field changed: `DocumentSort.CREATED` → `created`, `TITLE` → `title`, `CORRESPONDENT` → `correspondentId`, `ADDED` → never (no edit changes it). Other `DocumentSort` values → the matching field if there is one (`DOCUMENT_TYPE` → `documentTypeId`, `ARCHIVE_SERIAL_NUMBER` → `archiveSerialNumber`, `MODIFIED` → always true), for safety, though `SortOption` doesn't offer them.
 
-### [ ] 1.2 — The window re-fetch
+### [x] 1.2 — The window re-fetch
 
 Same file. Add `private const val WINDOW_PAGE_SIZE = 100` and `private var stale = false` (true while the shown window is out of step with the server) and `private fun refetchWindow()`:
-- Return when `_state.value.labels` is null or `consumed == 0`. Otherwise set `stale = true`, cancel `loadJob`, and set the state to `refreshing = true, loadingMore = false, loadMoreFailed = null`, keeping the rows.
+- Return when `_state.value.labels` is null or `consumed == 0`, or when a pull-to-refresh is already bringing page 1 (`refreshing && !stale`). Otherwise set `stale = true`, cancel `loadJob`, and set the state to `refreshing = true, loadingMore = false, loadMoreFailed = null`, keeping the rows.
 - In `loadJob = viewModelScope.launch`: fetch `query(page = p).copy(pageSize = WINDOW_PAGE_SIZE)` for p = 1, 2, … while the collected documents number fewer than `count` (= `consumed` at the start) and the last page `hasMore`. Take the first `count` documents, then `distinctBy { it.id }`.
 - On success: `consumed` = the number of positions taken (before distinct), `hasMore = last.hasMore || collected.size > consumed`, `loaded` = the window, `stale = false`, rows from `loaded`, `total = last.total`, `refreshing = false`, and status `Empty` when the window is empty, else `Loaded`. Leave `removed` as it is: `putBack` already falls back to the end for an index past the list.
 - On `CancellationException`, rethrow. On another failure: `refreshing = false`, `loadMoreFailed = e.failure().message`; `stale` stays true.
 
-### [ ] 1.3 — Wire `patch`, `apply` and `loadMore`
+### [x] 1.3 — Wire `patch`, `apply` and `loadMore`
 
 Same file.
 - `patch(document)`: keep the in-place patch, then `if (moves(old, document)) refetchWindow()`.
@@ -68,10 +68,10 @@ Same file.
 - `loadFirstPage` sets `stale = false` (a fresh page 1 is in step).
 - Update the class KDoc and the `consumed` KDoc to say that edits re-fetch the window.
 
-### [ ] 1.4 — Tests
+### [x] 1.4 — Tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/DocumentsViewModelTest.kt`
-Extend `serving(...)` (or add a sibling) so the fake server can serve `doc(...)` values with tags, title and created that the test changes, and filters by `q.tagIds`. Add the unit cases from the test plan, one `@Test` each. Write the issue-steps and title-sort cases first and watch them fail before 1.1–1.3.
+Add a sibling `serving(docs: MutableMap<Int, Document>)` (sorting by title, `created` descending or id, and filtering by search text) so the fake server can serve `doc(...)` values with tags, title and created that the test changes, and filters by `q.tagIds`. Add the unit cases from the test plan, one `@Test` each. Write the issue-steps and title-sort cases first and watch them fail before 1.1–1.3.
 
 ### Verify
 
