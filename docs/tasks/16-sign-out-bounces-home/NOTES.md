@@ -52,3 +52,16 @@ Branch: `fix/16-sign-out-bounces-home`
 - Skipped: the `onSignedInHandled()` pattern (an activity-scoped ViewModel consumes a one-shot result). Its KDoc explains it, and it applies to one screen, not a cross-cutting rule.
 - Checked, no drift: README architecture and use-case table are unchanged by this branch (no `domain/` or `data/` changes); CLAUDE.md "a bug fix comes with a test" is met.
 - Stale, fixed separately: `CLAUDE.md:Working on the app`. It called the local check command "what CI runs", but `ci.yml` (and `release.yml`) run `koverVerifyDebug`, not `koverVerify`. `koverVerify` also runs `testReleaseUnitTest`, which made the local command stricter, and that is how this branch found the release-variant failure. The line now says so; the command is unchanged.
+
+## Self verification
+
+Result: partial
+
+- CI build: `./build.sh ./gradlew --console=plain testDebugUnitTest koverVerify lintDebug assembleDebug` green. `testDebugUnitTest` 178 passed / 0 failed (3 of them `LoginScreenTest` under Robolectric), `testReleaseUnitTest` 175 passed / 0 failed, debug line coverage 94.9% (koverVerify passes), lint clean, debug APK built.
+- Server: not run (the branch touches no `data/` code and no Paperless call).
+- Verified: the sign-in screen shown after Sign out doesn't sign in on its own. `LoginScreenTest` proves it through the real `LoginScreen` around one ViewModel: one sign-in, then hide and show again, still one config with address and username kept, and a second sign-in then delivers. `LoginViewModelTest` covers `onSignedInHandled()`. The screen test failed before the fix (recorded in Implementation).
+- Failed: none
+- Not self-verifiable:
+  - Sign out: on the phone, sign in, tap Sign out, and check the sign-in screen stays up (it doesn't bounce back to Home) with the server address and username filled in and the password empty.
+  - Sign in again from there: check Home appears, and that closing and reopening the app keeps you signed in.
+  - With the fingerprint lock on: repeat both checks.
