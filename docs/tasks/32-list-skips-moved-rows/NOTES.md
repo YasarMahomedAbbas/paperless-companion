@@ -41,3 +41,13 @@ Branch: `fix/32-list-skips-moved-rows`
 - No drift found. The branch changes only `ui/documents/DocumentsViewModel.kt` and its test; README's feature list, architecture block and use-case table (`BrowseDocumentsUseCase`: one page of `GET /api/documents/`) and `docs/design/layouts.md` (infinite scroll, pull to refresh, loading-more footer) still match the code.
 - Skipped: the re-fetch of the shown window after a change that moves documents (`refetchWindow`, `page_size=100`). It's ViewModel-internal, explained in its KDoc and pinned by `DocumentsViewModelTest`; it reuses the existing refreshing indicator and load-more footer, so no screen state or rule changes for a future session to get wrong.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker: 460 tests passed / 0 failed / 0 skipped, application line coverage 92.59% (Kover bound held), lint 0 errors (17 warnings, none from this branch), debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent). The branch changes no `data/` call; the only server-facing difference is the existing `GET /api/documents/` list asked with `page_size=100`, which matches the paperless-ngx source (`StandardPagination`, max 100000) per planning and review. The planned read-only check (`page_size=100` vs `25` give the same `count`, `next`, `results` shape) is still unrun.
+- Verified: the window re-fetch after a moving change (issue steps with a 60-document tag filter, title and date sort, search, a window above 100, a failed re-fetch and Retry, cancellation by refresh or search, and trash / Undo / edit during a re-fetch) and the no-request in-place patch, all by `DocumentsViewModelTest` against its `serving(...)` fake server.
+- Failed: none
+- Not self-verifiable: scroll feel after a bulk change. On the phone, filter by a tag with more than 25 documents, scroll down, take the tag off a few with the bulk Tags sheet: the list should keep its scroll position while those rows leave, briefly show the refreshing indicator, and scrolling to the end should show every remaining document once.
