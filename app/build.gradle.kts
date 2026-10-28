@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
 }
@@ -10,7 +9,7 @@ val keystorePath: String? = System.getenv("RELEASE_KEYSTORE")
 
 android {
     namespace = "io.github.yasarmahomedabbas.paperlesscompanion"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.yasarmahomedabbas.paperlesscompanion"
@@ -43,9 +42,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -62,9 +58,15 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 // The Android SDK jar Robolectric runs the screen tests against, kept apart from the app's own
 // dependencies.
-val robolectricSdk by configurations.creating {
+val robolectricSdk = configurations.create("robolectricSdk") {
     isCanBeConsumed = false
     isTransitive = false
 }
@@ -129,6 +131,8 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    // Icons.* (back, share, more): Material 3 1.4 stopped bringing this in for us.
+    implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.activity.compose)
