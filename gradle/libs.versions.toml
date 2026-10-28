@@ -1,25 +1,25 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.1.0"
-kover = "0.9.0"
-composeBom = "2024.12.01"
+agp = "9.4.1"
+kotlin = "2.4.21"
+kover = "0.9.11"
+composeBom = "2026.09.00"
 activityCompose = "1.9.3"
 lifecycle = "2.8.7"
 biometric = "1.1.0"
-fragment = "1.8.9"
-appcompat = "1.6.1"
-coroutines = "1.9.0"
-serialization = "1.7.3"
-okhttp = "4.12.0"
+fragment = "1.9.1"
+appcompat = "1.8.0"
+coroutines = "1.11.0"
+serialization = "1.12.0"
+okhttp = "5.5.1"
 work = "2.12.0"
-mlkitScanner = "16.0.0-beta1"
+mlkitScanner = "16.0.0"
 junit = "4.13.2"
-robolectric = "4.14.1"
+robolectric = "4.17"
 # The SDK jar Robolectric 4.14.1 uses for SDK 35 (the targetSdk, pinned in robolectric.properties).
 # Bumping Robolectric or the targetSdk means bumping this too (read the new version's
 # DefaultSdkProvider); until they match, the tests fail, because Robolectric runs offline.
 robolectricSdk = "15-robolectric-12650502-i7"
-coil = "3.0.4"
+coil = "3.6.3"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
