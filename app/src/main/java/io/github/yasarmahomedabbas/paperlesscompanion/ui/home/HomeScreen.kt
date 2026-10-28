@@ -48,10 +48,10 @@ import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
-import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,7 +61,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    documents: UriDocuments,
+    documents: DocumentFiles,
     shared: List<DocumentSource>,
     onSharedConsumed: () -> Unit,
     onSignedOut: () -> Unit,
@@ -82,16 +82,16 @@ fun HomeScreen(
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pdf?.uri?.let { uri ->
-            viewModel.upload(listOf(documents.from(uri, "Scan ${timestamp()}.pdf")))
+            viewModel.upload(listOf(documents.from(uri.toString(), "Scan ${timestamp()}.pdf")))
         }
     }
     var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = photoUri
-        if (saved && uri != null) viewModel.upload(listOf(documents.from(uri, "Photo ${timestamp()}.jpg")))
+        if (saved && uri != null) viewModel.upload(listOf(documents.from(uri.toString(), "Photo ${timestamp()}.jpg")))
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        viewModel.upload(uris.map { documents.from(it, "Document ${timestamp()}") })
+        viewModel.upload(uris.map { documents.from(it.toString(), "Document ${timestamp()}") })
     }
 
     fun scan() {
@@ -191,7 +191,7 @@ fun HomeScreen(
                         item = item,
                         onRetry = { viewModel.retry(item.id) },
                         onOpen = { id ->
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(state.documentUrl(id))))
+                            viewModel.documentUrl(id)?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
                         },
                     )
                 }

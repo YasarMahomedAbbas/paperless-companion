@@ -1,12 +1,12 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException.Kind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,12 +33,12 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
-/** PaperlessRepository over the paperless-ngx REST API (token auth). */
+/** DocumentServer over the paperless-ngx REST API (token auth). */
 class PaperlessApi(
     private val client: OkHttpClient = defaultClient(),
     private val io: CoroutineDispatcher = Dispatchers.IO,
     pollTimeoutMillis: Long = 15_000,
-) : PaperlessRepository {
+) : DocumentServer {
     // A status check is small and repeated every few seconds, so a stuck one is dropped quickly and retried.
     private val pollClient = client.newBuilder().readTimeout(pollTimeoutMillis, TimeUnit.MILLISECONDS).build()
 
@@ -47,7 +47,7 @@ class PaperlessApi(
         val request = Request.Builder().url(url(baseUrl, "api/token/")).post(body).build()
         val json = call(request, badRequestIsAuth = true)
         return (json as? JsonObject)?.string("token")
-            ?: throw PaperlessException(Kind.SERVER, "Paperless sent no token")
+            ?: throw ServerException(Kind.SERVER, "Paperless sent no token")
     }
 
     override suspend fun upload(config: ServerConfig, document: DocumentSource): String {
@@ -57,7 +57,7 @@ class PaperlessApi(
             try {
                 document.open().use { it.readBytes() }
             } catch (e: Exception) {
-                throw PaperlessException(Kind.UNREADABLE, "Can't read ${document.name}", e)
+                throw ServerException(Kind.UNREADABLE, "Can't read ${document.name}", e)
             }
         }
         val body = MultipartBody.Builder()
@@ -67,7 +67,7 @@ class PaperlessApi(
         val request = authed(config, "api/documents/post_document/").post(body).build()
         // The response is the task id as a bare JSON string.
         return (call(request) as? JsonPrimitive)?.contentOrNull
-            ?: throw PaperlessException(Kind.SERVER, "Paperless sent no task id")
+            ?: throw ServerException(Kind.SERVER, "Paperless sent no task id")
     }
 
     override suspend fun task(config: ServerConfig, taskId: String): TaskInfo {
@@ -97,6 +97,9 @@ class PaperlessApi(
         return TaskInfo(status, message, documentId)
     }
 
+    /** The document's details page in the Paperless web UI (not an API endpoint). */
+    override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId/details"
+
     private fun authed(config: ServerConfig, path: String) = authed(config, url(config.baseUrl, path))
 
     private fun authed(config: ServerConfig, url: HttpUrl) =
@@ -115,20 +118,20 @@ class PaperlessApi(
         when {
             code in 200..299 -> runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
             code == 401 || code == 403 || (badRequestIsAuth && code == 400) ->
-                throw PaperlessException(Kind.UNAUTHORIZED, "Wrong username or password")
-            else -> throw PaperlessException(Kind.SERVER, "Paperless returned HTTP $code: ${text.take(200)}")
+                throw ServerException(Kind.UNAUTHORIZED, "Wrong username or password")
+            else -> throw ServerException(Kind.SERVER, "Paperless returned HTTP $code: ${text.take(200)}")
         }
     }
 
     /** Tells "couldn't connect" (wrong network, server down) apart from "connected, but no complete answer". */
-    private fun networkError(host: String, e: IOException): PaperlessException {
+    private fun networkError(host: String, e: IOException): ServerException {
         val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
         val connecting = e is ConnectException || e is UnknownHostException || e is NoRouteToHostException ||
             (e is SocketTimeoutException && detail.startsWith("connect", ignoreCase = true))
         return if (connecting) {
-            PaperlessException(Kind.UNREACHABLE, "can't connect to $host: $detail", e)
+            ServerException(Kind.UNREACHABLE, "can't connect to $host: $detail", e)
         } else {
-            PaperlessException(Kind.NO_ANSWER, "no answer from $host: $detail", e)
+            ServerException(Kind.NO_ANSWER, "no answer from $host: $detail", e)
         }
     }
 
@@ -141,7 +144,7 @@ class PaperlessApi(
 
         private fun url(baseUrl: String, path: String): HttpUrl =
             "${baseUrl.trimEnd('/')}/$path".toHttpUrlOrNull()
-                ?: throw PaperlessException(Kind.UNREACHABLE, "Invalid server address: $baseUrl")
+                ?: throw ServerException(Kind.UNREACHABLE, "Invalid server address: $baseUrl")
 
         private fun JsonObject.string(key: String): String? =
             (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.contentOrNull
