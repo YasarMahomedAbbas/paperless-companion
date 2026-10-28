@@ -66,3 +66,9 @@ val Typography.primaryButton: TextStyle get() = labelLarge.copy(fontSize = 16.sp
 
 /** Explanations under a screen title: 15 / 22. */
 val Typography.lead: TextStyle get() = bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp)
+
+/** The viewer bar's title: 18 / 24 at 500, between the bar title (22) and the sheet title (20). */
+val Typography.viewerTitle: TextStyle get() = titleSmall.copy(fontSize = 18.sp, lineHeight = 24.sp)
+
+/** A status card's statement: 17 / 24 at 500. */
+val Typography.statement: TextStyle get() = bodyLarge.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium)

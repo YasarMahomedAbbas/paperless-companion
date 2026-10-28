@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,27 +75,12 @@ fun DocumentRowCard(
                 Text(snippet, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             } else if (tags.isNotEmpty()) {
                 Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    tags.forEach { TagPill(it, Modifier.weight(1f, fill = false)) }
-                    if (moreTags > 0) TagPill("+$moreTags")
+                    tags.forEach { TagPill(it, inDetails = false, Modifier.weight(1f, fill = false)) }
+                    if (moreTags > 0) TagPill("+$moreTags", inDetails = false)
                 }
             }
         }
     }
-}
-
-/** A display-only tag (components.md § Tags): `raised` pill, 12 text in `mfg`. No per-tag colours. */
-@Composable
-fun TagPill(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
-            .padding(horizontal = 10.dp, vertical = Spacing.s4),
-    )
 }
 
 /** How a search match is marked in a snippet: `primary-tint` behind `fg` text. */

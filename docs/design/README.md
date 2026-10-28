@@ -144,3 +144,21 @@ Settled while building the Documents list (#9):
 - **Settings is partial.** It shows the server address, the fingerprint switch, Updates and
   Sign out. "Signed in as", the lock-again delay (the code still locks after 1 minute) and
   Source and licences from `layouts.md` § Settings are follow-ups.
+
+Settled while building the viewer (#10):
+
+- **New type slots.** The viewer bar's 18/500 title is `viewerTitle` (18 / 24) and a status
+  card's 17/500 statement is `statement` (17 / 24), both in `ui/theme/Type.kt`.
+- **Quick actions show Download alone** until #11 adds Edit; the More menu holds Download and
+  Open in Paperless. The menu is the stock M3 `DropdownMenu` on `surface`, `r-card`, 244 wide,
+  with `MenuItem` rows (48 high, 20dp `mfg` icon, 15 `fg` text).
+- **The photo-original notice** sits in the quick actions under the hint, and the quick actions
+  scroll when it doesn't fit in 268. An original that is neither a PDF nor an image gets the
+  same banner with "Get original". When the preview itself isn't a PDF (no archive version),
+  the page area shows a "Can't show this file here" status card with Download instead.
+- **Viewer failures** use fixed copy, never the server's text: "Can't reach Paperless" / "Check
+  you're on the home network or the VPN." (warning) or "Couldn't load this document" (refused),
+  each with Try again. A details failure is a compact notice banner inside the panel.
+- **The full-screen tab** is the panel's own handle shrunk to 120 × 48; the rest of the panel
+  slides below the screen edge. The page pill ("Page 1 of 3") is a `raised` fully round pill at
+  the top centre of the pages, 13 `fg`.

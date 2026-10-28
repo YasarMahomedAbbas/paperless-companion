@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -24,7 +23,6 @@ data class UploadsUiState(val uploads: List<UploadItem> = emptyList())
 /** The uploads in progress, shown as cards at the top of the Documents list until they're cleared. */
 class UploadsViewModel(
     private val uploadDocument: UploadDocumentUseCase,
-    private val documentLink: DocumentLinkUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(UploadsUiState())
     val state: StateFlow<UploadsUiState> = _state.asStateFlow()
@@ -37,9 +35,6 @@ class UploadsViewModel(
      * still reaches the list when it comes back.
      */
     val added: Flow<Int?> = _added.receiveAsFlow()
-
-    /** The web address of an uploaded document, or null when signed out. */
-    fun documentUrl(documentId: Int): String? = documentLink(documentId)
 
     private val sources = mutableMapOf<Long, DocumentSource>()
     private var nextId = 0L

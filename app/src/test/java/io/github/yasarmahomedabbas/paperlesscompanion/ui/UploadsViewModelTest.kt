@@ -8,7 +8,6 @@ import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
@@ -31,14 +30,9 @@ class UploadsViewModelTest {
 
     private val server = FakeServer()
     private val settings = FakeSettings(CONFIG)
-    private val viewModel = UploadsViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings))
+    private val viewModel = UploadsViewModel(UploadDocumentUseCase(server, settings))
 
     private val uploads get() = viewModel.state.value.uploads
-
-    @Test
-    fun `document links come from the server`() {
-        assertEquals("http://paperless:8000/documents/5", viewModel.documentUrl(5))
-    }
 
     @Test
     fun `new uploads go on top and finish as done`() = runTest(main.dispatcher) {

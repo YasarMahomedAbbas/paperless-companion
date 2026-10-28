@@ -4,7 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,17 +27,17 @@ import androidx.compose.ui.unit.dp
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.AppTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.Spacing
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.cardTitle
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.statement
 
-/** What a [StatusCard] says, which colours its icon by the colour rules. */
+/** What a [StatusCard] says, which picks its icon colour by the colour rules. */
 enum class StatusTone {
-    /** Nothing here yet, or no match: `mfg`. */
+    /** Nothing here (yet): `mfg`. */
     Empty,
 
     /** The phone can't reach the server: `warning`. */
     Unreachable,
 
-    /** Paperless refused: `destructive`. */
+    /** The server or the phone refused: `destructive`. */
     Refused,
 
     /** It worked: `primary` on `primary-tint`. */
@@ -43,31 +45,34 @@ enum class StatusTone {
 }
 
 /**
- * The empty / error / done card of docs/design/components.md § Status card: a 64 circle with a
- * 28dp icon, one statement, one line of what to do, and one `Secondary` button. The caller
- * places it (20 from the sides). [inSheet] steps it up a tone, `raised` with a `surface`
- * circle, for a sheet's no-match or load-failed state (no card on a card of the same tone).
+ * The empty / error / done card of docs/design/components.md § Status card: a `surface` card,
+ * `r-card`, with a 64 circle holding the icon, one statement (17/500), one line of what to do
+ * (14 `mfg`) and one `Secondary` button. Centre it in the space it fills; it keeps 20 from the sides.
+ * [inSheet] steps it up a tone, `raised` with a `surface` circle, for a sheet's no-match or
+ * load-failed state (no card on a card of the same tone).
  */
 @Composable
 fun StatusCard(
     icon: ImageVector,
     tone: StatusTone,
-    title: String,
-    body: String,
+    statement: String,
+    hint: String,
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
     inSheet: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
-    val tint = when (tone) {
-        StatusTone.Empty -> colors.onSurfaceVariant
-        StatusTone.Unreachable -> AppTheme.extendedColors.warning
-        StatusTone.Refused -> colors.error
-        StatusTone.Done -> colors.primary
+    val plain = if (inSheet) colors.surfaceContainer else colors.surfaceContainerHigh
+    val (tint, circle) = when (tone) {
+        StatusTone.Empty -> colors.onSurfaceVariant to plain
+        StatusTone.Unreachable -> AppTheme.extendedColors.warning to plain
+        StatusTone.Refused -> colors.error to plain
+        StatusTone.Done -> colors.primary to colors.primaryContainer
     }
     Column(
         modifier
+            .padding(horizontal = Spacing.s20)
             .fillMaxWidth()
             .background(if (inSheet) colors.surfaceContainerHigh else colors.surfaceContainer, MaterialTheme.shapes.medium)
             .semantics(mergeDescendants = false) { liveRegion = LiveRegionMode.Polite }
@@ -75,26 +80,20 @@ fun StatusCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s8),
     ) {
-        Box(
-            Modifier
-                .padding(bottom = Spacing.s8)
-                .size(64.dp)
-                .background(
-                    when {
-                        tone == StatusTone.Done -> colors.primaryContainer
-                        inSheet -> colors.surfaceContainer
-                        else -> colors.surfaceContainerHigh
-                    },
-                    CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
+        Box(Modifier.size(64.dp).background(circle, CircleShape), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
         }
-        Text(title, style = MaterialTheme.typography.cardTitle, color = colors.onSurface, textAlign = TextAlign.Center)
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(Spacing.s4))
+        Text(
+            statement,
+            style = MaterialTheme.typography.statement,
+            color = colors.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Text(hint, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, textAlign = TextAlign.Center)
         if (actionLabel != null) {
-            AppButton(actionLabel, onAction, Modifier.padding(top = Spacing.s12), ButtonVariant.Secondary)
+            Spacer(Modifier.height(Spacing.s8))
+            AppButton(actionLabel, onAction, variant = ButtonVariant.Secondary)
         }
     }
 }
@@ -103,22 +102,15 @@ fun StatusCard(
 @Composable
 private fun StatusCardPreview() = PaperlessTheme {
     Surface {
-        Column(Modifier.padding(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.s16)) {
+        Column(Modifier.padding(vertical = Spacing.s20), verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
             StatusCard(
-                AppIcons.File,
-                StatusTone.Empty,
-                "No documents yet",
-                "Scan a letter, take a photo or pick a file, and it shows up here once Paperless has read it.",
-                actionLabel = "Add a document",
+                AppIcons.WifiOff, StatusTone.Unreachable, "Can't reach Paperless",
+                "Check you're on the home network or the VPN.", actionLabel = "Try again",
             )
             StatusCard(
-                AppIcons.WifiOff,
-                StatusTone.Unreachable,
-                "Couldn't load your documents",
-                "Check you're on the home network or the VPN, then try again.",
-                actionLabel = "Try again",
+                AppIcons.Document, StatusTone.Empty, "Can't show this file here",
+                "Download it to open it in another app.", actionLabel = "Download",
             )
-            StatusCard(AppIcons.Alert, StatusTone.Refused, "Couldn't load your documents", "Paperless rejected the login. Sign out and sign in again.", actionLabel = "Try again")
         }
     }
 }

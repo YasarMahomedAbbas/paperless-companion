@@ -45,6 +45,8 @@ object AppIcons {
         "M5 13h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z",
         "M7 7.5v.01M7 16.5v.01",
     )
+    val Download = outline("Download", "M12 4v11M7 10l5 5 5-5M5 20h14")
+    val OpenExternal = outline("OpenExternal", "M14 4h6v6M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5")
 }
 
 private const val EYE = "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"

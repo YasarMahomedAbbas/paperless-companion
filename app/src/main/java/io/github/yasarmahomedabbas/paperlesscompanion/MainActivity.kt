@@ -1,6 +1,18 @@
 package io.github.yasarmahomedabbas.paperlesscompanion
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerEvent
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerViewModel
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -111,6 +123,12 @@ class MainActivity : FragmentActivity() {
                 if (current is GateState.Home) lastHome = current
                 val locked = current as? GateState.Locked
                 val home = current as? GateState.Home ?: lastHome.takeIf { locked?.overlay == true }
+                // The document open in the viewer, kept across rotation; signing out closes it.
+                var openDocumentId by rememberSaveable { mutableStateOf<Int?>(null) }
+                // Counts each opening, so reopening a document gets a fresh viewer rather than the last one's
+                // state (a stale failure, or another sign-in's document under the same id).
+                var viewerOpens by rememberSaveable { mutableIntStateOf(0) }
+                LaunchedEffect(current is GateState.SignIn) { if (current is GateState.SignIn) openDocumentId = null }
 
                 Box(Modifier.fillMaxSize()) {
                     if (home != null) {
@@ -118,20 +136,38 @@ class MainActivity : FragmentActivity() {
                         Box(if (locked != null) Modifier.clearAndSetSemantics {} else Modifier) {
                             val key = "$session ${home.config.baseUrl}"
                             val uploads = viewModel<UploadsViewModel>(key = "uploads $key", factory = container.uploadsViewModelFactory)
+                            // Keeps the list's scroll and sheets while the viewer covers it.
+                            val saved = rememberSaveableStateHolder()
+                            val documentId = openDocumentId
                             BackHandler(enabled = locked == null && screen != Screen.DOCUMENTS) {
                                 screen = if (screen == Screen.UPDATES) Screen.SETTINGS else Screen.DOCUMENTS
                             }
-                            when (screen) {
-                                Screen.DOCUMENTS -> DocumentsScreen(
-                                    documents = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory),
-                                    uploads = uploads,
-                                    files = container.documents,
-                                    pending = if (locked == null) pending else emptyList(),
-                                    onPendingConsumed = gate::onPendingConsumed,
-                                    onDocuments = gate::addPending,
-                                    onOpenSettings = { screen = Screen.SETTINGS },
-                                )
-                                Screen.SETTINGS -> {
+                            when {
+                                screen == Screen.DOCUMENTS && documentId != null -> {
+                                    BackHandler(enabled = locked == null) { openDocumentId = null }
+                                    val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
+                                    val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
+                                    ViewerScreen(
+                                        viewModel = viewer,
+                                        onBack = { openDocumentId = null },
+                                        onShare = ::share,
+                                        onPickSaveLocation = { saveAs.launch(it) },
+                                        onOpenUrl = ::openUrl,
+                                    )
+                                }
+                                screen == Screen.DOCUMENTS -> saved.SaveableStateProvider("documents $key") {
+                                    DocumentsScreen(
+                                        documents = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory),
+                                        uploads = uploads,
+                                        files = container.documents,
+                                        pending = if (locked == null) pending else emptyList(),
+                                        onPendingConsumed = gate::onPendingConsumed,
+                                        onDocuments = gate::addPending,
+                                        onOpenSettings = { screen = Screen.SETTINGS },
+                                        onOpenDocument = { viewerOpens++; openDocumentId = it },
+                                    )
+                                }
+                                screen == Screen.SETTINGS -> {
                                     val settings = viewModel<SettingsViewModel>(key = "settings $key", factory = container.settingsViewModelFactory)
                                     SettingsScreen(
                                         viewModel = settings,
@@ -142,6 +178,7 @@ class MainActivity : FragmentActivity() {
                                         onSignOut = {
                                             settings.signOut()
                                             uploads.clear()
+                                            openDocumentId = null
                                             screen = Screen.DOCUMENTS
                                             session++
                                             gate.onSignedOut()
@@ -149,7 +186,7 @@ class MainActivity : FragmentActivity() {
                                         onBack = { screen = Screen.DOCUMENTS },
                                     )
                                 }
-                                Screen.UPDATES -> UpdatesScreen(
+                                else -> UpdatesScreen(
                                     viewModel = viewModel<UpdatesViewModel>(factory = container.updatesViewModelFactory),
                                     onAllow = { startActivity(container.installer.permissionIntent()) },
                                     onBack = { screen = Screen.SETTINGS },
@@ -196,6 +233,25 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    /** Hands a document file to the app the user picks, with read access to that one file. */
+    private fun share(event: ViewerEvent.Share) {
+        val uri = Uri.parse(event.location)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType(event.mimeType ?: "application/octet-stream")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        send.clipData = ClipData.newRawUri(event.name, uri)
+        startActivity(Intent.createChooser(send, null))
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: ActivityNotFoundException) {
+            // No browser on the phone: nothing to open it in.
+        }
+    }
+
     private fun askForNotificationsOnce() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || container.updateStore.askedForNotifications()) return
         container.updateStore.markAskedForNotifications()
@@ -218,4 +274,16 @@ class MainActivity : FragmentActivity() {
         const val KEY_SESSION = "session"
         const val KEY_SCREEN = "screen"
     }
+}
+
+/** The system's "Save as" for a file whose name and type are known only at launch. */
+private class SaveAs : ActivityResultContract<ViewerEvent.PickSaveLocation, Uri?>() {
+    override fun createIntent(context: Context, input: ViewerEvent.PickSaveLocation): Intent =
+        Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(input.mimeType ?: "application/octet-stream")
+            .putExtra(Intent.EXTRA_TITLE, input.name)
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? =
+        intent?.data.takeIf { resultCode == Activity.RESULT_OK }
 }

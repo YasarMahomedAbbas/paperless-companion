@@ -113,6 +113,8 @@ fun DocumentsScreen(
     /** Every document the screen brings in goes here first, so one that arrives while locked waits. */
     onDocuments: (List<DocumentSource>) -> Unit,
     onOpenSettings: () -> Unit,
+    /** Opens a document in the viewer: a row's tap, or a finished upload card's "Open". */
+    onOpenDocument: (Int) -> Unit,
 ) {
     val state by documents.state.collectAsState()
     val uploadState by uploads.state.collectAsState()
@@ -200,7 +202,7 @@ fun DocumentsScreen(
             onOpenSettings = onOpenSettings,
             onClearFinished = uploads::clearFinished,
             onRetryUpload = uploads::retry,
-            onOpenUpload = { id -> uploads.documentUrl(id)?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } },
+            onOpenDocument = onOpenDocument,
             onOpenPlayServicesSettings = if (playServicesNeedsCamera) {
                 {
                     context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", PLAY_SERVICES, null)))
@@ -275,7 +277,7 @@ class DocumentsScreenActions(
     val onOpenSettings: () -> Unit = {},
     val onClearFinished: () -> Unit = {},
     val onRetryUpload: (Long) -> Unit = {},
-    val onOpenUpload: (Int) -> Unit = {},
+    val onOpenDocument: (Int) -> Unit = {},
     /** Set while the scanner needs Play services to get the camera: the notice's "Open settings". */
     val onOpenPlayServicesSettings: (() -> Unit)? = null,
 )
@@ -454,7 +456,7 @@ private fun DocumentList(
                         documentId != null -> "Open"
                         else -> null
                     },
-                    onAction = { if (documentId != null) actions.onOpenUpload(documentId) else actions.onRetryUpload(item.id) },
+                    onAction = { if (documentId != null) actions.onOpenDocument(documentId) else actions.onRetryUpload(item.id) },
                 )
             }
         }
@@ -478,30 +480,30 @@ private fun DocumentList(
                 StatusCard(
                     icon = if (filtered) AppIcons.Search else AppIcons.File,
                     tone = StatusTone.Empty,
-                    title = when {
+                    statement = when {
                         state.text.isNotBlank() -> "Nothing matches \"${state.text.trim()}\""
                         filtered -> "No documents match"
                         else -> "No documents yet"
                     },
-                    body = when {
+                    hint = when {
                         state.text.isNotBlank() -> "Search looks inside every document, OCR text included. Try another word, or clear the filters."
                         filtered -> "No document carries every one of these filters."
                         else -> "Scan a letter, take a photo or pick a file, and it shows up here once Paperless has read it."
                     },
                     actionLabel = if (filtered) "Clear filters" else "Add a document",
                     onAction = if (filtered) actions.onClearFilters else actions.onAdd,
-                    modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.s24),
+                    modifier = Modifier.padding(vertical = Spacing.s24),
                 )
             }
             is ListStatus.Failed -> item(key = "failed") {
                 StatusCard(
                     icon = if (status.unreachable) AppIcons.WifiOff else AppIcons.Alert,
                     tone = if (status.unreachable) StatusTone.Unreachable else StatusTone.Refused,
-                    title = "Couldn't load your documents",
-                    body = if (status.unreachable) "Check you're on the home network or the VPN, then try again." else status.message,
+                    statement = "Couldn't load your documents",
+                    hint = if (status.unreachable) "Check you're on the home network or the VPN, then try again." else status.message,
                     actionLabel = "Try again",
                     onAction = actions.onRefresh,
-                    modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.s24),
+                    modifier = Modifier.padding(vertical = Spacing.s24),
                 )
             }
             ListStatus.Loaded -> {
@@ -513,8 +515,7 @@ private fun DocumentList(
                         moreTags = row.moreTags,
                         thumbnail = row.thumbnail,
                         snippet = row.snippet?.highlighted(searchMatch),
-                        // Opening a document comes with the document view (#10).
-                        onClick = {},
+                        onClick = { actions.onOpenDocument(row.id) },
                         modifier = cardPadding.padding(bottom = Spacing.rowGap),
                     )
                 }

@@ -1,6 +1,7 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.domain
 
 import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
+import io.github.yasarmahomedabbas.paperlesscompanion.FakeExports
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.doc
@@ -16,6 +17,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerExcepti
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DeleteDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.ExportDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
@@ -124,6 +126,46 @@ class DocumentUseCasesTest {
         assertSame(library.file, OpenDocumentFileUseCase(library, signedIn)(4, DocumentFileKind.ORIGINAL))
         assertEquals(listOf("file 4 ORIGINAL"), library.calls)
         assertEquals(listOf(CONFIG), library.configs)
+    }
+
+    @Test
+    fun `open file passes the progress through`() = runTest {
+        library.progress = listOf(0L to 10L, 10L to 10L)
+        val heard = mutableListOf<Pair<Long, Long?>>()
+
+        OpenDocumentFileUseCase(library, signedIn)(4, DocumentFileKind.PREVIEW) { done, total -> heard += done to total }
+
+        assertEquals(listOf(0L to 10L, 10L to 10L), heard)
+    }
+
+    @Test
+    fun `export hands each call to its port`() = runTest {
+        val exports = FakeExports(canSaveDirectly = false)
+        val export = ExportDocumentUseCase(exports)
+        val file = library.file
+
+        assertEquals("content://test/bill.pdf", export.shareLocation(file))
+        assertEquals(false, export.canSaveDirectly)
+        exports.canSaveDirectly = true
+        assertEquals(true, export.canSaveDirectly)
+        exports.savedAs = "bill (1).pdf"
+        assertEquals("bill (1).pdf", export.saveToDownloads(file))
+        export.saveTo(file, "content://picked/1")
+
+        assertEquals(listOf("share bill.pdf", "downloads bill.pdf", "saveTo bill.pdf content://picked/1"), exports.calls)
+    }
+
+    @Test
+    fun `export passes a failure through`() = runTest {
+        val exports = FakeExports()
+        val failure = ServerException(Kind.UNREADABLE, "Couldn't save bill.pdf")
+        exports.failure = failure
+        try {
+            ExportDocumentUseCase(exports).saveToDownloads(library.file)
+            fail()
+        } catch (e: ServerException) {
+            assertSame(failure, e)
+        }
     }
 
     @Test

@@ -115,7 +115,7 @@ class DocumentsViewModelTest {
 
     @Test
     fun `labels that fail to load fail the list`() = runTest(main.dispatcher) {
-        library.labelsFailure = ServerException(Kind.UNAUTHORIZED, "401")
+        library.labelFailure = ServerException(Kind.UNAUTHORIZED, "401")
         val vm = loaded()
 
         assertFalse((vm.s.status as ListStatus.Failed).unreachable)
@@ -462,9 +462,9 @@ class DocumentsViewModelTest {
 
     @Test
     fun `a filter change while the labels never loaded loads them too`() = runTest(main.dispatcher) {
-        library.labelsFailure = ServerException(Kind.UNREACHABLE, "down")
+        library.labelFailure = ServerException(Kind.UNREACHABLE, "down")
         val vm = loaded()
-        library.labelsFailure = null
+        library.labelFailure = null
 
         vm.setSort(SortOption.OLDEST)
         advanceUntilIdle()

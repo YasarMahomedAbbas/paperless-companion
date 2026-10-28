@@ -25,14 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,36 +35,40 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.Spacing
 
 /**
- * A skeleton block (components.md § Skeleton): `surface` → `raised` → `surface` sweeping every
- * 1.8 s. Compose scales the sweep by the system animator scale, so "remove animations" stops it.
+ * One block of a skeleton (docs/design/components.md § Skeleton): a `surface` → `raised` → `surface`
+ * gradient sweeping every 1.8s, `r-thumb` corners, or fully round for chips and tags ([round]).
+ * Size it with [modifier] to the shape it stands in for. Hidden from TalkBack.
  */
 @Composable
-private fun Modifier.shim(shape: Shape): Modifier {
+fun SkeletonBlock(modifier: Modifier, round: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     val sweep by rememberInfiniteTransition(label = "shim").animateFloat(
-        initialValue = 1f,
-        targetValue = -1f,
+        initialValue = -1f,
+        targetValue = 2f,
         animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
-        label = "sweep",
+        label = "shim",
     )
-    return drawBehind {
-        val w = size.width
-        val brush = Brush.linearGradient(
-            0f to colors.surfaceContainer,
-            0.4f to colors.surfaceContainerHigh,
-            0.8f to colors.surfaceContainer,
-            start = Offset(sweep * w * 2, 0f),
-            end = Offset(sweep * w * 2 + w * 2, 0f),
-        )
-        val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
-        clipPath(path) { drawRect(brush) }
-    }
+    val shape = if (round) CircleShape else MaterialTheme.shapes.extraSmall
+    Box(
+        modifier
+            .clearAndSetSemantics {}
+            .background(colors.surfaceContainer, shape)
+            .background(
+                Brush.linearGradient(
+                    0f to colors.surfaceContainer,
+                    0.5f to colors.surfaceContainerHigh,
+                    1f to colors.surfaceContainer,
+                    start = Offset(sweep * 600f - 300f, 0f),
+                    end = Offset(sweep * 600f + 300f, 0f),
+                ),
+                shape,
+            ),
+    )
 }
 
-/** A document row with every shape a [shim] block: same sizes and places as [DocumentRowCard]. */
+/** A document row with every shape a [SkeletonBlock]: same sizes and places as [DocumentRowCard]. */
 @Composable
 fun DocumentRowSkeleton(modifier: Modifier = Modifier) {
-    val thumb = MaterialTheme.shapes.extraSmall
     Row(
         modifier
             .fillMaxWidth()
@@ -77,13 +76,13 @@ fun DocumentRowSkeleton(modifier: Modifier = Modifier) {
             .padding(Spacing.s12),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
     ) {
-        Box(Modifier.size(width = 56.dp, height = 72.dp).shim(thumb))
+        SkeletonBlock(Modifier.size(width = 56.dp, height = 72.dp))
         Column(Modifier.weight(1f).padding(top = Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s8)) {
-            Box(Modifier.fillMaxWidth(0.7f).height(16.dp).shim(thumb))
-            Box(Modifier.fillMaxWidth(0.45f).height(12.dp).shim(thumb))
+            SkeletonBlock(Modifier.fillMaxWidth(0.7f).height(16.dp))
+            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.width(48.dp).height(20.dp).shim(CircleShape))
-                Box(Modifier.width(56.dp).height(20.dp).shim(CircleShape))
+                SkeletonBlock(Modifier.width(48.dp).height(20.dp), round = true)
+                SkeletonBlock(Modifier.width(56.dp).height(20.dp), round = true)
             }
         }
     }
@@ -116,7 +115,7 @@ fun LoadMoreFailedFooter(message: String, onRetry: () -> Unit, modifier: Modifie
 private fun SkeletonPreview() = PaperlessTheme {
     Surface {
         Column(Modifier.padding(Spacing.cardGutter), verticalArrangement = Arrangement.spacedBy(Spacing.rowGap)) {
-            DocumentRowSkeleton(Modifier.semantics { contentDescription = "Loading" })
+            DocumentRowSkeleton()
             LoadingMoreFooter()
             LoadMoreFailedFooter("Can't reach Paperless (timeout). Are you on the home network or the VPN?", {})
         }

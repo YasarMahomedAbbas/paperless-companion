@@ -129,7 +129,7 @@ private fun LabelsFailed(onRetry: () -> Unit) {
         StatusTone.Unreachable,
         "Couldn't load your filters",
         "Check you're on the home network or the VPN, then try again.",
-        Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.s16),
+        Modifier.padding(vertical = Spacing.s16),
         actionLabel = "Try again",
         onAction = onRetry,
         inSheet = true,
@@ -216,7 +216,7 @@ private fun CorrespondentSheet(correspondents: List<Label>, selected: Int?, onSe
                         StatusTone.Empty,
                         "No correspondent called \"${find.trim()}\"",
                         "New correspondents are made in Paperless's web interface.",
-                        Modifier.padding(horizontal = Spacing.s12, vertical = Spacing.s16),
+                        Modifier.padding(vertical = Spacing.s16),
                         inSheet = true,
                     )
                 }
