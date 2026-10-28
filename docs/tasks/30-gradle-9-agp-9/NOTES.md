@@ -43,3 +43,16 @@ Branch: `chore/30-gradle-9-agp-9`
 - Skipped: `build.sh`'s shared image tag across parallel worktrees — transient, gone once this merges.
 - Checked, still true: README Development commands and `build.sh` usage, CI/CD bullets against `ci.yml` / `release.yml`, CLAUDE.md's check command and `koverVerifyDebug` CI claim, "JDK, Android SDK and Gradle live in a Docker image".
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker on Gradle 9.8.2; 384 debug unit tests passed (0 failed, 0 skipped), line coverage 93.4 % (`koverVerify` ≥ 80 % passed), lint clean with `abortOnError`, debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent). No Paperless call changed in method, path, query, body or parsing; only the transport moved to OkHttp 5.
+- Verified: upload `Content-Length` present and no `Transfer-Encoding` on OkHttp 5 (`PaperlessApiTest`, unedited); v9 bare-list and v10 paginated `/api/tasks/` parsing (unedited tests); `ArchitectureTest` (`okhttp3` only in `data/`); Robolectric screen tests offline on the 4.17 SDK jar.
+- Failed: none
+- Not self-verifiable:
+  - Installing the release APK over the current one: on the phone, the in-app update installs the new version without asking to uninstall (same key, higher version code). The Release workflow's `apksigner verify` (now build-tools 36.0.0) is the proxy.
+  - The ML Kit document scanner (16.0.0) opens and returns a scan that uploads.
+  - Uploads, document list and thumbnails against the real server (OkHttp 5 transport): scan or share a file, check it lands in Paperless and its thumbnail shows.
