@@ -41,6 +41,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsView
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
 import java.io.File
 
@@ -83,6 +84,9 @@ class AppContainer(private val context: Context) {
     }
     val uploadsViewModelFactory = viewModelFactory {
         initializer { UploadsViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings)) }
+    }
+    val settingsViewModelFactory = viewModelFactory {
+        initializer { SettingsViewModel(settings, updateStore, installer::installedVersionCode) }
     }
     val updatesViewModelFactory = viewModelFactory {
         initializer {

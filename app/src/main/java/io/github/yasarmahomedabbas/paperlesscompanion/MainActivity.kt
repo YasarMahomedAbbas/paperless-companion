@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -35,6 +36,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.LockScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.askToUnlock
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
@@ -50,14 +53,24 @@ class MainActivity : FragmentActivity() {
     /** The last unlocked home, kept composed under the lock screen when the app locks again. */
     private var lastHome: GateState.Home? = null
 
-    /** The Updates screen is open (from the menu or the "Update ready" notification). */
-    private var showUpdates by mutableStateOf(false)
+    /** The screens behind the gate: Documents → Settings → Updates (layouts.md § Navigation). */
+    private enum class Screen { DOCUMENTS, SETTINGS, UPDATES }
+
+    /** Which one is open; the "Update ready" notification opens Updates directly. */
+    private var screen by mutableStateOf(Screen.DOCUMENTS)
+
+    /** Counts sign-outs, so signing in again (even to the same server) starts the screens afresh. */
+    private var session by mutableIntStateOf(0)
 
     // "Update ready" can't be posted without it; whatever the answer, it's only asked once.
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.let {
+            session = it.getInt(KEY_SESSION)
+            screen = Screen.entries[it.getInt(KEY_SCREEN)]
+        }
         // One dark theme, so the system bars always get light icons, whatever the system setting.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -103,29 +116,43 @@ class MainActivity : FragmentActivity() {
                     if (home != null) {
                         // Hidden from TalkBack too while the lock screen covers it.
                         Box(if (locked != null) Modifier.clearAndSetSemantics {} else Modifier) {
-                            if (showUpdates) {
-                                BackHandler(enabled = locked == null) { showUpdates = false }
-                                UpdatesScreen(
-                                    viewModel = viewModel<UpdatesViewModel>(factory = container.updatesViewModelFactory),
-                                    onAllow = { startActivity(container.installer.permissionIntent()) },
-                                    onBack = { showUpdates = false },
-                                )
-                            } else {
-                                DocumentsScreen(
-                                    documents = viewModel<DocumentsViewModel>(
-                                        key = "documents ${home.config.baseUrl}",
-                                        factory = container.documentsViewModelFactory,
-                                    ),
-                                    uploads = viewModel<UploadsViewModel>(
-                                        key = "uploads ${home.config.baseUrl}",
-                                        factory = container.uploadsViewModelFactory,
-                                    ),
+                            val key = "$session ${home.config.baseUrl}"
+                            val uploads = viewModel<UploadsViewModel>(key = "uploads $key", factory = container.uploadsViewModelFactory)
+                            BackHandler(enabled = locked == null && screen != Screen.DOCUMENTS) {
+                                screen = if (screen == Screen.UPDATES) Screen.SETTINGS else Screen.DOCUMENTS
+                            }
+                            when (screen) {
+                                Screen.DOCUMENTS -> DocumentsScreen(
+                                    documents = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory),
+                                    uploads = uploads,
                                     files = container.documents,
                                     pending = if (locked == null) pending else emptyList(),
                                     onPendingConsumed = gate::onPendingConsumed,
                                     onDocuments = gate::addPending,
-                                    // Until Settings lands (checkpoint 5), the gear opens Updates.
-                                    onOpenSettings = { showUpdates = true },
+                                    onOpenSettings = { screen = Screen.SETTINGS },
+                                )
+                                Screen.SETTINGS -> {
+                                    val settings = viewModel<SettingsViewModel>(key = "settings $key", factory = container.settingsViewModelFactory)
+                                    SettingsScreen(
+                                        viewModel = settings,
+                                        lockAvailable = home.lockAvailable,
+                                        lockEnabled = home.lockEnabled,
+                                        onLockChange = ::changeLock,
+                                        onOpenUpdates = { screen = Screen.UPDATES },
+                                        onSignOut = {
+                                            settings.signOut()
+                                            uploads.clear()
+                                            screen = Screen.DOCUMENTS
+                                            session++
+                                            gate.onSignedOut()
+                                        },
+                                        onBack = { screen = Screen.DOCUMENTS },
+                                    )
+                                }
+                                Screen.UPDATES -> UpdatesScreen(
+                                    viewModel = viewModel<UpdatesViewModel>(factory = container.updatesViewModelFactory),
+                                    onAllow = { startActivity(container.installer.permissionIntent()) },
+                                    onBack = { screen = Screen.SETTINGS },
                                 )
                             }
                         }
@@ -143,6 +170,13 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // The ViewModels outlive a rotation, so the keys that find them must too.
+        outState.putInt(KEY_SESSION, session)
+        outState.putInt(KEY_SCREEN, screen.ordinal)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -170,7 +204,7 @@ class MainActivity : FragmentActivity() {
 
     private fun receive(intent: Intent) {
         // Shown only once signed in: the login screen ignores it.
-        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) showUpdates = true
+        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) screen = Screen.UPDATES
         val uris = when (intent.action) {
             Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
@@ -178,5 +212,10 @@ class MainActivity : FragmentActivity() {
             else -> emptyList()
         }
         gate.addPending(uris.map { container.documents.from(it.toString(), "Shared document") })
+    }
+
+    private companion object {
+        const val KEY_SESSION = "session"
+        const val KEY_SCREEN = "screen"
     }
 }

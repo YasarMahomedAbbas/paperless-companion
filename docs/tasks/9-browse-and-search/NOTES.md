@@ -22,3 +22,21 @@ Branch: `feat/9-browse-and-search`
   - No live server has ever answered these calls (from #7 as well). Search snippets and filter params are unproven against a running Paperless.
   - Sign out from Settings still hits #16 (it bounces back home) until that ticket lands.
   - A freshly uploaded document only appears at the top if its document date is the newest; under "Newest first" an old letter lands further down.
+
+## Implementation
+
+- Shipped:
+  - `DocumentsViewModel` (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsViewModel.kt:30`): hand-rolled paging (`loadMore` :55), one load job so a newer page-1 load cancels the older one (`loadFirstPage` :149), 400 ms debounced search, filters, sort, and the filter sheet's one-row count (`previewFilters` :123). Rows mapped by `Document.toRow` (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsUiState.kt:36`); sort options in `SortOption.kt`.
+  - Shared parts in `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/components/`: document row with the snippet highlighter (`DocumentRow.kt:110`), search field, chips, icon and action buttons, status card (with an in-sheet variant), skeleton and list footers, bottom sheet and option rows, picker field, settings rows, dialog, back bar, and the canvas's icons in `AppIcons.kt`.
+  - Documents is the home (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsScreen.kt:106`): list states, pull to refresh, infinite scroll five rows ahead (:304), upload cards on top, the Add sheet (`AddSheet.kt`), searching mode, the chip row (:375), the sort sheet (`SortSheet.kt`) and the filters sheet with its correspondent picker (`FiltersSheet.kt:55`). `HomeScreen` is gone.
+  - `HomeViewModel` became `UploadsViewModel` (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/UploadsViewModel.kt`), with `added` (:39, a buffered channel) refreshing the list when Paperless accepts an upload, and `clear()` (:68) for sign-out.
+  - Settings (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/settings/SettingsScreen.kt:43`, `SettingsViewModel.kt`): the address, the fingerprint switch, Updates with a "ready" pill, Sign out behind a confirm. `MainActivity` navigates Documents → Settings → Updates with a `Screen` enum (`app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/MainActivity.kt:57`), and a sign-out `session` counter (:146) keys the ViewModels so signing in again starts afresh; both survive a rotation (:175).
+  - `docs/design/README.md` § Decisions: the new drawn icons, search rows dropping their tags, the failed-next-page banner.
+- Tests: full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) green: 341 passed / 0 failed / 0 skipped; line coverage 90.4% (bound 80). New: `DocumentsViewModelTest` (45), `SortOptionTest` (2), `HighlightTest` (4), `SettingsViewModelTest` (5), `UploadsViewModelTest` (+4, moved from `HomeViewModelTest`).
+- Outstanding: none unticked. Device-only checks from the test plan (thumbnails and their disk cache, pull-to-refresh and scroll feel, the Add sheet's scanner, camera and picker, a shared file landing as an upload card, search over the VPN) and every real-server call are for self-verification; `verify.env` was not read here.
+- Contradicted the plan:
+  - Copy: the canvas (which the manual puts above the checklist on anything visual) words several things differently, and the canvas won: "Title, A to Z" / "Correspondent, A to Z", "Couldn't load your documents", "Unlock with fingerprint", "Sign out?", "Clear all"; the chip row puts the removable filters before the sort chip. The checklist text was edited to match.
+  - `added` is a buffered `Channel` flow, not a `SharedFlow`: a `SharedFlow` drops an upload accepted while Settings is open.
+  - `SettingsViewModel` also takes the update store and the installed version code, so the "ready" pill is worked out (and tested) there instead of in the activity.
+  - The ViewModel keys gained a sign-out counter: keyed on the address alone, signing out and back in to the same server would have shown the old session's list.
+  - `SearchHit.highlighted` takes its match style as a parameter (`searchMatch` from the theme in the app) so it is testable without Compose.

@@ -196,20 +196,20 @@ Filters chip is `Action` with no filters on, `Selected` "Filters · N" with some
 
 Goal: the gear opens Settings; Updates sits under it; the old ⋮ menu is gone.
 
-### [ ] 5.1 — SettingsViewModel
+### [x] 5.1 — SettingsViewModel
 
 File: `ui/settings/SettingsViewModel.kt` (new)
-`class SettingsViewModel(private val settings: SettingsRepository) : ViewModel()`, with `val serverUrl: String` (from `settings.load()?.baseUrl.orEmpty()`) and `fun signOut()` (`settings.clear()`). Test: `ui/SettingsViewModelTest.kt`.
+`class SettingsViewModel(private val settings: SettingsRepository, updates: UpdateStore, installedVersionCode: () -> Long) : ViewModel()`, with `val serverUrl: String` (from `settings.load()?.baseUrl.orEmpty()`), `val updateReady: StateFlow<String?>` (the offer's version when it is newer than the installed one, so the pill is tested here rather than worked out in the activity) and `fun signOut()` (`settings.clear()`). Test: `ui/SettingsViewModelTest.kt`.
 
-### [ ] 5.2 — Settings screen
+### [x] 5.2 — Settings screen
 
 File: `ui/settings/SettingsScreen.kt` (new)
-Back bar "Settings". Server card: the address. Security card: "Lock with fingerprint" switch row (only when `lockAvailable`; `onLockChange` as today, through the system prompt). App card: "Updates" row with a chevron, and a status pill ("<version> ready") when `UpdateStore.offer` holds one, passed in as `updateReady: String?`. Then a centred `Secondary` "Sign out" opening a confirm dialog ("Sign out of Paperless?", Cancel / Sign out `Primary`) per the canvas "Settings — sign out confirm" board. No "Signed in as", no lock-again delay, no Source and licences row (out of scope).
+Back bar "Settings" (new `BackBar` in `ui/components/Headers.kt`). Server card: the address. Security card: "Unlock with fingerprint" switch row with the canvas's second line (only when `lockAvailable`; `onLockChange` as today, through the system prompt). App card: "Updates" row with "Version <installed>", a chevron, and a status pill ("<version> ready") from `viewModel.updateReady`. Then a centred `Secondary` "Sign out" opening a confirm dialog ("Sign out?" with the canvas's body, Cancel / Sign out `Primary`) per the canvas "Settings — sign out confirm" board, on a new `AppDialog` in `ui/components/Dialog.kt`. No "Signed in as", no lock-again delay, no Source and licences row (out of scope).
 
-### [ ] 5.3 — Navigation
+### [x] 5.3 — Navigation
 
 Files: `MainActivity.kt`, `AppContainer.kt`
-Replace `showUpdates: Boolean` with `screen: Screen` (`enum class Screen { DOCUMENTS, SETTINGS, UPDATES }`, held in `mutableStateOf`). The gear goes to SETTINGS, the Updates row to UPDATES. Back goes UPDATES → SETTINGS → DOCUMENTS (`BackHandler`, disabled while locked, as today). The "Update ready" notification extra opens UPDATES, whose back goes to SETTINGS. Sign out calls `settingsViewModel.signOut()`, `uploadsViewModel.clear()`, `screen = DOCUMENTS`, then `gate.onSignedOut()`. Add `settingsViewModelFactory` to `AppContainer`. Remove the temporary checkpoint-3 path.
+Replace `showUpdates: Boolean` with `screen: Screen` (`enum class Screen { DOCUMENTS, SETTINGS, UPDATES }`, held in `mutableStateOf`). The gear goes to SETTINGS, the Updates row to UPDATES. Back goes UPDATES → SETTINGS → DOCUMENTS (`BackHandler`, disabled while locked, as today). The "Update ready" notification extra opens UPDATES, whose back goes to SETTINGS. Sign out calls `settingsViewModel.signOut()`, `uploadsViewModel.clear()`, `screen = DOCUMENTS`, bumps a `session` counter, then `gate.onSignedOut()`. The ViewModels are keyed on `"<session> <baseUrl>"`, so signing in again to the same server starts the list afresh instead of showing the old session's rows; `session` and `screen` are kept across a rotation in `onSaveInstanceState`, since the ViewModels outlive it. Add `settingsViewModelFactory` to `AppContainer`. Remove the temporary checkpoint-3 path.
 
 ### Verify
 
