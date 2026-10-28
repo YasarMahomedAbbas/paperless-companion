@@ -88,3 +88,50 @@ boards that show it now draw a proper gear.
   green Unlock button. Nothing of the documents shows behind it.
 - **No offline column** on the canvas: with no cache, "can't reach the server" is the same as
   load failed (see open question 1).
+
+## Implementation
+
+After the canvas was approved, the theme was built and applied to today's two screens
+(`design-recipe`, checked against `docs/design/checklist.md`). No CHECKLIST.md for a design
+ticket; three checkpoints:
+
+1. **Theme** — `8e1cd14` feat(ui): add the house theme: slate and green tokens, Figtree, corners.
+   `ui/theme/`: `Color.kt` (the README tokens as one dark `ColorScheme` with every slot set,
+   `ExtendedColors.warning`), `Type.kt` (the foundations.md scale plus `cardTitle`,
+   `primaryButton`, `lead`), `Shape.kt` (r-thumb / ctl / card / sheet), `Spacing.kt`, and
+   `Theme.kt` with no dark branch and no dynamic colour. Figtree 400 / 500 / 600 bundled in
+   `res/font/` as static instances cut (fontTools instancer) from the Google Fonts variable
+   font (`google/fonts` `ofl/figtree`); OFL in `assets/licenses/Figtree-OFL.txt`. The window
+   background and system bars are dark whatever the system setting. Tests: `ThemeTest` (the
+   foundations.md contrast table within 0.06, surfaces step up, Figtree 400/500/600 only) and
+   `DesignRulesTest` (no dark/dynamic branch anywhere; no `Color(0x`, `RoundedCornerShape(n`,
+   `fontSize =` or `.sp` outside `ui/theme` and `ui/components`).
+2. **Components** — `7ff7973` feat(ui): add the shared components the sign-in and home screens need.
+   `ui/components/`: `AppButton` (Primary / Secondary / Text / Destructive / DestructiveText,
+   busy), `AppTextField` (label, focus / error rings, error line, password eye),
+   `NoticeBanner` (Info / Unreachable / Refused), `UploadCard` (Working / Added / Refused /
+   Unreachable), `LargeTitleBar`, `SectionHeading`, `AppIcons` (outlined glyphs core icons lack).
+   Each has a `@Preview`; `ui-tooling-preview` added.
+3. **Screens** — `964ae61` feat(ui): apply the house theme to the sign-in and home screens.
+   Sign in per its canvas boards, with the failed-sign-in banner and the marked field
+   (`LoginUiState.errorField`, `.unreachable`; tests in `LoginViewModelTest`). Home keeps its
+   upload-first layout until #9, rebuilt from the components; `UploadState.Failed.unreachable`
+   lets a "couldn't reach" upload show amber, not red (tests in `UploadDocumentUseCaseTest`).
+   Previews for every state of both screens. Gaps the manual left are recorded in
+   `docs/design/README.md` § Decisions.
+
+**CI:** `./build.sh ./gradlew --console=plain testDebugUnitTest koverVerify lintDebug assembleDebug`
+→ BUILD SUCCESSFUL (65 tests, 0 failures; lint has only the pre-existing dependency-version,
+data-extraction and `mipmap-anydpi-v26` warnings). The APK carries the three Figtree files and
+the licence.
+
+**Deferred / not done:**
+
+- The new Documents home, Add sheet, scanner-needs-camera dialog and the other canvas rows
+  are #9, #10, #11, #13, #8; their components (search field, chips, rows, sheets, dialogs,
+  snackbar, skeleton, status card, menu, switch) are built there, by the same recipes.
+- Nobody has looked at the screens on a phone or in Android Studio's preview yet; the
+  previews are there for that.
+- `HomeScreen` still imports `data.UriDocuments` (it did before); the layer fix belongs to
+  #14's `ArchitectureTest`.
+- The launcher icon keeps its old `#17541F` background; the manual doesn't cover the icon.
