@@ -129,6 +129,22 @@ Settled when #6 met #8 and #13 on `main`:
   again; it says to check the connection rather than the home network or VPN, since GitHub
   isn't on the home network.
 
+Settled while building the Documents list (#9):
+
+- **More drawn icons.** Search, close, back, plus, chevron, the Settings gear, filters, sort,
+  scan, camera, file, person and server are drawn in `AppIcons.kt` from the canvas's strokes,
+  for the same reason as the first set.
+- **The search row drops its tags.** A row's search variant shows the two-line snippet in the
+  tags' place, as the "Search — searching" board draws it.
+- **A failed next page** is an `Unreachable` notice banner at the foot of the list with Try
+  again, so the rows already loaded stay put.
+- **Documents is the home**, replacing the upload-first home above: Scan document, Take photo
+  and Choose file moved into the Add sheet, and the ⋮ menu is gone (its Updates, fingerprint
+  switch and Sign out are in Settings).
+- **Settings is partial.** It shows the server address, the fingerprint switch, Updates and
+  Sign out. "Signed in as", the lock-again delay (the code still locks after 1 minute) and
+  Source and licences from `layouts.md` § Settings are follow-ups.
+
 Settled while building the viewer (#10):
 
 - **New type slots.** The viewer bar's 18/500 title is `viewerTitle` (18 / 24) and a status

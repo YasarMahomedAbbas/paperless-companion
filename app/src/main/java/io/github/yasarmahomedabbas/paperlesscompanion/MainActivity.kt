@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerViewModel
@@ -38,14 +39,17 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeScreen
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.LockScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.askToUnlock
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
@@ -61,14 +65,24 @@ class MainActivity : FragmentActivity() {
     /** The last unlocked home, kept composed under the lock screen when the app locks again. */
     private var lastHome: GateState.Home? = null
 
-    /** The Updates screen is open (from the menu or the "Update ready" notification). */
-    private var showUpdates by mutableStateOf(false)
+    /** The screens behind the gate: Documents → Settings → Updates (layouts.md § Navigation). */
+    private enum class Screen { DOCUMENTS, SETTINGS, UPDATES }
+
+    /** Which one is open; the "Update ready" notification opens Updates directly. */
+    private var screen by mutableStateOf(Screen.DOCUMENTS)
+
+    /** Counts sign-outs, so signing in again (even to the same server) starts the screens afresh. */
+    private var session by mutableIntStateOf(0)
 
     // "Update ready" can't be posted without it; whatever the answer, it's only asked once.
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.let {
+            session = it.getInt(KEY_SESSION)
+            screen = Screen.entries[it.getInt(KEY_SCREEN)]
+        }
         // One dark theme, so the system bars always get light icons, whatever the system setting.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -120,38 +134,62 @@ class MainActivity : FragmentActivity() {
                     if (home != null) {
                         // Hidden from TalkBack too while the lock screen covers it.
                         Box(if (locked != null) Modifier.clearAndSetSemantics {} else Modifier) {
+                            val key = "$session ${home.config.baseUrl}"
+                            val uploads = viewModel<UploadsViewModel>(key = "uploads $key", factory = container.uploadsViewModelFactory)
+                            // Keeps the list's scroll and sheets while the viewer covers it.
+                            val saved = rememberSaveableStateHolder()
                             val documentId = openDocumentId
-                            if (documentId != null && !showUpdates) {
-                                BackHandler(enabled = locked == null) { openDocumentId = null }
-                                val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
-                                val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
-                                ViewerScreen(
-                                    viewModel = viewer,
-                                    onBack = { openDocumentId = null },
-                                    onShare = ::share,
-                                    onPickSaveLocation = { saveAs.launch(it) },
-                                    onOpenUrl = ::openUrl,
-                                )
-                            } else if (showUpdates) {
-                                BackHandler(enabled = locked == null) { showUpdates = false }
-                                UpdatesScreen(
+                            BackHandler(enabled = locked == null && screen != Screen.DOCUMENTS) {
+                                screen = if (screen == Screen.UPDATES) Screen.SETTINGS else Screen.DOCUMENTS
+                            }
+                            when {
+                                screen == Screen.DOCUMENTS && documentId != null -> {
+                                    BackHandler(enabled = locked == null) { openDocumentId = null }
+                                    val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
+                                    val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
+                                    ViewerScreen(
+                                        viewModel = viewer,
+                                        onBack = { openDocumentId = null },
+                                        onShare = ::share,
+                                        onPickSaveLocation = { saveAs.launch(it) },
+                                        onOpenUrl = ::openUrl,
+                                    )
+                                }
+                                screen == Screen.DOCUMENTS -> saved.SaveableStateProvider("documents $key") {
+                                    DocumentsScreen(
+                                        documents = viewModel<DocumentsViewModel>(key = "documents $key", factory = container.documentsViewModelFactory),
+                                        uploads = uploads,
+                                        files = container.documents,
+                                        pending = if (locked == null) pending else emptyList(),
+                                        onPendingConsumed = gate::onPendingConsumed,
+                                        onDocuments = gate::addPending,
+                                        onOpenSettings = { screen = Screen.SETTINGS },
+                                        onOpenDocument = { viewerOpens++; openDocumentId = it },
+                                    )
+                                }
+                                screen == Screen.SETTINGS -> {
+                                    val settings = viewModel<SettingsViewModel>(key = "settings $key", factory = container.settingsViewModelFactory)
+                                    SettingsScreen(
+                                        viewModel = settings,
+                                        lockAvailable = home.lockAvailable,
+                                        lockEnabled = home.lockEnabled,
+                                        onLockChange = ::changeLock,
+                                        onOpenUpdates = { screen = Screen.UPDATES },
+                                        onSignOut = {
+                                            settings.signOut()
+                                            uploads.clear()
+                                            openDocumentId = null
+                                            screen = Screen.DOCUMENTS
+                                            session++
+                                            gate.onSignedOut()
+                                        },
+                                        onBack = { screen = Screen.DOCUMENTS },
+                                    )
+                                }
+                                else -> UpdatesScreen(
                                     viewModel = viewModel<UpdatesViewModel>(factory = container.updatesViewModelFactory),
                                     onAllow = { startActivity(container.installer.permissionIntent()) },
-                                    onBack = { showUpdates = false },
-                                )
-                            } else {
-                                HomeScreen(
-                                    viewModel = viewModel<HomeViewModel>(key = home.config.baseUrl, factory = container.homeViewModelFactory),
-                                    documents = container.documents,
-                                    pending = if (locked == null) pending else emptyList(),
-                                    onPendingConsumed = gate::onPendingConsumed,
-                                    onDocuments = gate::addPending,
-                                    lockAvailable = home.lockAvailable,
-                                    lockEnabled = home.lockEnabled,
-                                    onLockChange = ::changeLock,
-                                    onSignedOut = gate::onSignedOut,
-                                    onOpenUpdates = { showUpdates = true },
-                                    onOpenDocument = { viewerOpens++; openDocumentId = it },
+                                    onBack = { screen = Screen.SETTINGS },
                                 )
                             }
                         }
@@ -169,6 +207,13 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // The ViewModels outlive a rotation, so the keys that find them must too.
+        outState.putInt(KEY_SESSION, session)
+        outState.putInt(KEY_SCREEN, screen.ordinal)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -215,7 +260,7 @@ class MainActivity : FragmentActivity() {
 
     private fun receive(intent: Intent) {
         // Shown only once signed in: the login screen ignores it.
-        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) showUpdates = true
+        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) screen = Screen.UPDATES
         val uris = when (intent.action) {
             Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
@@ -223,6 +268,11 @@ class MainActivity : FragmentActivity() {
             else -> emptyList()
         }
         gate.addPending(uris.map { container.documents.from(it.toString(), "Shared document") })
+    }
+
+    private companion object {
+        const val KEY_SESSION = "session"
+        const val KEY_SCREEN = "screen"
     }
 }
 
