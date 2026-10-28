@@ -1,5 +1,10 @@
 <resources>
-    <!-- AppCompat so the biometric prompt's own dialog (a fingerprint dialog before API 28) can be shown. -->
-    <style name="Theme.PaperlessCompanion" parent="Theme.AppCompat.Light.NoActionBar" />
+    <!-- The app has one dark theme (docs/design). The window is painted in the page ground
+         (`bg`) so launching shows no white flash before Compose draws. AppCompat so the
+         biometric prompt's own dialog (a fingerprint dialog before API 28) can be shown. -->
+    <style name="Theme.PaperlessCompanion" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+    <color name="window_background">#1B2229</color>
     <color name="ic_launcher_background">#17541F</color>
 </resources>

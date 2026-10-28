@@ -9,36 +9,27 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,11 +38,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
@@ -60,12 +50,20 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppButton
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ButtonVariant
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.LargeTitleBar
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.NoticeBanner
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.SectionHeading
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.UploadCard
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.UploadStatus
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.Spacing
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -80,6 +78,8 @@ fun HomeScreen(
     onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
     onOpenUpdates: () -> Unit,
+    /** A finished upload's Open: shows the document in the viewer. */
+    onOpenDocument: (Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -143,135 +143,219 @@ fun HomeScreen(
         photoLauncher.launch(uri)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Paperless Scan") },
-                actions = {
-                    var menu by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { menu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Updates") },
-                                onClick = {
-                                    menu = false
-                                    onOpenUpdates()
-                                },
-                            )
-                            if (lockAvailable) {
-                                DropdownMenuItem(
-                                    text = { Text("Lock with fingerprint") },
-                                    trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
-                                    onClick = {
-                                        menu = false
-                                        onLockChange(!lockEnabled)
-                                    },
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("Sign out") },
-                                onClick = {
-                                    menu = false
-                                    viewModel.signOut()
-                                    onSignedOut()
-                                },
-                            )
-                        }
-                    }
-                },
-            )
+    HomeContent(
+        serverLine = listOfNotNull(state.serverUrl, version?.let { "v$it" }).joinToString(" · "),
+        uploads = state.uploads,
+        notice = notice,
+        showOpenSettings = playServicesNeedsCamera,
+        onScan = ::scan,
+        onTakePhoto = ::takePhoto,
+        onChooseFile = { fileLauncher.launch(arrayOf("application/pdf", "image/*")) },
+        onOpenSettings = {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", PLAY_SERVICES, null)))
         },
-    ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .fillMaxSize(),
-        ) {
-            Text(listOfNotNull(state.serverUrl, version?.let { "v$it" }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = ::scan, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                Text("Scan document", style = MaterialTheme.typography.titleMedium)
+        onSignOut = {
+            viewModel.signOut()
+            onSignedOut()
+        },
+        onClearFinished = viewModel::clearFinished,
+        onRetry = viewModel::retry,
+        onOpen = onOpenDocument,
+        lockAvailable = lockAvailable,
+        lockEnabled = lockEnabled,
+        onLockChange = onLockChange,
+        onOpenUpdates = onOpenUpdates,
+    )
+}
+
+/**
+ * Today's home until #9 makes Documents the home (layouts.md): a list shape whose only section
+ * is the uploads. The large title bar with its overflow menu (Updates, the fingerprint lock,
+ * Sign out), the server line, Scan as the one primary
+ * action with Take photo and Choose file as secondaries, the scanner notice, then the upload
+ * cards under "Uploads".
+ */
+@Composable
+private fun HomeContent(
+    serverLine: String,
+    uploads: List<UploadItem>,
+    notice: String?,
+    showOpenSettings: Boolean,
+    onScan: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onChooseFile: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onSignOut: () -> Unit,
+    onClearFinished: () -> Unit,
+    onRetry: (Long) -> Unit,
+    onOpen: (Int) -> Unit,
+    lockAvailable: Boolean = false,
+    lockEnabled: Boolean = false,
+    onLockChange: (Boolean) -> Unit = {},
+    onOpenUpdates: () -> Unit = {},
+) {
+    val colors = MaterialTheme.colorScheme
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .safeDrawingPadding(),
+        contentPadding = PaddingValues(bottom = Spacing.actionBottom),
+    ) {
+        item(key = "title") {
+            LargeTitleBar("Paperless Scan") {
+                OverflowMenu(lockAvailable, lockEnabled, onLockChange, onOpenUpdates, onSignOut)
             }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = ::takePhoto, modifier = Modifier.weight(1f)) { Text("Take photo") }
-                OutlinedButton(
-                    onClick = { fileLauncher.launch(arrayOf("application/pdf", "image/*")) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Choose file") }
-            }
-            notice?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                if (playServicesNeedsCamera) {
-                    TextButton(onClick = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", PLAY_SERVICES, null)),
-                        )
-                    }) { Text("Open settings") }
+        }
+        item(key = "server") {
+            Text(
+                serverLine,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = Spacing.gutter),
+            )
+        }
+        item(key = "actions") {
+            Column(
+                Modifier.padding(start = Spacing.gutter, end = Spacing.gutter, top = Spacing.s24),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+            ) {
+                AppButton("Scan document", onScan, Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s8)) {
+                    AppButton("Take photo", onTakePhoto, Modifier.weight(1f), ButtonVariant.Secondary)
+                    AppButton("Choose file", onChooseFile, Modifier.weight(1f), ButtonVariant.Secondary)
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Uploads", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (state.uploads.any { it.state.isFinished }) {
-                    TextButton(onClick = viewModel::clearFinished) { Text("Clear finished") }
+        }
+        notice?.let {
+            item(key = "notice") {
+                NoticeBanner(
+                    it,
+                    modifier = Modifier.padding(start = Spacing.cardGutter, end = Spacing.cardGutter, top = Spacing.s16),
+                    actionLabel = if (showOpenSettings) "Open settings" else null,
+                    onAction = onOpenSettings,
+                )
+            }
+        }
+        item(key = "heading") {
+            SectionHeading("Uploads", Modifier.padding(top = Spacing.s16)) {
+                if (uploads.any { it.state.isFinished }) {
+                    AppButton("Clear finished", onClearFinished, variant = ButtonVariant.Text)
                 }
             }
-            if (state.uploads.isEmpty()) {
+        }
+        if (uploads.isEmpty()) {
+            item(key = "empty") {
                 Text(
                     "Nothing uploaded yet. You can also share PDFs and photos to this app from other apps.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.gutter),
                 )
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.uploads, key = { it.id }) { item ->
-                    UploadCard(
-                        item = item,
-                        onRetry = { viewModel.retry(item.id) },
-                        onOpen = { id ->
-                            viewModel.documentUrl(id)?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
-                        },
-                    )
-                }
-            }
+        }
+        items(uploads, key = { it.id }) { item ->
+            val (status, text) = item.state.card()
+            val documentId = (item.state as? UploadState.Done)?.documentId
+            UploadCard(
+                name = item.name,
+                status = status,
+                statusText = text,
+                modifier = Modifier.padding(horizontal = Spacing.cardGutter, vertical = Spacing.s4),
+                actionLabel = when {
+                    item.state is UploadState.Failed -> "Retry"
+                    documentId != null -> "Open"
+                    else -> null
+                },
+                onAction = { if (documentId != null) onOpen(documentId) else onRetry(item.id) },
+            )
         }
     }
 }
 
+/** The title bar's ⋮ menu: Updates (#13), Lock with fingerprint when the phone can (#8), Sign out. */
 @Composable
-private fun UploadCard(item: UploadItem, onRetry: () -> Unit, onOpen: (Int) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val (text, isError) = when (val s = item.state) {
-                    UploadState.Uploading -> "Uploading…" to false
-                    is UploadState.Processing -> "Paperless is processing it…" to false
-                    is UploadState.Done -> "Added to Paperless" to false
-                    is UploadState.Failed -> s.message to true
-                }
-                Text(
-                    text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+private fun OverflowMenu(
+    lockAvailable: Boolean,
+    lockEnabled: Boolean,
+    onLockChange: (Boolean) -> Unit,
+    onOpenUpdates: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Updates") },
+                onClick = {
+                    open = false
+                    onOpenUpdates()
+                },
+            )
+            if (lockAvailable) {
+                DropdownMenuItem(
+                    text = { Text("Lock with fingerprint") },
+                    trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
+                    onClick = {
+                        open = false
+                        onLockChange(!lockEnabled)
+                    },
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            when (val s = item.state) {
-                UploadState.Uploading, is UploadState.Processing ->
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                is UploadState.Done -> s.documentId?.let { id -> TextButton(onClick = { onOpen(id) }) { Text("Open") } }
-                is UploadState.Failed -> TextButton(onClick = onRetry) { Text("Retry") }
-            }
+            DropdownMenuItem(
+                text = { Text("Sign out") },
+                onClick = {
+                    open = false
+                    onSignOut()
+                },
+            )
         }
     }
 }
+
+private fun UploadState.card(): Pair<UploadStatus, String> = when (this) {
+    UploadState.Uploading -> UploadStatus.Working to "Uploading…"
+    is UploadState.Processing -> UploadStatus.Working to "Paperless is reading it…"
+    is UploadState.Done -> UploadStatus.Added to "Added to Paperless"
+    is UploadState.Failed -> (if (unreachable) UploadStatus.Unreachable else UploadStatus.Refused) to message
+}
+
+private val previewUploads = listOf(
+    UploadItem(3, "Scan 2026-10-28 09-40-12.pdf", UploadState.Processing("t3")),
+    UploadItem(2, "Photo 2026-10-28 09-38-50.jpg", UploadState.Done(42)),
+    UploadItem(1, "Scan 2026-10-27 18-02-11.pdf", UploadState.Failed("Not consuming it: it's a duplicate of 'Electricity bill — October'")),
+    UploadItem(
+        0,
+        "Document 2026-10-26 08-15-00",
+        UploadState.Failed("Can't reach Paperless (timeout). Are you on the home network or the VPN?", unreachable = true),
+    ),
+)
+
+@Composable
+private fun HomePreview(uploads: List<UploadItem>, notice: String? = null) = PaperlessTheme {
+    HomeContent("http://paperless:8000 · v0.4.0", uploads, notice, notice != null, {}, {}, {}, {}, {}, {}, {}, {})
+}
+
+@Preview(name = "Home — no uploads", widthDp = 412, heightDp = 915)
+@Composable
+private fun HomeEmptyPreview() = HomePreview(emptyList())
+
+@Preview(name = "Home — uploads", widthDp = 412, heightDp = 915)
+@Composable
+private fun HomeUploadsPreview() = HomePreview(previewUploads)
+
+@Preview(name = "Home — scanner needs camera", widthDp = 360, heightDp = 800)
+@Composable
+private fun HomeNeedsCameraPreview() = HomePreview(
+    previewUploads.take(1),
+    notice = "The scanner runs in Google Play services, which needs camera access. " +
+        "Open settings, then Permissions → Camera → Allow only while using the app.",
+)
 
 private const val PLAY_SERVICES = "com.google.android.gms"
 

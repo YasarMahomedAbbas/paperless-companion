@@ -29,7 +29,7 @@ Tickets are GitHub issues; a `Needs: #a, #b` line names what must be closed firs
 `ArchitectureTest` (#14) fails the build when an import crosses these lines. Don't loosen it to get green; move the code to the right layer.
 
 ## Paperless API: always check the current docs
-Every call to Paperless (`data/PaperlessApi.kt`) must follow the **latest** Paperless-ngx API docs. Don't write or change a call from memory or from older examples: check the docs first, and check the live schema of the server it actually runs against.
+Every call to Paperless (`data/PaperlessApi.kt`, `data/PaperlessLibrary.kt`, both on `data/PaperlessHttp.kt`) must follow the **latest** Paperless-ngx API docs. Don't write or change a call from memory or from older examples: check the docs first, and check the live schema of the server it actually runs against.
 
 - **API docs:** https://docs.paperless-ngx.com/api/
 - **Changelog** (breaking API changes, version bumps): https://docs.paperless-ngx.com/changelog/

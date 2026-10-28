@@ -28,8 +28,11 @@ sealed interface UploadState {
     data object Uploading : UploadState
     data class Processing(val taskId: String) : UploadState
     data class Done(val documentId: Int?) : UploadState
-    /** [taskId] is set when the file already reached the server, so a retry only checks on it again. */
-    data class Failed(val message: String, val taskId: String? = null) : UploadState
+    /**
+     * [taskId] is set when the file already reached the server, so a retry only checks on it again.
+     * [unreachable] says the phone couldn't reach the server, as opposed to the server refusing.
+     */
+    data class Failed(val message: String, val taskId: String? = null, val unreachable: Boolean = false) : UploadState
 }
 
 val UploadState.isFinished: Boolean
@@ -43,6 +46,9 @@ data class TaskInfo(val status: TaskStatus, val message: String?, val documentId
 /** Every error the data layer reports, sorted into what the user can act on. */
 class ServerException(val kind: Kind, message: String, cause: Throwable? = null) :
     Exception(message, cause) {
-    /** UNREACHABLE: no connection at all. NO_ANSWER: connected, but the answer timed out or the connection dropped. */
-    enum class Kind { UNREACHABLE, NO_ANSWER, UNAUTHORIZED, UNREADABLE, SERVER }
+    /**
+     * UNREACHABLE: no connection at all. NO_ANSWER: connected, but the answer timed out or the connection dropped.
+     * NOT_FOUND: the server has no such item, or it is gone.
+     */
+    enum class Kind { UNREACHABLE, NO_ANSWER, UNAUTHORIZED, UNREADABLE, NOT_FOUND, SERVER }
 }
