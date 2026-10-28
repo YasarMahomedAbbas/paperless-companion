@@ -139,7 +139,7 @@ Files: `ui/home/HomeViewModel.kt`, `ui/home/HomeScreen.kt`, `AppContainer.kt`, `
 
 Goal: a plain unit test that reads the sources and fails on any import crossing `CLAUDE.md` § Layers.
 
-### [ ] 3.1 — The rule, as a pure function
+### [x] 3.1 — The rule, as a pure function
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ArchitectureTest.kt` (new)
 - `internal fun layerViolations(relativePath: String, source: String): List<String>`. `relativePath` is relative to the `paperlesscompanion` package directory (e.g. `ui/home/HomeScreen.kt`). It returns one human-readable message per offending line (`"<path>:<line> imports <what> (<rule>)"`).
@@ -149,7 +149,7 @@ File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/Architec
   - Anything not under `data/` and not `AppContainer.kt`: forbid `P.data.`.
 - Fully-qualified use: outside `data/` and `AppContainer.kt`, any non-import, non-package line containing `P.data.` is a violation, so a data class can't be named inline to dodge the import rule.
 
-### [ ] 3.2 — Rule tests (the "fails when added back" proof)
+### [x] 3.2 — Rule tests (the "fails when added back" proof)
 
 Same file, one `@Test` each, asserting non-empty / empty results on made-up sources:
 - `` `ui importing data is caught` ``
@@ -158,7 +158,7 @@ Same file, one `@Test` each, asserting non-empty / empty results on made-up sour
 - `` `a fully qualified data reference is caught` ``
 - `` `allowed imports pass` `` (`data/` → `okhttp3`/`kotlinx.serialization`, `AppContainer.kt` → `data`, `ui/` → `android`/`androidx`/`domain`, `domain/` → `java.io`/`kotlinx.coroutines`)
 
-### [ ] 3.3 — Tree test
+### [x] 3.3 — Tree test
 
 Same file: `` `the app's sources keep to the layers` ``.
 - Root: `File("src/main/java/io/github/yasarmahomedabbas/paperlesscompanion")`. Gradle runs unit tests from the module directory. Assert it `isDirectory`.
