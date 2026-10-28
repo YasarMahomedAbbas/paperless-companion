@@ -42,3 +42,13 @@ Branch: `fix/16-sign-out-bounces-home`
 - Raised: none
 - API: none touched (no Paperless call added or changed).
 - Layers: clean (changes only in `ui/login/` and test/build wiring; no `data/` or Paperless names).
+
+## Doc drift
+
+- Applied: `app/build.gradle.kts`: Kover comment. It said Compose screens "need a device", but this branch lets them run on the JVM under Robolectric. It now says some screens have tests in `src/testDebug` and screens stay out of coverage. A code comment, not a doc: fixed because the branch made it false and a session reading it would skip writing screen tests.
+- Applied (during implementation, verified here): `README.md:Development`: the "Tests cover" paragraph now names Robolectric + Compose ui-test, `app/src/testDebug/` and the offline SDK jar. Checked against `app/build.gradle.kts`, `robolectric.properties` and the test's location.
+- Skipped: why screen tests go in `testDebug` with `@Config(application = Application::class)` (`koverVerify` also runs `testReleaseUnitTest`; the release manifest has no `ComponentActivity`). The header comment of `LoginScreenTest`, the obvious template, already says so, and the README points to the folder.
+- Skipped: bumping Robolectric means bumping `robolectricSdk` by hand. `gradle/libs.versions.toml` and `.github/dependabot.yml` say so right where the bump happens, and the offline test run fails loudly if they don't match.
+- Skipped: the `onSignedInHandled()` pattern (an activity-scoped ViewModel consumes a one-shot result). Its KDoc explains it, and it applies to one screen, not a cross-cutting rule.
+- Checked, no drift: README architecture and use-case table are unchanged by this branch (no `domain/` or `data/` changes); CLAUDE.md "a bug fix comes with a test" is met.
+- Stale, fixed separately: `CLAUDE.md:Working on the app`. It called the local check command "what CI runs", but `ci.yml` (and `release.yml`) run `koverVerifyDebug`, not `koverVerify`. `koverVerify` also runs `testReleaseUnitTest`, which made the local command stricter, and that is how this branch found the release-variant failure. The line now says so; the command is unchanged.

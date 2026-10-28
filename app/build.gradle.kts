@@ -82,8 +82,9 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Coverage is measured on the domain and data layers and the ViewModels. Compose screens, the
-// activity and the Keystore-backed classes need a device, so they are left out.
+// Coverage is measured on the domain and data layers and the ViewModels. Compose screens (some
+// have Robolectric tests in src/testDebug, but not all), the activity and the Keystore-backed
+// classes are left out.
 kover {
     reports {
         filters {
