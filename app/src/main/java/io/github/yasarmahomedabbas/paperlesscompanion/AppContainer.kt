@@ -4,6 +4,9 @@ import android.app.Application
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.SystemClock
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yasarmahomedabbas.paperlesscompanion.data.KeystoreTokenVault
@@ -12,6 +15,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsStore
 import io.github.yasarmahomedabbas.paperlesscompanion.data.SealedSettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
+import io.github.yasarmahomedabbas.paperlesscompanion.data.thumbnailImageLoader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.GitHubReleases
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.HttpApkDownloader
@@ -51,6 +55,8 @@ class AppContainer(private val context: Context) {
     private val server: DocumentServer = PaperlessApi()
     // The documents already on the server. The document screens (#9-#11) build their use cases from it.
     private val library: DocumentLibrary = PaperlessLibrary(files = File(context.cacheDir, "documents"))
+    /** Coil's loader for the whole app, so a screen only writes `AsyncImage(model = document.thumbnail, ...)`. */
+    val imageLoader by lazy { thumbnailImageLoader(context, settings, PaperlessApi.defaultClient()) }
 
     val gateViewModelFactory = viewModelFactory {
         initializer { GateViewModel(settings, lock, AppLock(lock, SystemClock::elapsedRealtime)) }
@@ -85,8 +91,10 @@ class AppContainer(private val context: Context) {
     }
 }
 
-class PaperlessApp : Application() {
+class PaperlessApp : Application(), SingletonImageLoader.Factory {
     val container by lazy { AppContainer(this) }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader = container.imageLoader
 
     override fun onCreate() {
         super.onCreate()

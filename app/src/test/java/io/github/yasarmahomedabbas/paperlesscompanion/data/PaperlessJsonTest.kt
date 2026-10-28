@@ -116,4 +116,44 @@ class PaperlessJsonTest {
     fun `an empty match leaves no range`() {
         assertEquals("ab" to emptyList<IntRange>(), parseHighlights("""a<span class="match"></span>b"""))
     }
+
+    // --- download file names ---
+
+    @Test
+    fun `the extended name wins and is percent-decoded`() {
+        assertEquals(
+            "Rechnung März+1.pdf",
+            fileName("""attachment; filename="Rechnung Marz.pdf"; filename*=utf-8''Rechnung%20M%C3%A4rz+1.pdf""", "document-1"),
+        )
+        assertEquals("a b.pdf", fileName("""inline; filename*=UTF-8''a%20b.pdf""", "document-1"))
+    }
+
+    @Test
+    fun `a quoted or bare name is read`() {
+        assertEquals("bill 2024.pdf", fileName("""attachment; filename="bill 2024.pdf"""", "document-1"))
+        assertEquals("say \"hi\".pdf", fileName("""attachment; filename="say \"hi\".pdf"""", "document-1"))
+        assertEquals("bill.pdf", fileName("attachment; filename=bill.pdf; size=3", "document-1"))
+    }
+
+    @Test
+    fun `a broken extended name falls back to the plain one`() {
+        assertEquals("plain.pdf", fileName("""attachment; filename*=nope''x%ZZ.pdf; filename="plain.pdf"""", "document-1"))
+    }
+
+    @Test
+    fun `no name gives the fallback`() {
+        assertEquals("document-7.pdf", fileName(null, "document-7.pdf"))
+        assertEquals("document-7", fileName("attachment", "document-7"))
+        assertEquals("document-7", fileName("""attachment; filename="""""", "document-7"))
+    }
+
+    @Test
+    fun `path separators, dot-dot and control characters never reach the name`() {
+        assertEquals("__etc_passwd", fileName("""attachment; filename="../../etc/passwd"""", "d"))
+        assertEquals("_etc_passwd", fileName("""attachment; filename*=UTF-8''%2Fetc%2Fpasswd""", "d"))
+        assertEquals("__x.pdf", fileName("""attachment; filename="../..\\x.pdf"""", "d"))
+        assertEquals("ab.pdf", fileName("attachment; filename=\"a\u0000\nb.pdf\"", "d"))
+        assertEquals("d", fileName("""attachment; filename="..""""", "d"))
+        assertEquals("hidden", fileName("""attachment; filename=".hidden"""", "d"))
+    }
 }

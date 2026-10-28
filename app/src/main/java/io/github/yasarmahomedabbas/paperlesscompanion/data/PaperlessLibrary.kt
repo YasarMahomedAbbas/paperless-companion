@@ -1,6 +1,8 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
@@ -12,6 +14,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -64,10 +67,40 @@ class PaperlessLibrary(
     override suspend fun storagePaths(config: ServerConfig): List<Label> =
         labels(config, "api/storage_paths/").map { it.toLabel() }
 
+    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind): DocumentFile {
+        val url = PaperlessHttp.url(config.baseUrl, "api/documents/$id/${if (kind == DocumentFileKind.PREVIEW) "preview" else "download"}/")
+            .newBuilder()
+            .apply { if (kind == DocumentFileKind.ORIGINAL) addQueryParameter("original", "true") }
+            .build()
+        // One folder per document and kind, emptied first: only the latest copy is kept, and the name the
+        // server gives (known only once it answers) can't collide with another document's.
+        val dir = File(files, "$id-${kind.name.lowercase()}")
+        val download = File(dir, DOWNLOAD)
+        withContext(http.io) {
+            dir.deleteRecursively()
+            if (!dir.mkdirs()) throw ServerException(Kind.UNREADABLE, "Can't make room for the file")
+        }
+        val (disposition, type) = http.download(http.authed(config, url).get().build(), download)
+        return withContext(http.io) {
+            val mimeType = type?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
+            val fallback = "document-$id" + if (mimeType == "application/pdf") ".pdf" else ""
+            val name = fileName(disposition, fallback)
+            val file = File(dir, name)
+            if (!download.renameTo(file)) {
+                download.delete()
+                throw ServerException(Kind.UNREADABLE, "Can't save $name")
+            }
+            DocumentFile(name, mimeType, file)
+        }
+    }
+
     private suspend fun labels(config: ServerConfig, path: String) =
         http.pages(config, path, mapOf("page_size" to "100", "ordering" to "name"))
 
     private companion object {
+        /** Where a file lands before its name is known. A server-given name never starts with a dot. */
+        const val DOWNLOAD = ".download"
+
         val LIST_FIELDS = listOf(
             "id", "title", "created", "added", "modified", "correspondent", "document_type", "storage_path",
             "tags", "archive_serial_number", "original_file_name", "page_count", "mime_type",

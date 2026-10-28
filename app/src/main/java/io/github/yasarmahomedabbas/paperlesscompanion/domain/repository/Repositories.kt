@@ -3,6 +3,8 @@ package io.github.yasarmahomedabbas.paperlesscompanion.domain.repository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
@@ -40,6 +42,9 @@ interface DocumentLibrary {
     suspend fun correspondents(config: ServerConfig): List<Label>
     suspend fun documentTypes(config: ServerConfig): List<Label>
     suspend fun storagePaths(config: ServerConfig): List<Label>
+
+    /** Fetches one of a document's files into the app's cache, replacing the previous copy of the same document and kind. */
+    suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind): DocumentFile
 }
 
 /** Turns a file the user picked, shot, scanned or shared (by its location, e.g. a content URI string) into a DocumentSource. */

@@ -1,6 +1,7 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
@@ -22,6 +23,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 
@@ -32,12 +34,14 @@ class PaperlessLibraryTest {
     private val server = MockWebServer()
     private lateinit var library: PaperlessLibrary
     private lateinit var config: ServerConfig
+    private lateinit var files: File
 
     @Before
     fun setUp() {
         server.start()
         config = ServerConfig(server.url("/").toString().trimEnd('/'), "tok")
-        library = PaperlessLibrary(files = temp.newFolder("documents"))
+        files = temp.newFolder("documents")
+        library = PaperlessLibrary(files = files)
     }
 
     @After
@@ -280,5 +284,83 @@ class PaperlessLibraryTest {
             assertEquals(listOf(Label(4, "Power company", null)), load())
             server.takeRequest()
         }
+    }
+
+    // --- files ---
+
+    private fun respondFile(body: String, disposition: String?, type: String? = "application/pdf") {
+        val response = MockResponse().setBody(body)
+        disposition?.let { response.setHeader("Content-Disposition", it) }
+        type?.let { response.setHeader("Content-Type", it) }
+        server.enqueue(response)
+    }
+
+    @Test
+    fun `each kind of file comes from its own endpoint`() = runTest {
+        val expected = mapOf(
+            DocumentFileKind.PREVIEW to "/api/documents/7/preview/",
+            DocumentFileKind.ARCHIVED to "/api/documents/7/download/",
+            DocumentFileKind.ORIGINAL to "/api/documents/7/download/?original=true",
+        )
+        for ((kind, path) in expected) {
+            respondFile("PDF-$kind", """attachment; filename="bill.pdf"""")
+
+            val file = library.file(config, 7, kind)
+
+            val request = server.takeRequest()
+            assertEquals(path, request.path)
+            assertEquals("GET", request.method)
+            assertEquals("Token tok", request.getHeader("Authorization"))
+            assertEquals("bill.pdf", file.name)
+            assertEquals("application/pdf", file.mimeType)
+            assertEquals("PDF-$kind", file.file.readText())
+            assertEquals(File(files, "7-${kind.name.lowercase()}/bill.pdf"), file.file)
+        }
+    }
+
+    @Test
+    fun `a second fetch replaces the first copy`() = runTest {
+        respondFile("old", """inline; filename="old.pdf"""")
+        respondFile("new", """inline; filename="new.pdf"""")
+
+        library.file(config, 7, DocumentFileKind.PREVIEW)
+        val second = library.file(config, 7, DocumentFileKind.PREVIEW)
+
+        assertEquals(listOf("new.pdf"), File(files, "7-preview").list()!!.toList())
+        assertEquals("new", second.file.readText())
+    }
+
+    @Test
+    fun `without a name the file is named after the document`() = runTest {
+        respondFile("x", null, "application/pdf; charset=binary")
+        val pdf = library.file(config, 7, DocumentFileKind.ARCHIVED)
+        assertEquals("document-7.pdf", pdf.name)
+        assertEquals("application/pdf", pdf.mimeType)
+
+        respondFile("x", null, "image/png")
+        assertEquals("document-7", library.file(config, 7, DocumentFileKind.ORIGINAL).name)
+
+        respondFile("x", null, null)
+        val untyped = library.file(config, 7, DocumentFileKind.ORIGINAL)
+        assertEquals("document-7", untyped.name)
+        assertNull(untyped.mimeType)
+    }
+
+    @Test
+    fun `a name from the server never leaves the document's folder`() = runTest {
+        respondFile("x", """attachment; filename="../../escape.pdf"""")
+
+        val file = library.file(config, 7, DocumentFileKind.ORIGINAL)
+
+        assertEquals(File(files, "7-original"), file.file.parentFile)
+    }
+
+    @Test
+    fun `a gone document's file is not found and leaves nothing behind`() = runTest {
+        respond(404, """{"detail":"Not found."}""")
+
+        expectError(Kind.NOT_FOUND) { library.file(config, 99, DocumentFileKind.PREVIEW) }
+
+        assertTrue(File(files, "99-preview").list()!!.isEmpty())
     }
 }

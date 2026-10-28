@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
+import java.net.URLDecoder
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -117,3 +118,33 @@ internal fun parseHighlights(html: String): Pair<String, List<IntRange>> {
     if (inMatch() && text.length > matchStart) matches += matchStart until text.length
     return text.toString() to matches
 }
+
+private val FILENAME_STAR = Regex("""filename\*\s*=\s*([\w-]+)'[^']*'([^;]+)""", RegexOption.IGNORE_CASE)
+private val FILENAME = Regex("""filename\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^;]+))""", RegexOption.IGNORE_CASE)
+
+/**
+ * The file name a download's Content-Disposition gives (`filename*=UTF-8''…` before `filename="…"`), made
+ * safe to use as one name in the app's own folder: no path separators, no `..`, no control characters.
+ * [fallback] when nothing usable is left.
+ */
+internal fun fileName(contentDisposition: String?, fallback: String): String {
+    val header = contentDisposition.orEmpty()
+    val extended = FILENAME_STAR.find(header)?.let { match ->
+        runCatching {
+            URLDecoder.decode(match.groupValues[2].trim().replace("+", "%2B"), match.groupValues[1])
+        }.getOrNull()
+    }
+    val plain = FILENAME.find(header)?.let { match ->
+        match.groupValues[1].takeIf { match.groups[1] != null }?.replace(Regex("""\\(.)"""), "$1")
+            ?: match.groupValues[2].trim()
+    }
+    return listOfNotNull(extended, plain).map(::safeName).firstOrNull { it.isNotEmpty() } ?: fallback
+}
+
+private fun safeName(name: String): String = name
+    .filterNot { it.isISOControl() }
+    .replace('/', '_')
+    .replace('\\', '_')
+    .replace("..", "")
+    .trim()
+    .trimStart('.')

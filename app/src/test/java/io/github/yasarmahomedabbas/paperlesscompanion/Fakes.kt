@@ -7,6 +7,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.VaultVoidedException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
@@ -165,6 +167,7 @@ class FakeLibrary : DocumentLibrary {
     var correspondents = listOf(Label(2, "Power company", 4))
     var documentTypes = listOf(Label(3, "Invoice", 5))
     var storagePaths = listOf(Label(4, "Bills", 6))
+    var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
     var failure: Exception? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
@@ -182,6 +185,7 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun correspondents(config: ServerConfig) = answer(config, "correspondents", correspondents)
     override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
     override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
+    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =

@@ -4,6 +4,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.doc
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Labels
@@ -12,6 +13,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerExcepti
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -108,6 +110,23 @@ class DocumentUseCasesTest {
     @Test
     fun `labels passes a server error through`() = runTest {
         expectPassedThrough { LoadLabelsUseCase(library, signedIn)() }
+    }
+
+    @Test
+    fun `open file fetches the asked-for kind`() = runTest {
+        assertSame(library.file, OpenDocumentFileUseCase(library, signedIn)(4, DocumentFileKind.ORIGINAL))
+        assertEquals(listOf("file 4 ORIGINAL"), library.calls)
+        assertEquals(listOf(CONFIG), library.configs)
+    }
+
+    @Test
+    fun `open file signed out is not signed in`() = runTest {
+        expectSignedOut { OpenDocumentFileUseCase(library, signedOut)(4, DocumentFileKind.PREVIEW) }
+    }
+
+    @Test
+    fun `open file passes a server error through`() = runTest {
+        expectPassedThrough { OpenDocumentFileUseCase(library, signedIn)(4, DocumentFileKind.PREVIEW) }
     }
 
     @Test(expected = IllegalArgumentException::class)

@@ -134,17 +134,17 @@ File: `app/src/test/java/.../Fakes.kt`: `class FakeLibrary : DocumentLibrary` wi
 
 Goal: a document's preview, archived or original file lands in a cache file. Thumbnails load through Coil with the token, sent only to the signed-in server, and are cached by document version.
 
-### [ ] 3.1 — Domain
+### [x] 3.1 — Domain
 
 File: `domain/model/Documents.kt`: `enum class DocumentFileKind { PREVIEW, ARCHIVED, ORIGINAL }` and `data class DocumentFile(val name: String, val mimeType: String?, val file: java.io.File)`.
 File: `domain/repository/Repositories.kt`: `DocumentLibrary.file(config: ServerConfig, id: Int, kind: DocumentFileKind): DocumentFile` (KDoc: overwrites the previous copy of the same document and kind).
 File: `domain/usecase/DocumentsUseCase.kt`: `class OpenDocumentFileUseCase { suspend operator fun invoke(id: Int, kind: DocumentFileKind): DocumentFile }`.
 
-### [ ] 3.2 — `PaperlessLibrary.file`
+### [x] 3.2 — `PaperlessLibrary.file`
 
-`PREVIEW` → `api/documents/{id}/preview/`, `ARCHIVED` → `/download/`, `ORIGINAL` → `/download/?original=true`, streamed with `PaperlessHttp.download` into `files/<id>-<kind lower-case>/<name>`. The folder is emptied first. `name` comes from a new internal `fun fileName(contentDisposition: String?, fallback: String): String` in `PaperlessJson.kt`: `filename*=UTF-8''…` (percent-decoded) wins over `filename="…"`. Path separators, `..` and control characters are stripped. If nothing is left, the name is `document-<id>` plus an extension from the content type when it is PDF.
+`PREVIEW` → `api/documents/{id}/preview/`, `ARCHIVED` → `/download/`, `ORIGINAL` → `/download/?original=true`, streamed with `PaperlessHttp.download` into `files/<id>-<kind lower-case>/.download`, then renamed to `<name>` once the answer's headers give it. The folder is emptied first. `name` comes from a new internal `fun fileName(contentDisposition: String?, fallback: String): String` in `PaperlessJson.kt`: `filename*=UTF-8''…` (percent-decoded) wins over `filename="…"`. Path separators become `_`; `..`, control characters and leading dots are dropped. If nothing is left, the name is `document-<id>` plus an extension from the content type when it is PDF.
 
-### [ ] 3.3 — Coil
+### [x] 3.3 — Coil
 
 Files: `gradle/libs.versions.toml` (`coil = "3.0.4"`, libraries `coil-compose`, `coil-network-okhttp`), `app/build.gradle.kts` (`implementation` both).
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Thumbnails.kt` (new):
@@ -152,14 +152,14 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/Thu
 - `internal fun thumbnailCacheKey(config, thumb): String` = `thumb:<base>:<id>:<version epoch millis or 0>`.
 - `class ServerTokenInterceptor(private val settings: SettingsRepository) : Interceptor`: adds `Authorization: Token …` only when the request's scheme, host and port equal the signed-in server's. It never overwrites an existing header.
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/ThumbnailImages.kt` (new; the Coil glue, which needs Android):
-- `class ThumbnailFetcher.Factory(settings, network: Fetcher.Factory<Uri>)`: a Coil `Fetcher.Factory<DocumentThumbnail>`. Signed out → null (no fetch). Otherwise it delegates to the OkHttp network fetcher for `thumbnailUrl`, with `options.copy(diskCacheKey = key)`, because Coil's disk key defaults to the URL and would ignore the version. `class ThumbnailKeyer : Keyer<DocumentThumbnail>` returns the same key for the memory cache. Check both against the Coil 3.0.4 API while implementing.
-- `fun thumbnailImageLoader(context: Context, settings: SettingsRepository, client: OkHttpClient): ImageLoader`: the network fetcher on `client.newBuilder().addInterceptor(ServerTokenInterceptor(settings))`, the thumbnail fetcher and keyer, a memory cache, and a disk cache at `cacheDir/thumbnails` (64 MB).
+- `class ThumbnailFetcherFactory(settings, network: Fetcher.Factory<Uri>)`: a Coil `Fetcher.Factory<DocumentThumbnail>`. Signed out → null (no fetch). Otherwise it delegates to the OkHttp network fetcher for `thumbnailUrl`, with `options.copy(diskCacheKey = key)`, because Coil's disk key defaults to the URL and would ignore the version. `class ThumbnailKeyer : Keyer<DocumentThumbnail>` returns the same key for the memory cache. Both checked against Coil 3.0.4: it compiles, and `NetworkFetcher` reads `options.diskCacheKey`.
+- `fun thumbnailImageLoader(context: Context, settings: SettingsRepository, client: OkHttpClient): ImageLoader`: the network fetcher on `client.newBuilder().addInterceptor(ServerTokenInterceptor(settings))`, the thumbnail fetcher and keyer (the network fetcher is registered too, so it runs on the authed client), a memory cache (15% of the app's memory), and a disk cache at `cacheDir/thumbnails` (64 MB).
 - This file goes on the kover exclude list. The pure functions and the interceptor stay in `Thumbnails.kt` and stay measured.
 
 File: `AppContainer.kt`: `val imageLoader by lazy { thumbnailImageLoader(context, settings, PaperlessApi.defaultClient()) }`. `PaperlessApp` implements `coil3.SingletonImageLoader.Factory` and returns `container.imageLoader`, so a screen only writes `AsyncImage(model = document.thumbnail, …)`.
 File: `app/build.gradle.kts` kover excludes: `"*.data.ThumbnailImages*"`, `"*.data.ThumbnailFetcher*"`, `"*.data.ThumbnailKeyer*"`.
 
-### [ ] 3.4 — Tests
+### [x] 3.4 — Tests
 
 - `PaperlessLibraryTest`: each kind's path and query, the file's content and name, and the folder replaced on a second fetch; 404 → `NOT_FOUND` and no file left behind.
 - `data/ThumbnailsTest.kt` (new): URL and key (version change → new key, signed-in server change → new key). Interceptor with MockWebServer: the same server gets the header, another port gets none, and nobody signed in means no header.

@@ -1,6 +1,8 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
@@ -21,4 +23,9 @@ class BrowseDocumentsUseCase(private val library: DocumentLibrary, private val s
 /** One document with its text. A gone document throws ServerException NOT_FOUND. */
 class GetDocumentUseCase(private val library: DocumentLibrary, private val settings: SettingsRepository) {
     suspend operator fun invoke(id: Int): Document = library.document(settings.signedIn(), id)
+}
+
+/** Fetches a document's preview, archived or original file into the app's cache. Throws ServerException. */
+class OpenDocumentFileUseCase(private val library: DocumentLibrary, private val settings: SettingsRepository) {
+    suspend operator fun invoke(id: Int, kind: DocumentFileKind): DocumentFile = library.file(settings.signedIn(), id, kind)
 }

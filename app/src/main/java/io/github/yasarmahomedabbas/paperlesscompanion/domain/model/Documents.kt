@@ -1,5 +1,6 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.domain.model
 
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 
@@ -74,3 +75,9 @@ data class Labels(
 
 /** What the UI hands the image loader to show a document's thumbnail; [version] changes when the document does. */
 data class DocumentThumbnail(val documentId: Int, val version: Instant?)
+
+/** Which file of a document: the preview the server shows, the archived (OCR'd) PDF, or the file as uploaded. */
+enum class DocumentFileKind { PREVIEW, ARCHIVED, ORIGINAL }
+
+/** A document's file, fetched into the app's cache as [file]; [name] is the name to show or save it under. */
+data class DocumentFile(val name: String, val mimeType: String?, val file: File)
