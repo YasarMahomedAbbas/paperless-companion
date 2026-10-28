@@ -58,3 +58,19 @@ Branch: `feat/9-browse-and-search`
 - Skipped: CLAUDE.md — no new cross-cutting rule; hand-rolled navigation and paging are visible in `MainActivity` and `DocumentsViewModel`.
 - Skipped: `ArchitectureTest`'s `ui/home/HomeScreen.kt` strings — synthetic paths fed to the checker, not a doc claim.
 - Stale, fixed separately: none.
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker: 341 passed / 0 failed / 0 skipped; line coverage 90.4% (bound 80); lint 0 errors (23 warnings, dependency-version notices); debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` is absent). The branch adds no Paperless call (`data/` and `domain/` unchanged), but the list, page 2, search (`__search_hit__`), tag / correspondent / document-type filters, the one-row count, the four label lists and `/thumb/` from #7 have still never been answered by a live server; they are checked against the server source only (#7).
+- Verified: the CI build above; the ViewModel paging, search debounce, filters, sort and upload refresh through `DocumentsViewModelTest`, `UploadsViewModelTest`, `SettingsViewModelTest`, `SortOptionTest`, `HighlightTest` (fakes, not a server).
+- Failed: none
+- Not self-verifiable:
+  - Thumbnails show in the list and still show after a restart with the network off (disk cache).
+  - Pull to refresh and infinite scroll feel right on a long library.
+  - The Add sheet starts the scanner, the camera and the file picker; an upload shows as a card on Documents and the new document appears in the list.
+  - A file shared from another app lands as an upload card on Documents.
+  - Search finds a document by a word from its OCR text, with the snippet highlighted, on the home network and over the VPN.
+  - Filters and sort change the list; Settings shows the address, the fingerprint switch, Updates and Sign out (Sign out still bounces home until #16).
