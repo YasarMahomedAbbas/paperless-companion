@@ -43,6 +43,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsScre
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.SelectionViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
@@ -226,6 +227,8 @@ class MainActivity : FragmentActivity() {
                                             openDocumentId = it
                                         },
                                         trash = trash,
+                                        selection = viewModel<SelectionViewModel>(key = "selection $key", factory = container.selectionViewModelFactory),
+                                        onOpenUrl = ::openUrl,
                                     )
                                 }
                                 screen == Screen.SETTINGS -> {

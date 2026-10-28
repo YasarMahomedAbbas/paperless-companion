@@ -222,26 +222,27 @@ Files: `ui/documents/DocumentsScreen.kt`, `AppContainer.kt`, `MainActivity.kt`
 
 Goal: long-press selects; the bulk bar changes tags, correspondent or type for all selected, or trashes them with Undo.
 
-### [ ] 5.1 — Selectable row, selection bar, bulk bar
+### [x] 5.1 — Selectable row, selection bar, bulk bar
 
-Files: `ui/components/DocumentRow.kt` (from #9), `ui/components/Headers.kt`, `ui/components/BulkActionBar.kt` (new)
-- The row gets `selection: Boolean?` (null means not selecting) and `onLongClick`. While selecting it shows a 24dp round check at the start, the thumbnail shrinks to 48 × 62, and a selected row gets the `primary-tint` ground, a 2dp `primary` inner ring and a filled check. It exposes `selected` to TalkBack, and a tap toggles instead of opening.
+Files: `ui/components/DocumentRow.kt` (from #9), `ui/components/Headers.kt`, `ui/components/BulkActionBar.kt` (new), `ui/components/Snackbar.kt`
+- #9's `DocumentRowCard` gets `selection: Boolean?` (null means not selecting) and `onLongClick`. While selecting it shows a 24dp round check at the start, the thumbnail shrinks to 48 × 62, and a selected row gets the `primary-tint` ground, a 2dp `primary` inner ring and a filled check. It exposes `selected` to TalkBack, and a tap toggles instead of opening.
 - `SelectionBar(count: Int, onClose, onSelectAll)`: a close icon ("Stop selecting"), "<n> selected" at 22/500, and a "Select all" text button.
-- `BulkActionBar(onTags, onFrom, onType, onTrash, enabled)`: four equal 64-high buttons (22dp icon over a 13 label) on `surface` with a 1dp `border` ring and `r-card`, floating 24 above the bottom. Trash is destructive. Previews for each part.
+- `BulkActionBar(onTags, onFrom, onType, onTrash, modifier, enabled)` (icons Tag, Person, DocumentType, Trash): four equal 64-high buttons (22dp icon over a 13 label) on `surface` with a 1dp `border` ring and `r-card`, floating 24 above the bottom. Trash is destructive. Previews for each part.
+- `AppSnackbarHost` (#10's) wraps each snackbar in a `SwipeToDismissBox`, so the swipe-away that `undoShown()` relies on exists.
 
-### [ ] 5.2 — Selecting on the Documents screen
+### [x] 5.2 — Selecting on the Documents screen
 
-File: `ui/documents/DocumentsScreen.kt`
+File: `ui/documents/DocumentsScreen.kt` (gains `selection: SelectionViewModel` and `onOpenUrl` parameters; the bulk sheets and the trash dialog are new `DocumentsSheet` values)
 - A long-press calls `selection.start(id)`. While `selecting`, the title row gives way to the `SelectionBar` and the Add button to the `BulkActionBar`, and `BackHandler` calls `stop()`. "Select all" passes the loaded ids.
 - Tags opens `BulkTagsSheet` (new, `ui/documents/BulkTagsSheet.kt`): a list sheet with search, `MixedChoiceRow`s from `tagMarks(documents.documents(selected), tags)`, "Done" calling `changeTags(start, now)`, and the no-match and Open Paperless state as in 3.2.
-- From and Type open `LabelPickerSheet` for correspondent and document type ("None" clears), calling `change(SetCorrespondent / SetDocumentType)`.
-- Trash opens `ConfirmDialog("Move <n> documents to trash?", …, "Move to trash", destructive = true)` and then calls `trashViewModel.trash(selected.toList())`; on `Trashed` it calls `selection.stop()`.
+- From and Type open `LabelPickerSheet` for correspondent and document type with `showCurrent = false` ("None" clears), calling `change(SetCorrespondent / SetDocumentType)`.
+- Trash opens `AppDialog("Move <n> documents to trash?", …, "Move to trash", confirmVariant = Destructive)` and then calls `trashViewModel.trash(selected.toList())`; on `Trashed` it calls `selection.stop()`. Open Paperless in the bulk sheets uses `SelectionViewModel.labelsUrl(kind)` (a `LabelsLinkUseCase`, tested).
 - The screen collects `selection.changes` → `documents.apply(ids, edit)`. A `failure` shows the snackbar.
 
-### [ ] 5.3 — Wiring
+### [x] 5.3 — Wiring
 
-File: `AppContainer.kt`
-`selectionViewModelFactory` (`SelectionViewModel(BulkEditUseCase(library, settings))`). The labels for the sheets come from the list's already-loaded `Labels`.
+Files: `AppContainer.kt`, `MainActivity.kt`
+`selectionViewModelFactory` (`SelectionViewModel(BulkEditUseCase(library, settings), LabelsLinkUseCase(server, settings))`), keyed per session in `MainActivity`. The labels for the sheets come from the list's already-loaded `Labels`.
 
 ### Verify
 

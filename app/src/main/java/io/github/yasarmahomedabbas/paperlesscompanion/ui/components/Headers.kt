@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +91,32 @@ fun FormBar(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
+    }
+}
+
+/**
+ * The bar that replaces the title row while selecting (components.md § Top bars, Selection
+ * bar): a close icon ("Stop selecting"), "<n> selected" at 22/500 and a "Select all" text button.
+ */
+@Composable
+fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 68.dp)
+            .padding(start = Spacing.s4, end = Spacing.s8, top = Spacing.s12, bottom = Spacing.s8),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        AppIconButton(AppIcons.Close, "Stop selecting", onClose)
+        Text(
+            "$count selected",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            modifier = Modifier.weight(1f).semantics { heading(); liveRegion = LiveRegionMode.Polite },
+        )
+        AppButton("Select all", onSelectAll, variant = ButtonVariant.Text)
     }
 }
 

@@ -22,7 +22,7 @@ Branch: `feat/11-organise-documents`
   - No real Paperless has ever answered these write calls (open since #7). Self-verification needs `verify.env` with `PAPERLESS_ALLOW_WRITES=1` to prove "shows in the web UI straight after".
   - A 403 on a document the user doesn't own reads as "sign in again" until #21 lands.
 
-## Implementation (in progress — stopped at the 3.0 gate)
+## Implementation — checkpoints 1–2 (before the 3.0 gate)
 
 - Shipped so far:
   - Checkpoint 1 (`0be13a3`): `LabelKind` (`domain/model/Documents.kt`), `DocumentServer.labelsUrl` (`domain/repository/Repositories.kt`) built in `data/PaperlessApi.kt` next to `documentUrl`, `LabelsLinkUseCase` (`domain/usecase/DocumentLinkUseCase.kt`), `EditForm` / `changesFrom` / `LabelsStatus` / `EditDetailsUiState` (`ui/edit/EditDetailsUiState.kt`), `EditDetailsViewModel` (`ui/edit/EditDetailsViewModel.kt`), `matching` / `chosenFirst` (`ui/edit/PickerFilter.kt`).
@@ -30,3 +30,25 @@ Branch: `feat/11-organise-documents`
 - Tests: full `testDebugUnitTest koverVerify` green, 335 passed / 0 failed.
 - Stopped at 3.0: #9 (no PR yet) and #10 (PR #25 open) are both still OPEN, so checkpoints 3–5 can't start (Q1, option 1). Resume implement-plan at 3.0 once both are merged.
 - Contradicted the plan: none. Small additions written into the checklist text: `undo()` is ignored with no offer or while working; `SelectionViewModel.change` is ignored with nothing selected and falls back to "Couldn't change them".
+
+## Implementation
+
+- Shipped:
+  - Checkpoints 1–2 as recorded above (`0be13a3`, `5ed21c8`), then `origin/main` merged in (`7f30059`, #9, #10, #16, #21 and the dependabot bumps; one conflict in the test `Fakes.kt`, both sides kept).
+  - Checkpoint 3 (`55815d6`): Edit details screen `ui/edit/EditDetailsScreen.kt:71` with the date picker and the four pickers `ui/edit/PickerSheets.kt:58` (`LabelPickerSheet`), `:93` (`TagPickerSheet`); `PickerField` extended `ui/components/PickerField.kt:44`; `FormBar` `ui/components/Headers.kt:77`; `MixedChoiceRow` `ui/components/Sheets.kt:212`; Edit beside Download in the viewer's panel; `ViewerViewModel.showUpdated` `ui/viewer/ViewerViewModel.kt:180`; `DocumentsViewModel.patch` `ui/documents/DocumentsViewModel.kt:160`; `editDetailsViewModelFactory` `AppContainer.kt:132`; Edit drawn in the viewer's place `MainActivity.kt:181`.
+  - Checkpoint 4 (`3504dab`): Move to trash in the More menu with its confirm (`ui/viewer/ViewerScreen.kt`, `MenuItem(destructive)` / `MenuDivider` `ui/components/ViewerBar.kt:123`); `apply` / `remove` / `putBack` / `documents` `ui/documents/DocumentsViewModel.kt:168-195`; Undo snackbar on the list (`ui/documents/DocumentsScreen.kt`); trash events collected in `MainActivity.kt:158`; `trashViewModelFactory` `AppContainer.kt:123`.
+  - Checkpoint 5: selectable `DocumentRowCard` `ui/components/DocumentRow.kt:51`, `SelectionBar` `ui/components/Headers.kt:102`, `BulkActionBar` `ui/components/BulkActionBar.kt:34`, `BulkTagsSheet` `ui/documents/BulkTagsSheet.kt:39`, selecting on `DocumentsScreen`, swipe-away snackbars `ui/components/Snackbar.kt:27`, `SelectionViewModel.labelsUrl` `ui/documents/SelectionViewModel.kt:75`, `selectionViewModelFactory` `AppContainer.kt:128`.
+  - Design decisions recorded in `docs/design/README.md` § "Settled while building Organise documents (#11)".
+- Tests: full CI (`testDebugUnitTest koverVerify lintDebug assembleDebug`) green, 446 passed / 0 failed, Kover verify passed.
+- Outstanding: none in the checklist. Device-only checks (long-press feel, the date picker, the keyboard over the action area, the 8-second Undo, TalkBack on selected rows and mixed checkboxes, Open Paperless opening the right page) and the real-server writes are for self-verification. The design checklist was walked from the code only; no screenshots.
+- Contradicted the plan (names #9 and #10 actually shipped, resolved without changing what is built):
+  - `PickerField` already existed (#9) as `PickerField(value, placeholder, onClick, modifier, icon)`; extended with `label`, `tags` and a `Date` variant instead of a new one.
+  - No `ConfirmDialog`: #9's `AppDialog` (`ui/components/Dialog.kt`) takes `confirmVariant` (`Destructive`, `DestructiveText`) and `dismissLabel`, so it serves the trash confirms and "Discard changes?".
+  - The row component is `DocumentRowCard`, and #9's `DocumentsViewModel` kept only rows, not `Document`s; it now keeps the loaded documents beside them.
+  - #10's `ViewerViewModel` kept only `DocumentDetails`; `ViewerUiState` gained `document` and the ViewModel keeps its labels. It also gained `showMessage` so a failed trash shows on the viewer.
+  - `MainActivity` has no screen stack for the viewer (`openDocumentId` plus a `Screen` enum), so Edit details is a saveable `editing` flag drawn in the viewer's place rather than a pushed screen value.
+  - `TrashEvent`s are collected in `MainActivity`, not on the list screen: the list isn't composed while the viewer covers it, and a `SharedFlow` without replay would drop the event.
+  - #10's `MenuItem` had no destructive look and #10's snackbar host couldn't be swiped away; both were added.
+  - The bulk sheets' Open Paperless needed a link the list didn't have, so `SelectionViewModel` takes a `LabelsLinkUseCase` too.
+  - #9's `CorrespondentSheet` in `FiltersSheet.kt` stays private and unchanged; the pickers here are separate because they add "None", no-match → Open Paperless and the load states.
+

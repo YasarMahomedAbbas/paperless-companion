@@ -7,7 +7,10 @@ import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
+import io.github.yasarmahomedabbas.paperlesscompanion.FakeServer
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LabelsLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.Changed
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.SelectionViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TagMark.ALL
@@ -32,7 +35,7 @@ class SelectionViewModelTest {
     val main = MainDispatcherRule()
 
     private val library = FakeLibrary()
-    private val viewModel = SelectionViewModel(BulkEditUseCase(library, FakeSettings(CONFIG)))
+    private val viewModel = SelectionViewModel(BulkEditUseCase(library, FakeSettings(CONFIG)), LabelsLinkUseCase(FakeServer(), FakeSettings(CONFIG)))
     private val selected get() = viewModel.state.value.selected
 
     private fun TestScope.changes(): List<Changed> {
@@ -155,5 +158,10 @@ class SelectionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, library.calls.size)
+    }
+
+    @Test
+    fun `labelsUrl passes through`() {
+        assertEquals("http://paperless:8000/labels/CORRESPONDENT", viewModel.labelsUrl(LabelKind.CORRESPONDENT))
     }
 }

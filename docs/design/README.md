@@ -187,3 +187,16 @@ Settled while building Organise documents (#11):
 - **The Undo snackbar** shows on the list, not the viewer (the viewer closes on success). It has
   no time-out of its own: the app's 8-second offer decides when it goes, and swiping it away
   ends the offer. The Add button rises 64 above it while it shows.
+- **Selecting** keeps the search field and chips under the selection bar; only the title row
+  gives way. A tap toggles a row, a long-press on a row while selecting toggles it too, and
+  Back stops selecting before it stops searching. The bulk bar sits 12 from the sides (the
+  card gutter), 24 above the bottom, with a 6dp shadow, and is disabled while a change is on
+  its way.
+- **Bulk sheets.** The bulk Tags sheet is titled "Tags for 3 documents", has no chosen-first
+  divider (the marks are mixed), and its pinned bar counts the tags changed ("1 tag changed")
+  beside Done. From and Type reuse the single-choice picker with nothing marked, since the
+  selected documents differ; "None" clears it on all of them.
+- **Bulk trash** confirms with "Move 3 documents to trash?" and "They go to the Paperless trash.
+  You can bring them back from there." (the titles aren't listed). Its Undo is the same
+  snackbar, "3 moved to trash".
+- **Snackbars** can be swiped away sideways (`AppSnackbarHost`).

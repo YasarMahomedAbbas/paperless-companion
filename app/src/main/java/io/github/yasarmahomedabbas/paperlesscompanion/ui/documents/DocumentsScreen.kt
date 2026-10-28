@@ -62,6 +62,13 @@ import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppDialog
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.BulkActionBar
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.SelectionBar
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.LabelPickerSheet
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.PickerChoices
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentThumbnail
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
@@ -125,9 +132,13 @@ fun DocumentsScreen(
     onOpenDocument: (Int) -> Unit,
     /** Activity-wide, so a trash from the viewer offers its Undo here. */
     trash: TrashViewModel,
+    selection: SelectionViewModel,
+    /** Opens a page of the server's web interface (a bulk sheet's Open Paperless). */
+    onOpenUrl: (String) -> Unit,
 ) {
     val state by documents.state.collectAsState()
     val trashState by trash.state.collectAsState()
+    val selectionState by selection.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     // The Undo stays until the app's own 8-second timer clears the offer, which cancels this and takes the snackbar away.
@@ -137,6 +148,16 @@ fun DocumentsScreen(
             SnackbarResult.ActionPerformed -> trash.undo()
             SnackbarResult.Dismissed -> trash.undoShown()
         }
+    }
+    // A bulk change shows on the loaded rows; a bulk trash ends the selecting.
+    LaunchedEffect(selection) { selection.changes.collect { documents.apply(it.ids, it.edit) } }
+    LaunchedEffect(trash) {
+        trash.events.collect { event -> if (event is TrashEvent.Trashed) selection.stop() }
+    }
+    LaunchedEffect(selectionState.failure) {
+        val message = selectionState.failure ?: return@LaunchedEffect
+        selection.failureShown()
+        scope.launch { snackbar.showSnackbar(message) }
     }
     LaunchedEffect(trashState.failure) {
         val message = trashState.failure ?: return@LaunchedEffect
@@ -213,6 +234,7 @@ fun DocumentsScreen(
         uploads = uploadState.uploads,
         notice = notice,
         snackbar = snackbar,
+        selection = selectionState,
         actions = DocumentsScreenActions(
             onRefresh = documents::refresh,
             onLoadMore = documents::loadMore,
@@ -231,6 +253,14 @@ fun DocumentsScreen(
             onClearFinished = uploads::clearFinished,
             onRetryUpload = uploads::retry,
             onOpenDocument = onOpenDocument,
+            onStartSelecting = selection::start,
+            onToggleSelected = selection::toggle,
+            onSelectAll = { selection.selectAll(state.rows.map { it.id }) },
+            onStopSelecting = selection::stop,
+            onBulkTags = { sheet = DocumentsSheet.BULK_TAGS },
+            onBulkFrom = { sheet = DocumentsSheet.BULK_FROM },
+            onBulkType = { sheet = DocumentsSheet.BULK_TYPE },
+            onBulkTrash = { sheet = DocumentsSheet.BULK_TRASH },
             onOpenPlayServicesSettings = if (playServicesNeedsCamera) {
                 {
                     context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", PLAY_SERVICES, null)))
@@ -280,12 +310,69 @@ fun DocumentsScreen(
                 documents.stopPreview()
             },
         )
+        DocumentsSheet.BULK_TAGS -> {
+            val start = remember(selectionState.selected, state.labels) {
+                tagMarks(documents.documents(selectionState.selected), state.labels?.tags.orEmpty())
+            }
+            BulkTagsSheet(
+                choices = state.labels.choices { it.tags },
+                start = start,
+                count = selectionState.selected.size,
+                onDone = { from, to ->
+                    sheet = null
+                    selection.changeTags(from, to)
+                },
+                onOpenPaperless = { selection.labelsUrl(LabelKind.TAG)?.let(onOpenUrl) },
+                onRetry = documents::refresh,
+                onDismiss = { sheet = null },
+            )
+        }
+        DocumentsSheet.BULK_FROM -> LabelPickerSheet(
+            "From", "correspondent", state.labels.choices { it.correspondents }, selectedId = null,
+            onPick = {
+                sheet = null
+                selection.change(BulkEdit.SetCorrespondent(it))
+            },
+            onOpenPaperless = { selection.labelsUrl(LabelKind.CORRESPONDENT)?.let(onOpenUrl) },
+            onRetry = documents::refresh,
+            onDismiss = { sheet = null },
+            showCurrent = false,
+        )
+        DocumentsSheet.BULK_TYPE -> LabelPickerSheet(
+            "Type", "document type", state.labels.choices { it.documentTypes }, selectedId = null,
+            onPick = {
+                sheet = null
+                selection.change(BulkEdit.SetDocumentType(it))
+            },
+            onOpenPaperless = { selection.labelsUrl(LabelKind.DOCUMENT_TYPE)?.let(onOpenUrl) },
+            onRetry = documents::refresh,
+            onDismiss = { sheet = null },
+            showCurrent = false,
+        )
+        DocumentsSheet.BULK_TRASH -> {
+            val count = selectionState.selected.size
+            AppDialog(
+                title = if (count == 1) "Move 1 document to trash?" else "Move $count documents to trash?",
+                body = "They go to the Paperless trash. You can bring them back from there.",
+                confirmLabel = "Move to trash",
+                onConfirm = {
+                    sheet = null
+                    trash.trash(selectionState.selected.toList())
+                },
+                onDismiss = { sheet = null },
+                confirmVariant = ButtonVariant.Destructive,
+            )
+        }
         null -> Unit
     }
 }
 
-/** The sheets Documents opens over itself. */
-enum class DocumentsSheet { ADD, SORT, FILTERS }
+/** Picker choices from the list's labels; without them (they failed to load) the sheet offers Try again. */
+private fun <T> Labels?.choices(of: (Labels) -> List<T>): PickerChoices<T> =
+    if (this == null) PickerChoices.Failed else PickerChoices.Ready(of(this))
+
+/** The sheets (and the bulk trash dialog) Documents opens over itself. */
+enum class DocumentsSheet { ADD, SORT, FILTERS, BULK_TAGS, BULK_FROM, BULK_TYPE, BULK_TRASH }
 
 /** What the Documents screen can be asked to do; a class so the previews can pass no-ops. */
 class DocumentsScreenActions(
@@ -306,6 +393,14 @@ class DocumentsScreenActions(
     val onClearFinished: () -> Unit = {},
     val onRetryUpload: (Long) -> Unit = {},
     val onOpenDocument: (Int) -> Unit = {},
+    val onStartSelecting: (Int) -> Unit = {},
+    val onToggleSelected: (Int) -> Unit = {},
+    val onSelectAll: () -> Unit = {},
+    val onStopSelecting: () -> Unit = {},
+    val onBulkTags: () -> Unit = {},
+    val onBulkFrom: () -> Unit = {},
+    val onBulkType: () -> Unit = {},
+    val onBulkTrash: () -> Unit = {},
     /** Set while the scanner needs Play services to get the camera: the notice's "Open settings". */
     val onOpenPlayServicesSettings: (() -> Unit)? = null,
 )
@@ -318,6 +413,7 @@ private fun DocumentsContent(
     notice: String?,
     actions: DocumentsScreenActions,
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
+    selection: SelectionUiState = SelectionUiState(),
     listState: LazyListState = rememberLazyListState(),
 ) {
     val colors = MaterialTheme.colorScheme
@@ -327,6 +423,8 @@ private fun DocumentsContent(
         actions.onStopSearch()
     }
     BackHandler(enabled = state.searching, onBack = stopSearching)
+    // Registered after searching's, so Back leaves selecting first.
+    BackHandler(enabled = selection.selecting, onBack = actions.onStopSelecting)
     val rowCount by rememberUpdatedState(state.rows.size)
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -347,7 +445,9 @@ private fun DocumentsContent(
     ) {
         Column(Modifier.fillMaxSize()) {
             // Searching swaps the title row for a back arrow beside the field; the field stays put, so it keeps focus.
-            if (!state.searching) {
+            if (selection.selecting) {
+                SelectionBar(selection.selected.size, actions.onStopSelecting, actions.onSelectAll)
+            } else if (!state.searching) {
                 LargeTitleBar("Documents") {
                     AppIconButton(AppIcons.Settings, "Settings", actions.onOpenSettings, variant = IconButtonVariant.Tonal)
                 }
@@ -388,18 +488,32 @@ private fun DocumentsContent(
                     )
                 },
             ) {
-                DocumentList(state, uploads, notice, actions, listState)
+                DocumentList(state, uploads, notice, actions, listState, selection)
             }
         }
         // The Add button moves up above a snackbar.
         val lift by animateDpAsState(if (snackbar.currentSnackbarData != null) SNACKBAR_LIFT else 0.dp, label = "lift")
-        AddButton(
-            actions.onAdd,
-            Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = Spacing.gutter, bottom = Spacing.actionBottom + lift),
-        )
+        if (selection.selecting) {
+            BulkActionBar(
+                actions.onBulkTags,
+                actions.onBulkFrom,
+                actions.onBulkType,
+                actions.onBulkTrash,
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(start = Spacing.cardGutter, end = Spacing.cardGutter, bottom = Spacing.s24 + lift),
+                enabled = !selection.working,
+            )
+        } else {
+            AddButton(
+                actions.onAdd,
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = Spacing.gutter, bottom = Spacing.actionBottom + lift),
+            )
+        }
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
@@ -451,6 +565,7 @@ private fun DocumentList(
     notice: String?,
     actions: DocumentsScreenActions,
     listState: LazyListState,
+    selection: SelectionUiState,
 ) {
     val colors = MaterialTheme.colorScheme
     val cardPadding = Modifier.padding(horizontal = Spacing.cardGutter)
@@ -550,8 +665,10 @@ private fun DocumentList(
                         moreTags = row.moreTags,
                         thumbnail = row.thumbnail,
                         snippet = row.snippet?.highlighted(searchMatch),
-                        onClick = { actions.onOpenDocument(row.id) },
+                        onClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onOpenDocument(row.id) },
                         modifier = cardPadding.padding(bottom = Spacing.rowGap),
+                        selection = if (selection.selecting) row.id in selection.selected else null,
+                        onLongClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onStartSelecting(row.id) },
                     )
                 }
                 val failed = state.loadMoreFailed
@@ -608,6 +725,18 @@ private fun DocumentsPreview(state: DocumentsUiState, uploads: List<UploadItem> 
 @Preview(name = "Documents — view", widthDp = 412, heightDp = 915)
 @Composable
 private fun DocumentsViewPreview() = DocumentsPreview(DocumentsUiState(rows = previewRows, total = 60, status = ListStatus.Loaded))
+
+@Preview(name = "Documents — selecting", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSelectingPreview() = PaperlessTheme {
+    DocumentsContent(
+        DocumentsUiState(rows = previewRows, total = 60, status = ListStatus.Loaded),
+        emptyList(),
+        null,
+        DocumentsScreenActions(),
+        selection = SelectionUiState(selected = setOf(1, 3, 4)),
+    )
+}
 
 @Preview(name = "Documents — loading", widthDp = 412, heightDp = 915)
 @Composable

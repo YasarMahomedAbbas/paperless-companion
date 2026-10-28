@@ -47,6 +47,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DeleteDocum
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.TrashUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.TrashViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.SelectionViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LabelsLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.EditDetailsViewModel
@@ -123,6 +124,9 @@ class AppContainer(private val context: Context) {
         initializer {
             TrashViewModel(DeleteDocumentUseCase(library, settings), BulkEditUseCase(library, settings), TrashUseCase(library, settings))
         }
+    }
+    val selectionViewModelFactory = viewModelFactory {
+        initializer { SelectionViewModel(BulkEditUseCase(library, settings), LabelsLinkUseCase(server, settings)) }
     }
     /** Edit details for [document], as the viewer last had it. */
     fun editDetailsViewModelFactory(document: Document) = viewModelFactory {

@@ -3,7 +3,9 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui.documents
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LabelsLinkUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +28,7 @@ data class Changed(val ids: List<Int>, val edit: BulkEdit)
  * Selecting documents on the list and changing their tags, correspondent or type in one call.
  * Trashing them goes through [TrashViewModel]: the screen passes the selected ids and calls [stop] on Trashed.
  */
-class SelectionViewModel(private val bulkEdit: BulkEditUseCase) : ViewModel() {
+class SelectionViewModel(private val bulkEdit: BulkEditUseCase, private val labelsLink: LabelsLinkUseCase) : ViewModel() {
     private val _state = MutableStateFlow(SelectionUiState())
     val state: StateFlow<SelectionUiState> = _state.asStateFlow()
 
@@ -68,4 +70,7 @@ class SelectionViewModel(private val bulkEdit: BulkEditUseCase) : ViewModel() {
     }
 
     fun failureShown() = _state.update { it.copy(failure = null) }
+
+    /** Where a bulk sheet with no match sends the user to make the label; null when signed out. */
+    fun labelsUrl(kind: LabelKind): String? = labelsLink(kind)
 }

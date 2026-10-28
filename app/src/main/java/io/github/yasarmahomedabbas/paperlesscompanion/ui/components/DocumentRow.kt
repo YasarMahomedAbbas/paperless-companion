@@ -1,7 +1,14 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,7 +42,11 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.cardTitle
  * `r-card` corners. With a [snippet] it is the search variant: two lines of the matching text
  * under the meta line instead of the tags. [thumbnail] is whatever the app's image loader
  * takes; null (or still loading) shows the `raised` placeholder. TalkBack reads it as one item.
+ * With a non-null [selection] it is the selectable variant: a 24dp round check at the start, a
+ * smaller thumbnail, and when selected a `primary-tint` ground with a 2dp `primary` ring.
+ * [onLongClick] starts selecting.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DocumentRowCard(
     title: String,
@@ -46,23 +57,31 @@ fun DocumentRowCard(
     snippet: AnnotatedString?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selection: Boolean? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
+    val shape = MaterialTheme.shapes.medium
+    val selected = selection == true
     Row(
         modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(colors.surfaceContainer)
-            .clickable(onClick = onClick)
+            .clip(shape)
+            .background(if (selected) colors.primaryContainer else colors.surfaceContainer)
+            .then(if (selected) Modifier.border(2.dp, colors.primary, shape) else Modifier)
+            .then(if (selection != null) Modifier.semantics { this.selected = selected } else Modifier)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = if (onLongClick != null) "Select" else null)
             .padding(Spacing.s12),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
+        verticalAlignment = if (selection != null) Alignment.CenterVertically else Alignment.Top,
     ) {
+        if (selection != null) SelectionCheck(selected)
         AsyncImage(
             model = thumbnail,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(width = 56.dp, height = 72.dp)
+                .then(if (selection != null) Modifier.size(width = 48.dp, height = 62.dp) else Modifier.size(width = 56.dp, height = 72.dp))
                 .clip(MaterialTheme.shapes.extraSmall)
                 .background(colors.surfaceContainerHigh),
         )
@@ -80,6 +99,20 @@ fun DocumentRowCard(
                 }
             }
         }
+    }
+}
+
+/** The selectable row's 24dp round check: a `mfg` ring, or filled `primary` with an `on-primary` tick. */
+@Composable
+private fun SelectionCheck(selected: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(24.dp)
+            .then(if (selected) Modifier.background(colors.primary, CircleShape) else Modifier.border(2.dp, colors.onSurfaceVariant, CircleShape)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) Icon(AppIcons.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -116,6 +149,8 @@ private fun DocumentRowPreview() = PaperlessTheme {
                 {},
             )
             DocumentRowCard("Scan 2026-10-28", "28 Oct 2026", emptyList(), 0, null, null, {})
+            DocumentRowCard("Payslip — September", "Acme Logistics · 25 Sep 2026", listOf("Payslips"), 0, null, null, {}, selection = true)
+            DocumentRowCard("Car licence renewal", "Dept. of Transport · 18 Sep 2026", listOf("Car"), 0, null, null, {}, selection = false)
             DocumentRowCard(
                 "Municipal rates — August",
                 "City of Johannesburg · 28 Aug 2026",

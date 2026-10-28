@@ -51,7 +51,8 @@ sealed interface PickerChoices<out T> {
  * A single-choice list sheet for a correspondent, document type or storage path (components.md
  * § Option list): an in-sheet search, "None" first in `mfg`, and a tap chooses and closes.
  * [noun] names one ("correspondent") for the no-match line, which links to the web UI, where
- * new ones are made.
+ * new ones are made. Without [showCurrent] (a bulk change, where the documents differ) nothing
+ * is marked as the current choice.
  */
 @Composable
 fun LabelPickerSheet(
@@ -63,6 +64,7 @@ fun LabelPickerSheet(
     onOpenPaperless: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
+    showCurrent: Boolean = true,
 ) {
     var find by rememberSaveable { mutableStateOf("") }
     AppBottomSheet(title, onDismiss, variant = SheetVariant.List) {
@@ -71,7 +73,7 @@ fun LabelPickerSheet(
             val shown = labels.matching(find) { it.name }
             LazyColumn(Modifier.selectableGroup().padding(horizontal = Spacing.s8)) {
                 if (find.isBlank()) {
-                    item(key = "none") { SingleChoiceRow("None", selected = selectedId == null, onClick = { onPick(null) }, muted = true) }
+                    item(key = "none") { SingleChoiceRow("None", selected = showCurrent && selectedId == null, onClick = { onPick(null) }, muted = true) }
                 }
                 items(shown, key = { it.id }) { label ->
                     SingleChoiceRow(label.name, selected = label.id == selectedId, onClick = { onPick(label.id) })
