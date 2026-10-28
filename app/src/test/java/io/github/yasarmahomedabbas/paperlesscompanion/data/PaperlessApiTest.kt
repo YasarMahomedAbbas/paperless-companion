@@ -9,6 +9,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
@@ -19,6 +20,7 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import java.io.FileNotFoundException
+import java.net.SocketTimeoutException
 
 class PaperlessApiTest {
     private val server = MockWebServer()
@@ -219,7 +221,29 @@ class PaperlessApiTest {
             fail()
         } catch (e: ServerException) {
             assertEquals(Kind.NO_ANSWER, e.kind)
-            assertTrue(e.message!!.contains("timeout"))
+            assertTrue(e.cause is SocketTimeoutException)
+            assertTrue(e.message!!.startsWith("no answer from ${server.hostName}: "))
+        }
+    }
+
+    @Test
+    fun `a timeout is sorted by where it happened, whatever its wording`() = runTest {
+        val cases = listOf(
+            "timeout" to Kind.NO_ANSWER,
+            "Read timed out" to Kind.NO_ANSWER,
+            "Connect timed out" to Kind.UNREACHABLE,
+            "connect timed out" to Kind.UNREACHABLE,
+        )
+        for ((message, kind) in cases) {
+            val client = OkHttpClient.Builder().addInterceptor { throw SocketTimeoutException(message) }.build()
+            try {
+                PaperlessApi(client = client).task(config, "t")
+                fail("\"$message\": expected ServerException($kind)")
+            } catch (e: ServerException) {
+                assertEquals("\"$message\"", kind, e.kind)
+                assertTrue("\"$message\": cause", e.cause is SocketTimeoutException)
+                assertTrue("\"$message\": ${e.message}", e.message!!.endsWith(": $message"))
+            }
         }
     }
 
