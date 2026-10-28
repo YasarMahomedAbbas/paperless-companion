@@ -22,6 +22,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -39,19 +41,22 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
     fun authed(config: ServerConfig, url: HttpUrl): Request.Builder =
         Request.Builder().url(url).header("Authorization", "Token ${config.token}")
 
-    /** Sends [request] and parses the answer as JSON (or a bare string when it isn't JSON). */
+    /**
+     * Sends [request] and parses the answer as JSON (or a bare string when it isn't JSON).
+     * [signIn]: the request is a sign-in, so 400 and 403 mean wrong credentials.
+     */
     suspend fun call(
         request: Request,
         client: OkHttpClient = this.client,
-        badRequestIsAuth: Boolean = false,
-    ): JsonElement = callUnless(request, emptySet(), client, badRequestIsAuth)!!
+        signIn: Boolean = false,
+    ): JsonElement = callUnless(request, emptySet(), client, signIn)!!
 
     /** Like [call], but answers null instead of throwing when the server answers one of the [absent] codes. */
     private suspend fun callUnless(
         request: Request,
         absent: Set<Int>,
         client: OkHttpClient = this.client,
-        badRequestIsAuth: Boolean = false,
+        signIn: Boolean = false,
     ): JsonElement? = withContext(io) {
         val (code, text) = try {
             client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
@@ -59,7 +64,7 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
             throw networkError(request.url.host, e)
         }
         if (code in absent) return@withContext null
-        if (code !in 200..299) throw httpError(code, text, badRequestIsAuth)
+        if (code !in 200..299) throw httpError(code, text, signIn)
         runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
     }
 
@@ -93,9 +98,15 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
 
     /**
      * Streams [request]'s answer into [into] (through `<into>.part`, renamed on success; nothing is left
-     * on any failure) and returns its Content-Disposition and Content-Type.
+     * on any failure) and returns its Content-Disposition and Content-Type. [onProgress] hears the bytes
+     * written so far: first (0, total), then every [PROGRESS_STEP] bytes, and once at the end. The total
+     * comes from Content-Length and is null when the server doesn't send one.
      */
-    suspend fun download(request: Request, into: File): Pair<String?, String?> = withContext(io) {
+    suspend fun download(
+        request: Request,
+        into: File,
+        onProgress: (done: Long, total: Long?) -> Unit = { _, _ -> },
+    ): Pair<String?, String?> = withContext(io) {
         val part = File(into.parentFile, "${into.name}.part")
         try {
             val response: Response = try {
@@ -104,10 +115,11 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
                 throw networkError(request.url.host, e)
             }
             response.use {
-                if (it.code !in 200..299) throw httpError(it.code, it.body?.string().orEmpty(), false)
+                if (it.code !in 200..299) throw httpError(it.code, it.body?.string().orEmpty(), signIn = false)
+                val body = it.body ?: throw ServerException(Kind.SERVER, "Paperless sent no file")
+                val total = body.contentLength().takeIf { length -> length >= 0 }
                 try {
-                    it.body?.byteStream()?.use { input -> part.outputStream().use { out -> input.copyTo(out) } }
-                        ?: throw ServerException(Kind.SERVER, "Paperless sent no file")
+                    body.byteStream().use { input -> part.outputStream().use { out -> copy(input, out, total, onProgress) } }
                 } catch (e: IOException) {
                     throw networkError(request.url.host, e)
                 }
@@ -148,6 +160,25 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
 
     companion object {
         private val JSON = "application/json".toMediaType()
+        private const val PROGRESS_STEP = 64 * 1024L
+
+        private fun copy(input: InputStream, out: OutputStream, total: Long?, onProgress: (Long, Long?) -> Unit) {
+            val buffer = ByteArray(8 * 1024)
+            var done = 0L
+            var reported = 0L
+            onProgress(0, total)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                out.write(buffer, 0, read)
+                done += read
+                if (done - reported >= PROGRESS_STEP) {
+                    reported = done
+                    onProgress(done, total)
+                }
+            }
+            if (reported != done) onProgress(done, total)
+        }
         private const val MAX_PAGES = 1000
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
@@ -160,9 +191,14 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
             "${baseUrl.trimEnd('/')}/$path".toHttpUrlOrNull()
                 ?: throw ServerException(Kind.UNREACHABLE, "Invalid server address: $baseUrl")
 
-        private fun httpError(code: Int, text: String, badRequestIsAuth: Boolean) = when {
-            code == 401 || code == 403 || (badRequestIsAuth && code == 400) ->
+        /**
+         * 401 is a login the server doesn't accept. On a signed-in call 403 is a working login the server
+         * refused this action, so signing in again can't help; on a sign-in it means wrong credentials.
+         */
+        private fun httpError(code: Int, text: String, signIn: Boolean) = when {
+            code == 401 || (signIn && (code == 400 || code == 403)) ->
                 ServerException(Kind.UNAUTHORIZED, "Wrong username or password")
+            code == 403 -> ServerException(Kind.FORBIDDEN, "Paperless returned HTTP $code: ${text.take(200)}")
             code == 404 -> ServerException(Kind.NOT_FOUND, "Paperless returned HTTP $code: ${text.take(200)}")
             else -> ServerException(Kind.SERVER, "Paperless returned HTTP $code: ${text.take(200)}")
         }

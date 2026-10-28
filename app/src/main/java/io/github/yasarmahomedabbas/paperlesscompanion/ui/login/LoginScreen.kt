@@ -44,7 +44,12 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.lead
 @Composable
 fun LoginScreen(viewModel: LoginViewModel, notice: String?, onSignedIn: (ServerConfig) -> Unit) {
     val state by viewModel.state.collectAsState()
-    LaunchedEffect(state.signedIn) { state.signedIn?.let(onSignedIn) }
+    LaunchedEffect(state.signedIn) {
+        state.signedIn?.let {
+            onSignedIn(it)
+            viewModel.onSignedInHandled()
+        }
+    }
     LoginContent(
         state = state,
         notice = notice,

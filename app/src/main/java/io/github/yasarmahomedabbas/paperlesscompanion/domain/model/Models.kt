@@ -48,7 +48,8 @@ class ServerException(val kind: Kind, message: String, cause: Throwable? = null)
     Exception(message, cause) {
     /**
      * UNREACHABLE: no connection at all. NO_ANSWER: connected, but the answer timed out or the connection dropped.
-     * NOT_FOUND: the server has no such item, or it is gone.
+     * UNAUTHORIZED: the server doesn't accept the login. FORBIDDEN: signed in, but the server refused this
+     * action for this user. NOT_FOUND: the server has no such item, or it is gone.
      */
-    enum class Kind { UNREACHABLE, NO_ANSWER, UNAUTHORIZED, UNREADABLE, NOT_FOUND, SERVER }
+    enum class Kind { UNREACHABLE, NO_ANSWER, UNAUTHORIZED, FORBIDDEN, UNREADABLE, NOT_FOUND, SERVER }
 }

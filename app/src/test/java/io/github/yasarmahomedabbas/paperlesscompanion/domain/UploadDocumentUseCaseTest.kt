@@ -166,6 +166,13 @@ class UploadDocumentUseCaseTest {
     }
 
     @Test
+    fun `a permission refusal does not tell the user to sign in again`() {
+        val message = ServerException(Kind.FORBIDDEN, "x").userMessage()
+        assertEquals("You don't have permission to do that in Paperless.", message)
+        assertFalse(message.contains("sign in", ignoreCase = true))
+    }
+
+    @Test
     fun `only done and failed count as finished`() {
         assertFalse(UploadState.Uploading.isFinished)
         assertFalse(UploadState.Processing("t").isFinished)

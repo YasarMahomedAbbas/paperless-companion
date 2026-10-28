@@ -77,7 +77,12 @@ class PaperlessLibrary(
     override suspend fun storagePaths(config: ServerConfig): List<Label> =
         labels(config, "api/storage_paths/").map { it.toLabel() }
 
-    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind): DocumentFile {
+    override suspend fun file(
+        config: ServerConfig,
+        id: Int,
+        kind: DocumentFileKind,
+        onProgress: (done: Long, total: Long?) -> Unit,
+    ): DocumentFile {
         val url = PaperlessHttp.url(config.baseUrl, "api/documents/$id/${if (kind == DocumentFileKind.PREVIEW) "preview" else "download"}/")
             .newBuilder()
             .apply { if (kind == DocumentFileKind.ORIGINAL) addQueryParameter("original", "true") }
@@ -90,7 +95,7 @@ class PaperlessLibrary(
             dir.deleteRecursively()
             if (!dir.mkdirs()) throw ServerException(Kind.UNREADABLE, "Can't make room for the file")
         }
-        val (disposition, type) = http.download(http.authed(config, url).get().build(), download)
+        val (disposition, type) = http.download(http.authed(config, url).get().build(), download, onProgress)
         return withContext(http.io) {
             val mimeType = type?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
             val fallback = "document-$id" + if (mimeType == "application/pdf") ".pdf" else ""

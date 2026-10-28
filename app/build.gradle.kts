@@ -54,10 +54,37 @@ android {
         warningsAsErrors = false
         abortOnError = true
     }
+    // Robolectric needs the merged resources and manifest to run Compose and Material 3.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
-// Coverage is measured on the domain and data layers and the ViewModels. Compose screens, the
-// activity and the Keystore-backed classes need a device, so they are left out.
+// The Android SDK jar Robolectric runs the screen tests against, kept apart from the app's own
+// dependencies.
+val robolectricSdk by configurations.creating {
+    isCanBeConsumed = false
+    isTransitive = false
+}
+
+// Robolectric would download its SDK jar into ~/.m2, which the Docker build loses after
+// every run. Gradle resolves it into GRADLE_USER_HOME instead (cached on the host by
+// build.sh and on CI by setup-gradle), and Robolectric runs offline against it.
+tasks.withType<Test>().configureEach {
+    inputs.files(robolectricSdk).withPropertyName("robolectricSdk").withNormalizer(ClasspathNormalizer::class.java)
+    jvmArgumentProviders += CommandLineArgumentProvider {
+        listOf(
+            "-Drobolectric.offline=true",
+            "-Drobolectric.dependency.dir=${robolectricSdk.singleFile.parentFile}",
+        )
+    }
+}
+
+// Coverage is measured on the domain and data layers and the ViewModels. Compose screens (some
+// have Robolectric tests in src/testDebug, but not all), the activity and the Keystore-backed
+// classes are left out.
 kover {
     reports {
         filters {
@@ -73,6 +100,10 @@ kover {
                     "*.data.KeystoreTokenVault*",
                     "*.data.PrefsStore*",
                     "*.data.UriDocuments*",
+                    "*.data.PhoneExports*",
+                    // PdfRenderer needs a device.
+                    "*.ui.viewer.PdfPages*",
+                    "*.ui.viewer.PdfDocument*",
                     "*.data.update.PackageInstallerUpdates*",
                     "*.data.update.InstallResultReceiver*",
                     "*.data.update.PrefsUpdateStore*",
@@ -118,4 +149,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.compose.ui.test.junit4)
+    // Puts the ComponentActivity that createComposeRule() launches into the debug manifest.
+    debugImplementation(libs.compose.ui.test.manifest)
+    robolectricSdk(libs.robolectric.android.all)
 }

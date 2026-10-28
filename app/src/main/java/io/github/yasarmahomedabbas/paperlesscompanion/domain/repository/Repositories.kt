@@ -49,8 +49,16 @@ interface DocumentLibrary {
     suspend fun documentTypes(config: ServerConfig): List<Label>
     suspend fun storagePaths(config: ServerConfig): List<Label>
 
-    /** Fetches one of a document's files into the app's cache, replacing the previous copy of the same document and kind. */
-    suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind): DocumentFile
+    /**
+     * Fetches one of a document's files into the app's cache, replacing the previous copy of the same document and kind.
+     * [onProgress] hears the bytes fetched so far and the total, which is null when the server doesn't say.
+     */
+    suspend fun file(
+        config: ServerConfig,
+        id: Int,
+        kind: DocumentFileKind,
+        onProgress: (done: Long, total: Long?) -> Unit = { _, _ -> },
+    ): DocumentFile
 
     /** Changes a document's details and returns it as the server now has it. */
     suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges): Document
@@ -65,6 +73,24 @@ interface DocumentLibrary {
 
     /** Applies [edit] to every document in [ids]; nothing happens for none. */
     suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit)
+}
+
+/**
+ * Puts a fetched document file where the user and other apps can reach it.
+ * Implementations throw ServerException(UNREADABLE, …) when the file can't be copied.
+ */
+interface DocumentExports {
+    /** A location another app may be granted to read the file at. */
+    fun shareLocation(file: DocumentFile): String
+
+    /** True when [saveToDownloads] works without asking the user where. */
+    val canSaveDirectly: Boolean
+
+    /** Saves a copy in the phone's Downloads and returns the name it was saved under. */
+    suspend fun saveToDownloads(file: DocumentFile): String
+
+    /** Copies the file to a [location] the user picked. */
+    suspend fun saveTo(file: DocumentFile, location: String)
 }
 
 /** Turns a file the user picked, shot, scanned or shared (by its location, e.g. a content URI string) into a DocumentSource. */

@@ -25,6 +25,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppInstaller
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentExports
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
@@ -172,6 +173,18 @@ class FakeLibrary : DocumentLibrary {
     var documentTypes = listOf(Label(3, "Invoice", 5))
     var storagePaths = listOf(Label(4, "Bills", 6))
     var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
+    /** Per-kind answers for file(); a kind not in here gets [file]. */
+    var files = mapOf<DocumentFileKind, DocumentFile>()
+    /** What file() reports to its onProgress before it answers. */
+    var progress = listOf<Pair<Long, Long?>>()
+    /** Thrown by file() alone, so a test can fail the file while the document loads. */
+    var fileFailure: Exception? = null
+    /** Thrown by document() alone. */
+    var documentFailure: Exception? = null
+    /** Thrown by the four label lists alone. */
+    var labelFailure: Exception? = null
+    /** With a gate set, file() waits on it (after reporting progress), so a test can look at a fetch in flight. */
+    var fileGate: CompletableDeferred<Unit>? = null
     var failure: Exception? = null
     /** Thrown by update() only, so the label calls still answer. */
     var updateFailure: Exception? = null
@@ -179,8 +192,14 @@ class FakeLibrary : DocumentLibrary {
     var updateGate: CompletableDeferred<Unit>? = null
     /** Thrown by delete(), restore() and bulkEdit() only. */
     var writeFailure: Exception? = null
+    /** When set, documents() answers with what it returns for the query (and throws what it throws) instead of [page]. */
+    var pages: ((DocumentQuery) -> DocumentPage)? = null
+    /** When set, documents() waits on it before answering, so a test can look at a load in flight. */
+    var documentsGate: CompletableDeferred<Unit>? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
+    /** Every documents() query, recorded before it waits or fails. */
+    val queries = mutableListOf<DocumentQuery>()
 
     private fun <T> answer(config: ServerConfig, call: String, value: T, only: Exception? = null): T {
         calls += call
@@ -190,13 +209,39 @@ class FakeLibrary : DocumentLibrary {
         return value
     }
 
-    override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
-    override suspend fun document(config: ServerConfig, id: Int) = answer(config, "document $id", document)
-    override suspend fun tags(config: ServerConfig) = answer(config, "tags", tags)
-    override suspend fun correspondents(config: ServerConfig) = answer(config, "correspondents", correspondents)
-    override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
-    override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
-    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
+    override suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage {
+        calls += "documents $query"
+        configs += config
+        queries += query
+        documentsGate?.await()
+        failure?.let { throw it }
+        return pages?.invoke(query) ?: page
+    }
+    override suspend fun document(config: ServerConfig, id: Int): Document {
+        documentFailure?.let { calls += "document $id"; throw it }
+        return answer(config, "document $id", document)
+    }
+    override suspend fun tags(config: ServerConfig) = label(config, "tags", tags)
+    override suspend fun correspondents(config: ServerConfig) = label(config, "correspondents", correspondents)
+    override suspend fun documentTypes(config: ServerConfig) = label(config, "documentTypes", documentTypes)
+    override suspend fun storagePaths(config: ServerConfig) = label(config, "storagePaths", storagePaths)
+
+    private fun <T> label(config: ServerConfig, call: String, value: T): T {
+        labelFailure?.let { calls += call; configs += config; throw it }
+        return answer(config, call, value)
+    }
+
+    override suspend fun file(
+        config: ServerConfig,
+        id: Int,
+        kind: DocumentFileKind,
+        onProgress: (done: Long, total: Long?) -> Unit,
+    ): DocumentFile {
+        progress.forEach { (done, total) -> onProgress(done, total) }
+        fileGate?.await()
+        fileFailure?.let { calls += "file $id $kind"; throw it }
+        return answer(config, "file $id $kind", files[kind] ?: file)
+    }
     override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges): Document {
         updateGate?.await()
         return answer(config, "update $id $changes", document, updateFailure)
@@ -205,6 +250,30 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
     override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit, writeFailure)
     override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit, writeFailure)
+}
+
+/** Records each export as "<call> <name>[ <location>]", answering [savedAs] or throwing [failure]. */
+class FakeExports(override var canSaveDirectly: Boolean = true) : DocumentExports {
+    var failure: Exception? = null
+    var savedAs: String? = null
+    val calls = mutableListOf<String>()
+
+    override fun shareLocation(file: DocumentFile): String {
+        calls += "share ${file.name}"
+        failure?.let { throw it }
+        return "content://test/${file.name}"
+    }
+
+    override suspend fun saveToDownloads(file: DocumentFile): String {
+        calls += "downloads ${file.name}"
+        failure?.let { throw it }
+        return savedAs ?: file.name
+    }
+
+    override suspend fun saveTo(file: DocumentFile, location: String) {
+        calls += "saveTo ${file.name} $location"
+        failure?.let { throw it }
+    }
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =

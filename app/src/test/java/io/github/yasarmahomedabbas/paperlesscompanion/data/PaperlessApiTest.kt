@@ -81,6 +81,14 @@ class PaperlessApiTest {
     }
 
     @Test
+    fun `login refused with 403 or 401 is unauthorized`() = runTest {
+        listOf(403, 401).forEach { code ->
+            respond(code, """{"detail":"Authentication credentials were not provided."}""")
+            expectError(Kind.UNAUTHORIZED) { api.login(config.baseUrl, "anna", "nope") }
+        }
+    }
+
+    @Test
     fun `login without a token in the answer is a server error`() = runTest {
         respond(body = """{"something":"else"}""")
         expectError(Kind.SERVER) { api.login(config.baseUrl, "anna", "pw") }
@@ -116,6 +124,18 @@ class PaperlessApiTest {
     fun `an expired token is unauthorized`() = runTest {
         respond(401, """{"detail":"Invalid token."}""")
         expectError(Kind.UNAUTHORIZED) { api.upload(config, document()) }
+    }
+
+    @Test
+    fun `an upload refused for lack of permission is forbidden`() = runTest {
+        respond(403, """{"detail":"You do not have permission to perform this action."}""")
+        expectError(Kind.FORBIDDEN) { api.upload(config, document()) }
+    }
+
+    @Test
+    fun `a status check refused for lack of permission is forbidden`() = runTest {
+        respond(403, """{"detail":"You do not have permission to perform this action."}""")
+        expectError(Kind.FORBIDDEN) { api.task(config, "t") }
     }
 
     @Test

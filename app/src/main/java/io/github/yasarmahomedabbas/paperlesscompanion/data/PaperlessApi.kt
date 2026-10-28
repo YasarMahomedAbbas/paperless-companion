@@ -40,7 +40,7 @@ class PaperlessApi(
     override suspend fun login(baseUrl: String, username: String, password: String): String {
         val body = FormBody.Builder().add("username", username).add("password", password).build()
         val request = Request.Builder().url(url(baseUrl, "api/token/")).post(body).build()
-        val json = call(request, badRequestIsAuth = true)
+        val json = call(request, signIn = true)
         return (json as? JsonObject)?.string("token")
             ?: throw ServerException(Kind.SERVER, "Paperless sent no token")
     }
@@ -112,8 +112,8 @@ class PaperlessApi(
     private suspend fun call(
         request: Request,
         client: OkHttpClient = this.client,
-        badRequestIsAuth: Boolean = false,
-    ): JsonElement = http.call(request, client, badRequestIsAuth)
+        signIn: Boolean = false,
+    ): JsonElement = http.call(request, client, signIn)
 
     companion object {
         fun defaultClient(): OkHttpClient = PaperlessHttp.defaultClient()

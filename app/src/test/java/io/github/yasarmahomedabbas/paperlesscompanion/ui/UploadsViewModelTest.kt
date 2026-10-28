@@ -8,38 +8,31 @@ import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class HomeViewModelTest {
+class UploadsViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
     private val server = FakeServer()
     private val settings = FakeSettings(CONFIG)
-    private val viewModel = HomeViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings), settings)
+    private val viewModel = UploadsViewModel(UploadDocumentUseCase(server, settings))
 
     private val uploads get() = viewModel.state.value.uploads
-
-    @Test
-    fun `shows the server`() {
-        assertEquals("http://paperless:8000", viewModel.state.value.serverUrl)
-    }
-
-    @Test
-    fun `document links come from the server`() {
-        assertEquals("http://paperless:8000/documents/5", viewModel.documentUrl(5))
-    }
 
     @Test
     fun `new uploads go on top and finish as done`() = runTest(main.dispatcher) {
@@ -107,7 +100,7 @@ class HomeViewModelTest {
     fun `clear finished keeps uploads that are still running`() = runTest(main.dispatcher) {
         viewModel.upload(listOf(document("done.pdf")))
         advanceUntilIdle()
-        server.tasks[0] = server.tasks[0].copy(status = io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus.RUNNING)
+        server.tasks[0] = server.tasks[0].copy(status = TaskStatus.RUNNING)
         viewModel.upload(listOf(document("busy.pdf")))
         main.dispatcher.scheduler.runCurrent()
 
@@ -117,13 +110,59 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `sign out forgets the server and the uploads`() = runTest(main.dispatcher) {
+    fun `clear drops every upload, running or not`() = runTest(main.dispatcher) {
+        viewModel.upload(listOf(document("done.pdf")))
+        advanceUntilIdle()
+        server.tasks[0] = server.tasks[0].copy(status = TaskStatus.RUNNING)
+        viewModel.upload(listOf(document("busy.pdf")))
+        main.dispatcher.scheduler.runCurrent()
+
+        viewModel.clear()
+
+        assertTrue(uploads.isEmpty())
+        viewModel.retry(0)
+        main.dispatcher.scheduler.runCurrent()
+        assertEquals(2, server.uploads.size)
+    }
+
+    @Test
+    fun `an accepted upload says so once, with the new document`() = runTest(main.dispatcher) {
+        val added = mutableListOf<Int?>()
+        backgroundScope.launch { viewModel.added.toList(added) }
+        server.tasks.clear()
+        server.tasks += listOf(TaskInfo(TaskStatus.PENDING, null, null), TaskInfo(TaskStatus.SUCCESS, "ok", 42))
+
+        viewModel.upload(listOf(document()))
+        advanceUntilIdle()
+        runCurrent() // the collector runs in the background scope, which advanceUntilIdle doesn't wait for
+
+        assertEquals(UploadState.Done(42), uploads.single().state)
+        assertEquals(listOf<Int?>(42), added)
+    }
+
+    @Test
+    fun `a failed upload says nothing was added`() = runTest(main.dispatcher) {
+        val added = mutableListOf<Int?>()
+        backgroundScope.launch { viewModel.added.toList(added) }
+        server.uploadResult = { throw ServerException(ServerException.Kind.SERVER, "duplicate") }
+
+        viewModel.upload(listOf(document()))
+        advanceUntilIdle()
+        runCurrent()
+
+        assertTrue(uploads.single().state is UploadState.Failed)
+        assertTrue(added.isEmpty())
+    }
+
+    @Test
+    fun `an upload accepted before anyone listens still reaches the list`() = runTest(main.dispatcher) {
         viewModel.upload(listOf(document()))
         advanceUntilIdle()
 
-        viewModel.signOut()
+        val added = mutableListOf<Int?>()
+        backgroundScope.launch { viewModel.added.toList(added) }
+        runCurrent()
 
-        assertNull(settings.config)
-        assertTrue(uploads.isEmpty())
+        assertEquals(listOf<Int?>(42), added)
     }
 }

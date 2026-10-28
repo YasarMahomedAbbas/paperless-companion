@@ -129,4 +129,39 @@ class LoginViewModelTest {
 
         assertEquals(1, server.logins.size)
     }
+
+    @Test
+    fun `a handled sign-in is not delivered again`() = runTest(main.dispatcher) {
+        fillIn()
+        viewModel.submit()
+        advanceUntilIdle()
+
+        viewModel.onSignedInHandled()
+
+        assertNull(viewModel.state.value.signedIn)
+    }
+
+    @Test
+    fun `a handled sign-in keeps the address and username`() = runTest(main.dispatcher) {
+        fillIn()
+        viewModel.submit()
+        advanceUntilIdle()
+
+        viewModel.onSignedInHandled()
+
+        val state = viewModel.state.value
+        assertEquals("paperless:8000", state.serverUrl)
+        assertEquals("anna", state.username)
+        assertEquals("", state.password)
+    }
+
+    @Test
+    fun `handling with nothing pending changes nothing`() = runTest(main.dispatcher) {
+        fillIn()
+        val before = viewModel.state.value
+
+        viewModel.onSignedInHandled()
+
+        assertEquals(before, viewModel.state.value)
+    }
 }
