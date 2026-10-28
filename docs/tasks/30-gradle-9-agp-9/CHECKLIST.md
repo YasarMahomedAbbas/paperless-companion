@@ -90,12 +90,13 @@ File: `.github/workflows/release.yml`
 
 Goal: the app's HTTP runs on OkHttp 5.5.1, still only from `data/`, and the upload still sends its length.
 
-### [ ] 2.1 — Bump
+### [x] 2.1 — Bump
 
 File: `gradle/libs.versions.toml`
 `okhttp = "5.5.1"` (both `okhttp` and `okhttp-mockwebserver` use it; the artifact `com.squareup.okhttp3:mockwebserver` keeps the `okhttp3.mockwebserver` package in 5.x).
 
-### [ ] 2.2 — Check the code against the OkHttp 5 changes
+### [x] 2.2 — Check the code against the OkHttp 5 changes
+Done: everything compiled and passed unchanged; the only item that touched this code is `Response.body` becoming non-null, which left dead `?.` / `?:` null handling in `PaperlessHttp.kt`, `GitHubReleases.kt` and `HttpApkDownloader.kt` (removed). No test edits.
 
 Files: `data/PaperlessHttp.kt`, `data/PaperlessApi.kt`, `data/PaperlessLibrary.kt`, `data/Thumbnails.kt`, `data/ThumbnailImages.kt`, `data/update/GitHubReleases.kt`, `data/update/HttpApkDownloader.kt` (all under `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/`), and the MockWebServer tests under `app/src/test/java/.../data/`.
 Read the "Upgrading to OkHttp 5" notes and fix only what fails to compile or behaves differently (e.g. `MockResponse` / `SocketPolicy` / `RecordedRequest` API in the legacy package, `RecordedRequest.body` / `bodySize`, `Response.body` non-null, `toRequestBody` on a `ByteArray` still giving a known length). The upload body stays a `ByteArray` request body inside `MultipartBody`, so its `contentLength()` is known and OkHttp sends `Content-Length`. No `okhttp3` import outside `data/` (ArchitectureTest enforces it). Record in NOTES which changelog items touched this code and which didn't.

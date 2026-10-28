@@ -38,7 +38,7 @@ class GitHubReleases(
             .get()
             .build()
         val (code, text) = try {
-            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+            client.newCall(request).execute().use { it.code to it.body.string() }
         } catch (e: IOException) {
             throw UpdateException(Kind.OFFLINE, "can't reach GitHub: ${e.message}", e)
         }
