@@ -9,6 +9,7 @@ An Android app for scanning paper documents straight into a self-hosted [Paperle
 - Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and opens the new document in the app.
 - **Open a document**: its pages (pinch to zoom), title, tags and details in a panel you drag up or down, with Share, Download (straight to Downloads on Android 10+, a Save-as picker on 8–9), Get original and Open in Paperless.
 - **Organise documents**: **Edit** in the document view changes its title, date, correspondent, document type, storage path and tags. **Move to trash** (in its More menu) sends it to the Paperless trash, with Undo on the list for 8 seconds. Long-press a document on the list to select several, then change their tags, correspondent (From) or type, or move them all to the trash. Tags and correspondents are created in Paperless itself: a picker with no match offers **Open Paperless**.
+- **Saved views, notes and more like this**: the views saved in Paperless's web interface show the same documents in the app, the server's home views as chips at the start of the list and every view under **Views**; search and filters narrow a view. **Notes** in a document's details lists its notes, newest first, and adds one (hidden when the server has notes switched off). **More like this** (in its More menu) lists the documents Paperless finds similar.
 - **Unlock with fingerprint**: when the phone has a screen lock, the app opens only after a fingerprint or the phone's PIN/pattern, and locks again after a minute in the background. The switch is in **Settings** (the gear on the Documents screen).
 
 The app talks only to your own server. It's built for a server reached over the home network or a VPN such as Tailscale, so plain `http://` addresses are allowed.
@@ -36,8 +37,9 @@ ui/       Compose screens + ViewModels (state as StateFlow)
   ↓
 domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
   ↑
-data/     PaperlessApi (uploads, login) and PaperlessLibrary (documents, labels, trash, bulk edit), both on
-          PaperlessHttp (OkHttp + paperless-ngx REST); Thumbnails + ThumbnailImages (Coil),
+data/     PaperlessApi (uploads, login) and PaperlessLibrary (documents, labels, trash, bulk edit,
+          saved views, notes), both on PaperlessHttp (OkHttp + paperless-ngx REST);
+          PaperlessViews (a saved view's filter rules as the web UI's query parameters); Thumbnails + ThumbnailImages (Coil),
           SealedSettingsRepository + KeystoreTokenVault, UriDocuments,
           PhoneExports (share through the FileProvider, save to Downloads via MediaStore),
           update/ (GitHub Releases, APK download, PackageInstaller, WorkManager, the notification)
@@ -54,8 +56,10 @@ Thumbnails go through the app-wide Coil loader that `PaperlessApp` provides: a s
 | `AppLock` | Locks the app again (and forgets the unlocked token) after a minute or more in the background, while the lock is on |
 | `CheckForUpdateUseCase` | Asks GitHub for the latest release (`GET /repos/…/releases/latest`), keeps it as the offer when its version code is higher than the installed one, and announces each version once |
 | `DocumentLinkUseCase`, `LabelsLinkUseCase` | Give the web address of an uploaded document on the signed-in server, for the viewer's Open in Paperless, and of a label list (tags, correspondents, …) for a picker's Open Paperless |
-| `BrowseDocumentsUseCase`, `GetDocumentUseCase`, `OpenDocumentFileUseCase` | One page of documents (`GET /api/documents/`: sort, filter by tags, correspondent and type, or full-text search), one document with its text, and its preview, archived or original file streamed into the app's cache, reporting progress |
+| `BrowseDocumentsUseCase`, `GetDocumentUseCase`, `OpenDocumentFileUseCase` | One page of documents (`GET /api/documents/`: sort, filter by tags, correspondent and type, full-text search, a saved view's rules, or `more_like_id`), one document with its text, and its preview, archived or original file streamed into the app's cache, reporting progress |
 | `ExportDocumentUseCase` | Hands a fetched file to another app (Share) or saves a copy to Downloads or a picked location |
+| `SavedViewsUseCase` | The server's saved views (`GET /api/saved_views/`), as the home views and as every view, quick-list (sidebar) ones first, in the server's order: v9 reads the view's own flags, v10 the ids in `GET /api/ui_settings/` |
+| `NotesUseCase` | A document's notes, newest first, and adding one (`GET`/`POST /api/documents/{id}/notes/`; a 200 with `{"error"}` is a refusal), and whether `ui_settings` has notes switched on |
 | `LoadLabelsUseCase` | Every tag, correspondent, document type and storage path, loaded side by side |
 | `UpdateDocumentUseCase`, `DeleteDocumentUseCase`, `TrashUseCase`, `BulkEditUseCase` | Edit one document (`PATCH`), move it to the trash, list and restore the trash, and change or delete many at once (`bulk_edit`; delete posts v10's `/api/documents/delete/` and falls back to `bulk_edit` on Paperless 2) |
 

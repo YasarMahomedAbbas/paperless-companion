@@ -59,3 +59,14 @@ Branch: `feat/12-saved-views-and-notes`
   - `GET api/documents/` with a view's parameters and with `more_like_id`: match the source; the rule translation was re-checked line by line against `queryParamsFromFilterRules` at v3.3.4.
   - `GET` / `POST api/documents/{id}/notes/`: bare list, 200 + `{"error"}` on failure, 403 without permission, as in `views.py` v3.3.4; order differs by version (fixed above).
 - Layers: clean
+
+## Doc drift
+
+- Applied: README.md:features — a "Saved views, notes and more like this" bullet (rung 3, using the app).
+- Applied: README.md:Architecture — `PaperlessLibrary` now also covers saved views and notes; `PaperlessViews` (rule translation) added to the `data/` block (rung 3).
+- Applied: README.md:use-case table — `SavedViewsUseCase` and `NotesUseCase` rows; `BrowseDocumentsUseCase` row names a saved view's rules and `more_like_id` (rung 3).
+- Skipped: CLAUDE.md "every call to Paperless" file list — `PaperlessViews.kt` makes no call, it only builds parameters, so the list stays true.
+- Skipped: the rule table being pinned to the v3.3.4 web UI — the `PaperlessViews.kt` header says it and `PaperlessViewsTest` covers it; one `rg` finds it.
+- Skipped: the v9/v10 saved-view flag difference — documented on `savedViews()` and tested both ways; the README's "reads both API v9 and v10" stays true.
+- Skipped: `docs/design/README.md` § Decisions — the branch already added its #12 entries; the component and icon variants are named there.
+- Stale, fixed separately: none
