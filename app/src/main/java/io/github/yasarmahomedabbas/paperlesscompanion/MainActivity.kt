@@ -26,8 +26,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeScreen
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.LockScreen
@@ -110,17 +111,21 @@ class MainActivity : FragmentActivity() {
                                     onBack = { showUpdates = false },
                                 )
                             } else {
-                                HomeScreen(
-                                    viewModel = viewModel<HomeViewModel>(key = home.config.baseUrl, factory = container.homeViewModelFactory),
-                                    documents = container.documents,
+                                DocumentsScreen(
+                                    documents = viewModel<DocumentsViewModel>(
+                                        key = "documents ${home.config.baseUrl}",
+                                        factory = container.documentsViewModelFactory,
+                                    ),
+                                    uploads = viewModel<UploadsViewModel>(
+                                        key = "uploads ${home.config.baseUrl}",
+                                        factory = container.uploadsViewModelFactory,
+                                    ),
+                                    files = container.documents,
                                     pending = if (locked == null) pending else emptyList(),
                                     onPendingConsumed = gate::onPendingConsumed,
                                     onDocuments = gate::addPending,
-                                    lockAvailable = home.lockAvailable,
-                                    lockEnabled = home.lockEnabled,
-                                    onLockChange = ::changeLock,
-                                    onSignedOut = gate::onSignedOut,
-                                    onOpenUpdates = { showUpdates = true },
+                                    // Until Settings lands (checkpoint 5), the gear opens Updates.
+                                    onOpenSettings = { showUpdates = true },
                                 )
                             }
                         }

@@ -126,29 +126,30 @@ Files: `ui/components/Sheets.kt`, `ui/components/SettingsRow.kt`
 
 Goal: the app opens on Documents, with the list in all its states, pull to refresh, infinite scroll, upload cards on top and the Add sheet. Uploads keep working exactly as today.
 
-### [ ] 3.1 — Uploads ViewModel
+### [x] 3.1 — Uploads ViewModel
 
 Files: `ui/home/HomeViewModel.kt` → `ui/documents/UploadsViewModel.kt` (`git mv`), `ui/HomeViewModelTest.kt` → `ui/UploadsViewModelTest.kt`
-Rename the class to `UploadsViewModel` and drop `serverUrl` from its state (Settings shows it now) and `signOut()`. Add `fun clear()` (drops every upload and source, used on sign-out) and `val added: SharedFlow<Int?>`, which emits the document id (or null) once when an upload reaches `UploadState.Done`. Keep every existing test, and add the `added` and `clear()` tests.
+Rename the class to `UploadsViewModel` and drop `serverUrl` from its state (Settings shows it now), the `settings` parameter and `signOut()`. Add `fun clear()` (drops every upload and source, used on sign-out) and `val added: Flow<Int?>`, which emits the document id (or null) once when an upload reaches `UploadState.Done`. It is a buffered `Channel` rather than a `SharedFlow`, so an upload accepted while Settings is open still refreshes the list when Documents comes back. Keep every existing test, and add the `added` and `clear()` tests.
 
-### [ ] 3.2 — Documents screen
+### [x] 3.2 — Documents screen
 
 File: `ui/documents/DocumentsScreen.kt` (new; replaces `ui/home/HomeScreen.kt`, which is deleted)
 `DocumentsScreen(documents: DocumentsViewModel, uploads: UploadsViewModel, files: DocumentFiles, pending, onPendingConsumed, onDocuments, onOpenSettings)`. The layout follows `layouts.md` § List — Documents:
 - A `LargeTitleBar("Documents")` with the tonal gear ("Settings"), then the search field and the chip row (Filters / sort and the applied filters, wired in checkpoint 4; here the sort chip and the Filters chip only open nothing yet).
 - `PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = documents::refresh)` around a `LazyColumn`. The "Uploading" section with `UploadCard`s and "Clear finished" goes at the top when there are uploads, then the result line ("23 documents", only when `showResultLine`), then rows (`key = id`), then the loading-more or load-more-failed footer.
 - Infinite scroll: `snapshotFlow { listState.layoutInfo }` triggers `documents.loadMore()` when the last visible index is within five rows of the end.
-- States: `Loading` gives skeleton rows (no spinner). `Empty` gives a status card ("No documents yet", "Add a document" opens the Add sheet), or, with search text or filters on, "No documents match" with "Clear filters". `Failed` gives a status card (unreachable → `warning`, "Couldn't reach Paperless", "Check you're on the home network or the VPN.", Try again; refused → `destructive` with the message).
+- States: `Loading` gives skeleton rows (no spinner). `Empty` gives a status card ("No documents yet", "Add a document" opens the Add sheet), or, with search text or filters on, "Nothing matches "<text>"" / "No documents match" with "Clear filters". `Failed` gives a status card titled "Couldn't load your documents" (the canvas's copy): unreachable → `warning`, "Check you're on the home network or the VPN, then try again."; refused → `destructive` with the message; both with Try again.
+- The Add sheet is its own file, `ui/documents/AddSheet.kt`; the screen's actions go through a `DocumentsScreenActions` class so the previews pass no-ops.
 - Row tap does nothing yet (#10 adds the document view); long-press does nothing (#11).
 - `AddButton` opens `AddSheet`, which moves today's scanner, photo and file launchers and the Play-services camera notice out of `HomeScreen` unchanged. The camera notice stays an `Info` notice banner above the list, as on the "Add a document — scanner needs camera" board.
 - `LaunchedEffect(Unit) { uploads.added.collect { documents.refresh() } }`.
 - Previews for view, loading, empty, failed, uploading and loading more.
 
-### [ ] 3.3 — Wiring
+### [x] 3.3 — Wiring
 
 Files: `AppContainer.kt`, `MainActivity.kt`
 - `documentsViewModelFactory` (`DocumentsViewModel(BrowseDocumentsUseCase(library, settings), LoadLabelsUseCase(library, settings))`) and `uploadsViewModelFactory` (replacing `homeViewModelFactory`). Drop the "#9-#11 build their use cases from it" comment's #9.
-- `MainActivity` shows `DocumentsScreen` where `HomeScreen` was, with both ViewModels keyed on `home.config.baseUrl`. Updates stays reachable through a temporary path until checkpoint 5 (the gear opens Updates directly), so nothing is lost between commits.
+- `MainActivity` shows `DocumentsScreen` where `HomeScreen` was, with both ViewModels keyed on `home.config.baseUrl` (as `"documents <url>"` and `"uploads <url>"`: one store key can hold only one ViewModel). Updates stays reachable through a temporary path until checkpoint 5 (the gear opens Updates directly), so nothing is lost between commits.
 
 ### Verify
 

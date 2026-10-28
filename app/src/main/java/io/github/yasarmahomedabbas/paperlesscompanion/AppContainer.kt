@@ -30,12 +30,15 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.CheckForUpdateUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
-import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.UploadsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
@@ -53,7 +56,7 @@ class AppContainer(private val context: Context) {
     val lock: AppLockRepository = sealed
     val documents: DocumentFiles = UriDocuments(context.contentResolver)
     private val server: DocumentServer = PaperlessApi()
-    // The documents already on the server. The document screens (#9-#11) build their use cases from it.
+    // The documents already on the server. The document screens (#10, #11) build their use cases from it too.
     private val library: DocumentLibrary = PaperlessLibrary(files = File(context.cacheDir, "documents"))
     /** Coil's loader for the whole app, so a screen only writes `AsyncImage(model = document.thumbnail, ...)`. */
     val imageLoader by lazy { thumbnailImageLoader(context, settings, PaperlessApi.defaultClient()) }
@@ -75,8 +78,11 @@ class AppContainer(private val context: Context) {
     val loginViewModelFactory = viewModelFactory {
         initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
-    val homeViewModelFactory = viewModelFactory {
-        initializer { HomeViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings), settings) }
+    val documentsViewModelFactory = viewModelFactory {
+        initializer { DocumentsViewModel(BrowseDocumentsUseCase(library, settings), LoadLabelsUseCase(library, settings)) }
+    }
+    val uploadsViewModelFactory = viewModelFactory {
+        initializer { UploadsViewModel(UploadDocumentUseCase(server, settings), DocumentLinkUseCase(server, settings)) }
     }
     val updatesViewModelFactory = viewModelFactory {
         initializer {
