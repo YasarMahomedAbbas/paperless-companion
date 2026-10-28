@@ -102,12 +102,15 @@ class PackageInstallerUpdates(
                 setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
             }
         }
-        val id = try {
-            installer.createSession(params)
+        // Every failure leaves as an UpdateException, as the AppInstaller contract says: anything
+        // else would end the caller's coroutine (and the app) instead of showing a reason.
+        val session = try {
+            installer.openSession(installer.createSession(params))
         } catch (e: IOException) {
             throw UpdateException(Kind.STORAGE, "can't start the install", e)
+        } catch (e: RuntimeException) {
+            throw UpdateException(Kind.REFUSED, e.message.orEmpty(), e)
         }
-        val session = installer.openSession(id)
         try {
             session.openWrite("base.apk", 0, apk.length()).use { out ->
                 apk.inputStream().use { it.copyTo(out) }

@@ -42,6 +42,9 @@ class AppContainer(private val context: Context) {
     val notifier = UpdateNotifier(context, MainActivity::class.java)
     val checkForUpdate = CheckForUpdateUseCase(releases, updateStore, installer::installedVersionCode, notifier::announce)
 
+    /** One update check as soon as there's a network (the activity asks on each fresh launch). */
+    fun checkForUpdatesNow() = UpdateSchedule.now(context)
+
     val loginViewModelFactory = viewModelFactory {
         initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
@@ -53,6 +56,11 @@ class AppContainer(private val context: Context) {
             val installed = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
             UpdatesViewModel(installed, updateStore, downloader, installer, checkForUpdate)
         }
+    }
+
+    companion object {
+        /** On the activity's intent: open the Updates screen (the "Update ready" notification's tap). */
+        const val EXTRA_OPEN_UPDATES = UpdateNotifier.EXTRA_OPEN_UPDATES
     }
 }
 

@@ -10,16 +10,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateNotifier
-import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateSchedule
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
@@ -28,6 +27,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.PaperlessTheme
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val container get() = (application as PaperlessApp).container
@@ -47,19 +48,22 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) receive(intent)
         // Debug builds aren't signed with the release key, so a release could never replace them.
         if (!BuildConfig.DEBUG && savedInstanceState == null) {
-            UpdateSchedule.now(this)
+            container.checkForUpdatesNow()
             askForNotificationsOnce()
+        }
+        // Android's install confirmation, started from here (it needs an activity). Only while the
+        // app is on screen: Android blocks an activity start from the background, so one that
+        // arrives then waits until the user comes back instead of being lost.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                container.installer.confirmation.filterNotNull().collect {
+                    container.installer.consumeConfirmation(it)
+                    startActivity(it)
+                }
+            }
         }
         setContent {
             PaperlessTheme {
-                // Android's install confirmation, started from here (it needs an activity).
-                val confirmation by container.installer.confirmation.collectAsState()
-                LaunchedEffect(confirmation) {
-                    confirmation?.let {
-                        container.installer.consumeConfirmation(it)
-                        startActivity(it)
-                    }
-                }
                 var config by remember { mutableStateOf(container.settings.load()) }
                 val signedIn = config
                 if (signedIn == null) {
@@ -101,7 +105,7 @@ class MainActivity : ComponentActivity() {
 
     private fun receive(intent: Intent) {
         // Shown only once signed in: the login screen ignores it.
-        if (intent.getBooleanExtra(UpdateNotifier.EXTRA_OPEN_UPDATES, false)) showUpdates = true
+        if (intent.getBooleanExtra(AppContainer.EXTRA_OPEN_UPDATES, false)) showUpdates = true
         val uris = when (intent.action) {
             Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
             Intent.ACTION_SEND_MULTIPLE ->
