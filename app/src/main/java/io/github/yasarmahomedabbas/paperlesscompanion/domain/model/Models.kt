@@ -5,6 +5,17 @@ import java.io.InputStream
 /** A document server and the API token that signs in to it. */
 data class ServerConfig(val baseUrl: String, val token: String)
 
+/** What reading the saved sign-in found. */
+sealed interface StoredSignIn {
+    /** Nobody has signed in on this phone. */
+    data object None : StoredSignIn
+    /** The token is sealed behind the phone's lock: unlock, then call AppLockRepository.unlock(). */
+    data object Locked : StoredSignIn
+    /** The phone voided the key (a new fingerprint, or the screen lock was removed); the sign-in is gone. */
+    data object Voided : StoredSignIn
+    data class Ready(val config: ServerConfig) : StoredSignIn
+}
+
 /** A file to upload. [open] is called once per upload attempt and must return a fresh stream. */
 class DocumentSource(
     val name: String,

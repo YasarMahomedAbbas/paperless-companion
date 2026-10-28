@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,8 +70,14 @@ import java.util.Locale
 fun HomeScreen(
     viewModel: HomeViewModel,
     documents: DocumentFiles,
-    shared: List<DocumentSource>,
-    onSharedConsumed: () -> Unit,
+    /** Documents shared, scanned, photographed or picked, waiting to be uploaded now that Home is unlocked. */
+    pending: List<DocumentSource>,
+    onPendingConsumed: () -> Unit,
+    /** Every document the screen brings in goes here first, so one that arrives while locked waits. */
+    onDocuments: (List<DocumentSource>) -> Unit,
+    lockAvailable: Boolean,
+    lockEnabled: Boolean,
+    onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
     onOpenUpdates: () -> Unit,
 ) {
@@ -80,26 +87,26 @@ fun HomeScreen(
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(shared) {
-        if (shared.isNotEmpty()) {
-            viewModel.upload(shared)
-            onSharedConsumed()
+    LaunchedEffect(pending) {
+        if (pending.isNotEmpty()) {
+            viewModel.upload(pending)
+            onPendingConsumed()
         }
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pdf?.uri?.let { uri ->
-            viewModel.upload(listOf(documents.from(uri.toString(), "Scan ${timestamp()}.pdf")))
+            onDocuments(listOf(documents.from(uri.toString(), "Scan ${timestamp()}.pdf")))
         }
     }
     var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = photoUri
-        if (saved && uri != null) viewModel.upload(listOf(documents.from(uri.toString(), "Photo ${timestamp()}.jpg")))
+        if (saved && uri != null) onDocuments(listOf(documents.from(uri.toString(), "Photo ${timestamp()}.jpg")))
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        viewModel.upload(uris.map { documents.from(it.toString(), "Document ${timestamp()}") })
+        if (uris.isNotEmpty()) onDocuments(uris.map { documents.from(it.toString(), "Document ${timestamp()}") })
     }
 
     fun scan() {
@@ -154,6 +161,16 @@ fun HomeScreen(
                                     onOpenUpdates()
                                 },
                             )
+                            if (lockAvailable) {
+                                DropdownMenuItem(
+                                    text = { Text("Lock with fingerprint") },
+                                    trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
+                                    onClick = {
+                                        menu = false
+                                        onLockChange(!lockEnabled)
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Sign out") },
                                 onClick = {

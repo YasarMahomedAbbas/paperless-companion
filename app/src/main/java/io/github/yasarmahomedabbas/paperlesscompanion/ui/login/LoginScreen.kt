@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel, onSignedIn: (ServerConfig) -> Unit) {
+fun LoginScreen(viewModel: LoginViewModel, notice: String?, onSignedIn: (ServerConfig) -> Unit) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(state.signedIn) { state.signedIn?.let(onSignedIn) }
 
@@ -48,6 +48,8 @@ fun LoginScreen(viewModel: LoginViewModel, onSignedIn: (ServerConfig) -> Unit) {
                 "Sign in to your Paperless server. You need to be on the home network or the VPN.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            // The theme has no warning colour yet (#6 adds it), so the notice uses the error colour.
+            notice?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             OutlinedTextField(
                 value = state.serverUrl,
                 onValueChange = viewModel::onServerUrl,

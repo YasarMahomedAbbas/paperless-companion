@@ -63,6 +63,10 @@ These live in `.claude/skills/design-canvas/assets/artboard.dc.html` for the can
 ## Open decisions
 
 - The token values, the typeface and the screen shapes: settled by #6.
+- No `warning` colour in `ui/theme/` yet: the sign-in screen's "sign in again" notice (#8) uses
+  the error colour until #6 adds it.
+- No `@Preview`s: the app has no `ui-tooling` dependency yet, so the lock screen (#8) ships
+  without one, like the other screens.
 - The Updates screen (#13) is a detail screen built from stock Material 3 parts on the current
   theme, like the home screen, because `ui/components/` and the recipes don't exist yet; #6
   restyles it and moves its entry out of the home overflow menu (⋮ → Updates, Sign out). It has
