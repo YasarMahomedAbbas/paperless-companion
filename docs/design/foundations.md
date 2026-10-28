@@ -44,7 +44,7 @@ phones without Google Play can't fetch downloadable fonts. Weights 400, 500 and 
 | Version, big number | `titleLarge` | 24 / 30 | 500 | "Version 0.4.0", "Paperless Scan is locked" |
 | Bar title | `titleMedium` (custom 22) | 22 / 28 | 500 | the title in a back-arrow top bar |
 | Sheet / dialog title | `titleSmall` (custom 20) | 20 / 26 | 500 | "Add a document", "Move to trash?" |
-| Viewer bar title | — | 18 / 24 | 500 | the document title over the PDF, one line, ellipsised |
+| Viewer bar title | `viewerTitle` | 18 / 24 | 500 | the document title over the PDF, one line, ellipsised |
 | Card title | `bodyLarge` + 500 | 16–17 / 22 | 500 | row titles, card headings, empty-state statement |
 | Body | `bodyLarge` | 16 / 24 | 400 | field values, option labels |
 | Body small | `bodyMedium` | 14–15 / 21 | 400 | secondary lines, explanations, dialog text |

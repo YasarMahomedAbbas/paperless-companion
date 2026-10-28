@@ -322,6 +322,16 @@ class PaperlessLibraryTest {
     }
 
     @Test
+    fun `file passes the progress through`() = runTest {
+        respondFile("x".repeat(1000), """inline; filename="bill.pdf"""")
+        val heard = mutableListOf<Pair<Long, Long?>>()
+
+        library.file(config, 7, DocumentFileKind.PREVIEW) { done, total -> heard += done to total }
+
+        assertEquals(listOf(0L to 1000L, 1000L to 1000L), heard)
+    }
+
+    @Test
     fun `a second fetch replaces the first copy`() = runTest {
         respondFile("old", """inline; filename="old.pdf"""")
         respondFile("new", """inline; filename="new.pdf"""")

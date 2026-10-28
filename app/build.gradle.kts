@@ -73,6 +73,10 @@ kover {
                     "*.data.KeystoreTokenVault*",
                     "*.data.PrefsStore*",
                     "*.data.UriDocuments*",
+                    "*.data.PhoneExports*",
+                    // PdfRenderer needs a device.
+                    "*.ui.viewer.PdfPages*",
+                    "*.ui.viewer.PdfDocument*",
                     "*.data.update.PackageInstallerUpdates*",
                     "*.data.update.InstallResultReceiver*",
                     "*.data.update.PrefsUpdateStore*",
