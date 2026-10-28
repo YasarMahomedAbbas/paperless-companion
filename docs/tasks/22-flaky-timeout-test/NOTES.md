@@ -16,3 +16,10 @@ Branch: `fix/22-flaky-timeout-test`
 - Tests: `PaperlessApiTest` 21 passed / 0 failed; full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) BUILD SUCCESSFUL, debug unit tests 184 passed / 0 failed / 0 skipped.
 - Outstanding: none.
 - Contradicted the plan: none.
+
+## Review
+
+- Fixed: none. Checked: `networkError` builds exactly the `"no answer from <host>: <detail>"` / `"can't connect to <host>: <detail>"` messages with the exception as cause; the interceptor survives `client.newBuilder()` into the poll client, so the new test really runs `networkError`; an OkHttp read timeout is a `SocketTimeoutException` ("timeout" from Okio or "Read timed out" from the JDK) and is not retried once the request is sent, so the reworked MockWebServer test can't flake on cause or kind. Every "Done when" item is in the diff; no production code changed (Out of scope respected).
+- Raised: none
+- API: none touched (`GET /api/tasks/?task_id=` only exercised by the test, unchanged)
+- Layers: clean
