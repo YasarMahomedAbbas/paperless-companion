@@ -40,3 +40,20 @@ Branch: `feat/13-self-update-github-releases`
 - Skipped: README CI/CD version-code line (`v1.2.3` → 10203) — still true, `versionCodeOf` uses the same formula.
 - Skipped: the release-builds-only rule, the signer check and the "Android always confirms" behaviour — code and README state them; no future session is likely to get them wrong without a doc.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker: 129 tests passed / 0 failed / 0 skipped; line coverage 96.7% (koverVerify passed); lint shows only the earlier GradleDependency, AndroidGradlePluginVersion, DataExtractionRules and ObsoleteSdkInt warnings, none in new code; debug APK built.
+- Server: Paperless not run (the branch changes no Paperless call; nothing in `data/PaperlessApi.kt` touched). The branch's one remote source is GitHub, checked live instead (below).
+- Verified: `GET https://api.github.com/repos/YasarMahomedAbbas/paperless-companion/releases/latest` with the code's headers (`Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`), anonymous → 200, `x-ratelimit-limit: 60`. Parsed by the code's rules: tag `v0.1.5` → version code 105, asset `paperless-scan-0.1.5.apk`, `size` 8570413, `digest` `sha256:57dbb664…05bb` (64 hex), `browser_download_url` present, `body` 840 chars. Streamed the asset: one 302 to `https://release-assets.githubusercontent.com/…` (https→https, allowed with `followSslRedirects(false)`; no host is pinned in code) → 200, 8570413 bytes, sha256 equal to `digest`. The MockWebServer fixtures already have this shape (checked in review), so no fixture change.
+- Failed: none
+- Not self-verifiable (check on the phone, on a release build older than the next tag):
+  - First launch asks for the notification permission once (Android 13+), and not again on rotation or relaunch.
+  - Opening the app with a newer release out posts "Update ready"; tapping it opens *⋮ → Updates* with the offer and release notes.
+  - The daily WorkManager check finds a new tag without opening the app (network constraint).
+  - *Install* with "Install unknown apps" off sends to Android's setting; coming back with it allowed continues the install.
+  - Download progress shows; Android's install confirmation appears, including when the app was left during the download (it waits until the app is back on screen).
+  - The update installs over the existing copy (signer check against the installed app passes) and the offer clears afterwards; on both phones.
+  - The copy currently installed (without this feature) must be updated to this release by hand or Obtainium once.
