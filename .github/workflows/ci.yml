@@ -26,7 +26,7 @@ jobs:
         if: always()
         run: python3 .github/scripts/coverage_summary.py app/build/reports/kover/reportDebug.xml >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports
@@ -34,7 +34,7 @@ jobs:
             app/build/reports/
             app/build/test-results/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
