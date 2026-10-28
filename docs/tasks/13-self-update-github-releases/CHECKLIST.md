@@ -98,18 +98,18 @@ fakes `FakeReleases`, `FakeUpdateStore` added to `Fakes.kt`. Cases as in the tes
 
 Goal: a release's APK is downloaded, refused unless its size and sha256 match, and the signer compare exists and is tested.
 
-### [ ] 2.1 — `HttpApkDownloader`
+### [x] 2.1 — `HttpApkDownloader`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/HttpApkDownloader.kt`
 `class HttpApkDownloader(dir: File /* cacheDir/updates */, client: OkHttpClient = OkHttpClient(), io: CoroutineDispatcher = Dispatchers.IO) : ApkDownloader`.
-Mirror the assistant's `ApkFetcher`: clear `dir` first; stream to `<name>.part` while hashing; more bytes than `size` → `CHECKSUM` at once; size or sha256 mismatch → `CHECKSUM`; rename to `<name>`; any failure or cancel deletes both; call cancelled on coroutine cancel; progress every 256 KiB and at the end. Differences: redirects **followed** (GitHub's 302 to its file host); only `https://` locations accepted except in tests (constructor flag `allowHttp: Boolean = false`); the file name is `apk.name` checked against `^paperless-scan-[0-9.]+\.apk$` (else `CHECKSUM`) so nothing from the network chooses a path; non-200 → `SERVER(status)`; `IOException` on the wire → `OFFLINE`, on disk → `STORAGE`. Read timeout 60 s.
+Mirror the assistant's `ApkFetcher`: clear `dir` first; stream to `<name>.part` while hashing; more bytes than `size` → `CHECKSUM` at once; size or sha256 mismatch → `CHECKSUM`; rename to `<name>`; any failure or cancel deletes both; call cancelled on coroutine cancel; progress every 256 KiB and at the end. Differences: redirects **followed** (GitHub's 302 to its file host), never from https to http (`followSslRedirects(false)`); only `https://` locations accepted (else `SERVER`, nothing requested) except in tests (constructor flag `allowHttp: Boolean = false`); the file name is `apk.name` checked against `^paperless-scan-[0-9.]+\.apk$` (else `CHECKSUM`) so nothing from the network chooses a path; non-200 → `SERVER(status)`; `IOException` on the wire → `OFFLINE`, on disk → `STORAGE`. Read timeout 60 s.
 
-### [ ] 2.2 — Signer compare
+### [x] 2.2 — Signer compare
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/update/ApkSigner.kt`
 `fun sameSigners(ours: List<ByteArray>, theirs: List<ByteArray>): Boolean` (same set of sha256 digests, non-empty), as in the assistant. `fun sameSigner(context: Context, apk: File): Boolean` reads ours and the archive's: API 28+ `GET_SIGNING_CERTIFICATES` → `signingInfo.apkContentsSigners`; below, `GET_SIGNATURES` → `signatures` (deprecated, `@Suppress`). Use `getPackageInfo(name, flags: Int)` (not `PackageInfoFlags`, API 33).
 
-### [ ] 2.3 — Tests
+### [x] 2.3 — Tests
 
 Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/HttpApkDownloaderTest.kt` (MockWebServer, temp dir via `TemporaryFolder`), `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/ApkSignerTest.kt` (pure `sameSigners`: equal, different, either empty, order-insensitive). Downloader cases as in the test plan; a tampered body (same size, one byte flipped) → `CHECKSUM` and no file left.
 
