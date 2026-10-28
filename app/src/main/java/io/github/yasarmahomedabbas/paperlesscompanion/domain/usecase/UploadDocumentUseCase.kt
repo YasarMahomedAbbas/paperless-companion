@@ -61,7 +61,7 @@ class UploadDocumentUseCase(
 }
 
 fun PaperlessException.userMessage(): String = when (kind) {
-    PaperlessException.Kind.UNREACHABLE -> "Can't reach Paperless. Are you on the VPN?"
+    PaperlessException.Kind.UNREACHABLE -> "Can't reach Paperless. Are you on the home network or the VPN?"
     PaperlessException.Kind.UNAUTHORIZED -> "Paperless rejected the login. Sign out and sign in again."
     PaperlessException.Kind.UNREADABLE -> "Couldn't read the file on the phone"
     PaperlessException.Kind.SERVER -> message ?: "Paperless returned an error"

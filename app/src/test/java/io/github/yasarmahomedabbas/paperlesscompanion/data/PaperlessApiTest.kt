@@ -129,6 +129,38 @@ class PaperlessApiTest {
     }
 
     @Test
+    fun `task reads the paginated Paperless 3 answer`() = runTest {
+        respond(
+            body = """{"count":1,"next":null,"previous":null,"results":[{"task_id":"t1","status":"success",""" +
+                """"result_data":{"document_id":98},"related_document_ids":[98]}]}""",
+        )
+
+        assertEquals(TaskInfo(TaskStatus.SUCCESS, "Success. New document id 98 created", 98), api.task(config, "t1"))
+    }
+
+    @Test
+    fun `task reads a Paperless 3 duplicate refusal`() = runTest {
+        respond(body = """{"results":[{"status":"failure","result_data":{"duplicate_of":97},"related_document_ids":[]}]}""")
+
+        assertEquals(
+            TaskInfo(TaskStatus.FAILURE, "Not consuming: It is a duplicate of document #97", null),
+            api.task(config, "t"),
+        )
+    }
+
+    @Test
+    fun `task reads a Paperless 3 error message`() = runTest {
+        respond(body = """{"results":[{"status":"failure","result_data":{"error_message":"Unsupported type"}}]}""")
+        assertEquals(TaskInfo(TaskStatus.FAILURE, "Unsupported type", null), api.task(config, "t"))
+    }
+
+    @Test
+    fun `an unknown task in the paginated answer is still pending`() = runTest {
+        respond(body = """{"count":0,"results":[]}""")
+        assertEquals(TaskInfo(TaskStatus.PENDING, null, null), api.task(config, "t"))
+    }
+
+    @Test
     fun `task maps every Paperless status`() = runTest {
         val expected = mapOf(
             "PENDING" to TaskStatus.PENDING,
@@ -140,6 +172,9 @@ class PaperlessApiTest {
         )
         for ((paperlessStatus, status) in expected) {
             respond(body = """[{"status":"$paperlessStatus","result":null,"related_document":null}]""")
+            assertEquals(TaskInfo(status, null, null), api.task(config, "t"))
+            // Paperless 3 sends the same statuses in lower case.
+            respond(body = """{"results":[{"status":"${paperlessStatus.lowercase()}"}]}""")
             assertEquals(TaskInfo(status, null, null), api.task(config, "t"))
         }
     }

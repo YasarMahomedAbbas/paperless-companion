@@ -66,15 +66,28 @@ class PaperlessApi(
     override suspend fun task(config: ServerConfig, taskId: String): TaskInfo {
         val url = url(config.baseUrl, "api/tasks/").newBuilder().addQueryParameter("task_id", taskId).build()
         val request = authed(config, url).get().build()
-        val task = (call(request) as? JsonArray)?.firstOrNull()?.jsonObject
+        // Paperless 2.x (API v9) answers with a bare list; 3.x (API v10) with a paginated object.
+        val json = call(request)
+        val tasks = json as? JsonArray ?: (json as? JsonObject)?.get("results") as? JsonArray
+        val task = tasks?.firstOrNull()?.jsonObject
             ?: return TaskInfo(TaskStatus.PENDING, null, null)
-        val status = when (task.string("status")) {
+        val status = when (task.string("status")?.uppercase()) {
             "SUCCESS" -> TaskStatus.SUCCESS
             "FAILURE", "REVOKED" -> TaskStatus.FAILURE
             "STARTED", "RETRY" -> TaskStatus.RUNNING
             else -> TaskStatus.PENDING
         }
-        return TaskInfo(status, task.string("result"), task.string("related_document")?.toIntOrNull())
+        val data = task["result_data"] as? JsonObject
+        val message = task.string("result") ?: data?.let { d ->
+            d.string("document_id")?.let { "Success. New document id $it created" }
+                ?: d.string("reason")
+                ?: d.string("duplicate_of")?.let { "Not consuming: It is a duplicate of document #$it" }
+                ?: d.string("error_message")
+        }
+        val documentId = task.string("related_document")?.toIntOrNull()
+            ?: (task["related_document_ids"] as? JsonArray)?.firstOrNull()?.let { (it as? JsonPrimitive)?.contentOrNull?.toIntOrNull() }
+            ?: data?.string("document_id")?.toIntOrNull()
+        return TaskInfo(status, message, documentId)
     }
 
     private fun authed(config: ServerConfig, path: String) = authed(config, url(config.baseUrl, path))
