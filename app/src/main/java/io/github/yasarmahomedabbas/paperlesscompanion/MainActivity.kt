@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.content.IntentCompat
@@ -19,7 +17,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
@@ -35,9 +32,6 @@ class MainActivity : FragmentActivity() {
     private val container get() = (application as PaperlessApp).container
 
     private val gate by lazy { ViewModelProvider(this, container.gateViewModelFactory)[GateViewModel::class.java] }
-
-    /** Files shared, scanned, photographed or picked, waiting for an unlocked home screen (and a sign-in, if needed). */
-    private var pending by mutableStateOf<List<DocumentSource>>(emptyList())
 
     /** The last unlocked home, kept composed under the lock screen when the app locks again. */
     private var lastHome: GateState.Home? = null
@@ -59,6 +53,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             PaperlessTheme {
                 val state by gate.state.collectAsState()
+                val pending by gate.pending.collectAsState()
                 val current = state
                 if (current is GateState.Home) lastHome = current
                 val locked = current as? GateState.Locked
@@ -72,8 +67,8 @@ class MainActivity : FragmentActivity() {
                                 viewModel = viewModel<HomeViewModel>(key = home.config.baseUrl, factory = container.homeViewModelFactory),
                                 documents = container.documents,
                                 pending = if (locked == null) pending else emptyList(),
-                                onPendingConsumed = { pending = emptyList() },
-                                onDocuments = { pending = pending + it },
+                                onPendingConsumed = gate::onPendingConsumed,
+                                onDocuments = gate::addPending,
                                 lockAvailable = home.lockAvailable,
                                 lockEnabled = home.lockEnabled,
                                 onLockChange = ::changeLock,
@@ -120,6 +115,6 @@ class MainActivity : FragmentActivity() {
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
-        if (uris.isNotEmpty()) pending = pending + uris.map { container.documents.from(it, "Shared document") }
+        gate.addPending(uris.map { container.documents.from(it, "Shared document") })
     }
 }

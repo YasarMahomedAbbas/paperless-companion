@@ -3,6 +3,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui
 import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeLock
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateState
@@ -11,6 +12,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel.Comp
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel.Companion.VOIDED_NOTICE
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class GateViewModelTest {
     private val settings = FakeSettings()
@@ -193,5 +195,21 @@ class GateViewModelTest {
         gate.onSignedOut()
 
         assertEquals(GateState.SignIn(), gate.state.value)
+    }
+
+    @Test
+    fun `documents wait in the gate until home takes them`() {
+        settings.stored = StoredSignIn.Locked
+        val gate = gate()
+        val scan = DocumentSource("Scan.pdf", "application/pdf") { ByteArrayInputStream(ByteArray(0)) }
+        val shared = DocumentSource("Shared document", "application/pdf") { ByteArrayInputStream(ByteArray(0)) }
+
+        gate.addPending(listOf(scan))
+        gate.addPending(emptyList())
+        gate.addPending(listOf(shared))
+        assertEquals(listOf(scan, shared), gate.pending.value)
+
+        gate.onPendingConsumed()
+        assertEquals(emptyList<DocumentSource>(), gate.pending.value)
     }
 }

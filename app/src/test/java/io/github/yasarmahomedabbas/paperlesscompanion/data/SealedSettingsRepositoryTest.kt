@@ -79,6 +79,16 @@ class SealedSettingsRepositoryTest {
     }
 
     @Test
+    fun `a seal the key can no longer open clears the sign-in instead of crashing`() {
+        // A locked seal the current locked key can't read: the fake vault throws as a bad GCM tag would.
+        store.values += mapOf("url" to CONFIG.baseUrl, "token" to "plain:${CONFIG.token}", "token_locked" to true)
+
+        assertEquals(StoredSignIn.Voided, repo.unlock())
+        assertTrue(store.values.isEmpty())
+        assertEquals(StoredSignIn.None, restarted().read())
+    }
+
+    @Test
     fun `a locked token on a phone that lost its screen lock is voided`() {
         storedBy(locked = true)
         deviceSecure = false

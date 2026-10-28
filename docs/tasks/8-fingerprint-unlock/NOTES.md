@@ -40,3 +40,12 @@ Branch: `feat/8-fingerprint-unlock`
   - Removing the screen lock leaves `token_locked` set with no way to prompt; `read()` now treats that as Voided (clear, sign in again) instead of showing a lock screen that can't unlock (checklist 1.4 updated).
   - `hasUnsavedSignIn()` moved from 2.2 to 1.4 because the save tests need it. `seal()` never reports a voided key: `KeystoreTokenVault` deletes it and seals with a fresh one.
   - The design manual has no warning colour or ui-tooling for previews yet: the notice uses the error colour and the lock screen has no `@Preview`; both recorded in `docs/design/README.md` § Open decisions.
+
+## Review
+
+- Fixed:
+  - `SealedSettingsRepository.unlock()` only caught `VaultLockedException` / `VaultVoidedException`, so a seal the key could no longer open (e.g. the screen lock removed and set again between launches: the locked key is regenerated, and AES-GCM fails its tag check) escaped as a crash on every unlock, with the lock screen re-prompting at each launch. It now clears the sign-in and reports Voided, as `read()` already did for the plain key. Test: `a seal the key can no longer open clears the sign-in instead of crashing`.
+  - The `pending` buffer lived in a `MainActivity` field, so a scan or share waiting on the lock screen was dropped by a rotation before the unlock (before this branch a scan went straight to the rotation-safe `HomeViewModel`). Moved into `GateViewModel` (`pending`, `addPending`, `onPendingConsumed`). Test: `documents wait in the gate until home takes them`.
+- Raised: https://github.com/YasarMahomedAbbas/paperless-companion/issues/16 (Sign out bounces straight back to Home; pre-existing, noted during implementation).
+- API: none touched (no Paperless call added or changed).
+- Layers: clean. `data/` holds the Keystore and prefs; `domain/` has `StoredSignIn`, `AppLockRepository`, `AppLock` in the app's words; `ui/` only sees domain. Security: the token isn't logged or put in a URL; it's stored only AES-GCM-sealed by a Keystore key in private prefs; no manifest change.

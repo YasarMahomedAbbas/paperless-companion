@@ -1,6 +1,7 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.lock
 
 import androidx.lifecycle.ViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
@@ -35,6 +36,22 @@ class GateViewModel(
         },
     )
     val state: StateFlow<GateState> = _state.asStateFlow()
+
+    private val _pending = MutableStateFlow<List<DocumentSource>>(emptyList())
+
+    /**
+     * Files shared, scanned, photographed or picked, waiting for an unlocked home (and a sign-in, if
+     * needed). Kept here so a rotation on the lock screen doesn't lose them.
+     */
+    val pending: StateFlow<List<DocumentSource>> = _pending.asStateFlow()
+
+    fun addPending(documents: List<DocumentSource>) {
+        if (documents.isNotEmpty()) _pending.update { it + documents }
+    }
+
+    fun onPendingConsumed() {
+        _pending.value = emptyList()
+    }
 
     /** The phone's prompt succeeded. */
     fun onUnlocked() {

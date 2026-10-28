@@ -70,6 +70,10 @@ class SealedSettingsRepository(
         } catch (e: VaultVoidedException) {
             clear()
             return StoredSignIn.Voided
+        } catch (e: Exception) {
+            // The seal no longer opens, e.g. the key was replaced after the screen lock was removed and set again.
+            clear()
+            return StoredSignIn.Voided
         }
         val wanted = active()
         if (wasLocked != wanted) {
