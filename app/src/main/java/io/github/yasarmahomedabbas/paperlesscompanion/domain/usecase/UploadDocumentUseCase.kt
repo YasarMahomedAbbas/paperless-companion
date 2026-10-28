@@ -35,7 +35,7 @@ class UploadDocumentUseCase(
             emit(UploadState.Uploading)
             server.upload(config, document)
         } catch (e: ServerException) {
-            emit(UploadState.Failed(e.userMessage()))
+            emit(UploadState.Failed(e.userMessage(), unreachable = e.isNetwork))
             return@flow
         }
         emit(UploadState.Processing(taskId))
@@ -46,7 +46,7 @@ class UploadDocumentUseCase(
                 server.task(config, taskId).also { lastError = null }
             } catch (e: ServerException) {
                 // The file is already on the server, so a dropped or slow check is tried again, not reported.
-                if (e.kind != Kind.UNREACHABLE && e.kind != Kind.NO_ANSWER) {
+                if (!e.isNetwork) {
                     emit(UploadState.Failed(notConfirmed(e), taskId))
                     return@flow
                 }
@@ -67,13 +67,15 @@ class UploadDocumentUseCase(
             if (waited >= timeout) {
                 val message = lastError?.let(::notConfirmed)
                     ?: "Uploaded, but Paperless is still processing it. Tap Retry to check again."
-                emit(UploadState.Failed(message, taskId))
+                emit(UploadState.Failed(message, taskId, unreachable = lastError != null))
                 return@flow
             }
             delay(pollInterval)
             waited += pollInterval
         }
     }
+
+    private val ServerException.isNetwork get() = kind == Kind.UNREACHABLE || kind == Kind.NO_ANSWER
 
     private fun notConfirmed(e: ServerException) =
         "Uploaded, but checking whether Paperless accepted it failed: ${e.userMessage()} Tap Retry to check again."

@@ -28,8 +28,11 @@ sealed interface UploadState {
     data object Uploading : UploadState
     data class Processing(val taskId: String) : UploadState
     data class Done(val documentId: Int?) : UploadState
-    /** [taskId] is set when the file already reached the server, so a retry only checks on it again. */
-    data class Failed(val message: String, val taskId: String? = null) : UploadState
+    /**
+     * [taskId] is set when the file already reached the server, so a retry only checks on it again.
+     * [unreachable] says the phone couldn't reach the server, as opposed to the server refusing.
+     */
+    data class Failed(val message: String, val taskId: String? = null, val unreachable: Boolean = false) : UploadState
 }
 
 val UploadState.isFinished: Boolean

@@ -7,6 +7,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerExcepti
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginField
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -55,6 +56,8 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         assertEquals("Wrong username or password", viewModel.state.value.error)
+        assertEquals(LoginField.PASSWORD, viewModel.state.value.errorField)
+        assertFalse(viewModel.state.value.unreachable)
         assertNull(viewModel.state.value.signedIn)
     }
 
@@ -67,6 +70,33 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.state.value.error!!.contains("VPN"))
+        assertEquals(LoginField.SERVER, viewModel.state.value.errorField)
+        assertTrue(viewModel.state.value.unreachable)
+    }
+
+    @Test
+    fun `a server error marks no field and is not a network problem`() = runTest(main.dispatcher) {
+        server.loginResult = { throw ServerException(Kind.SERVER, "Paperless returned 500") }
+        fillIn()
+
+        viewModel.submit()
+        advanceUntilIdle()
+
+        assertNull(viewModel.state.value.errorField)
+        assertFalse(viewModel.state.value.unreachable)
+    }
+
+    @Test
+    fun `missing input marks the first field that needs it`() = runTest(main.dispatcher) {
+        viewModel.onServerUrl("paperless:8000")
+        viewModel.submit()
+        advanceUntilIdle()
+        assertEquals(LoginField.USERNAME, viewModel.state.value.errorField)
+
+        viewModel.onUsername("anna")
+        viewModel.submit()
+        advanceUntilIdle()
+        assertEquals(LoginField.PASSWORD, viewModel.state.value.errorField)
     }
 
     @Test
@@ -75,6 +105,7 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.state.value.error!!.contains("server address"))
+        assertEquals(LoginField.SERVER, viewModel.state.value.errorField)
         assertTrue(server.logins.isEmpty())
     }
 
@@ -86,6 +117,7 @@ class LoginViewModelTest {
         viewModel.onUsername("a")
 
         assertNull(viewModel.state.value.error)
+        assertNull(viewModel.state.value.errorField)
     }
 
     @Test
