@@ -79,6 +79,10 @@ kover {
                     "*.data.update.UpdateWorker*",
                     "*.data.update.UpdateSchedule*",
                     "*.data.update.UpdateNotifier*",
+                    // The Coil glue needs a device; the URL, cache key and token interceptor in Thumbnails.kt stay measured.
+                    "*.data.ThumbnailImages*",
+                    "*.data.ThumbnailFetcher*",
+                    "*.data.ThumbnailKeyer*",
                 )
             }
         }
@@ -107,6 +111,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.work.runtime)
     implementation(libs.mlkit.document.scanner)
+    // Document thumbnails: Coil fetches them over the app's OkHttp, with the token, and caches them.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

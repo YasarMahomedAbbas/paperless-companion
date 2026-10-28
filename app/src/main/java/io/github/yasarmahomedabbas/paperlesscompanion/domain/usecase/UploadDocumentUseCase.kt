@@ -86,5 +86,6 @@ fun ServerException.userMessage(): String = when (kind) {
     Kind.NO_ANSWER -> "Paperless didn't answer ($message)."
     Kind.UNAUTHORIZED -> "Paperless rejected the login. Sign out and sign in again."
     Kind.UNREADABLE -> "Couldn't read the file on the phone"
+    Kind.NOT_FOUND -> message ?: "Paperless couldn't find it"
     Kind.SERVER -> message ?: "Paperless returned an error"
 }

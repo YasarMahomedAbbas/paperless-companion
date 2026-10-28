@@ -6,15 +6,25 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.VaultLockedException
 import io.github.yasarmahomedabbas.paperlesscompanion.data.VaultVoidedException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentChanges
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppLockRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.AppInstaller
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
@@ -146,6 +156,43 @@ class FakeServer(
     }
 
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
+}
+
+fun doc(id: Int = 1, title: String = "Bill $id") =
+    Document(id, title, null, null, null, null, null, null, emptyList(), null, null, null, null)
+
+/** A scripted library: answers what its fields hold, records each call as "<name> <args>", or throws [failure]. */
+class FakeLibrary : DocumentLibrary {
+    var page = DocumentPage(1, listOf(doc()), hasMore = false)
+    var document = doc()
+    var tags = listOf(Tag(1, "Inbox", "#ff0000", "#ffffff", true, 3))
+    var correspondents = listOf(Label(2, "Power company", 4))
+    var documentTypes = listOf(Label(3, "Invoice", 5))
+    var storagePaths = listOf(Label(4, "Bills", 6))
+    var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
+    var failure: Exception? = null
+    val calls = mutableListOf<String>()
+    val configs = mutableListOf<ServerConfig>()
+
+    private fun <T> answer(config: ServerConfig, call: String, value: T): T {
+        calls += call
+        configs += config
+        failure?.let { throw it }
+        return value
+    }
+
+    override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
+    override suspend fun document(config: ServerConfig, id: Int) = answer(config, "document $id", document)
+    override suspend fun tags(config: ServerConfig) = answer(config, "tags", tags)
+    override suspend fun correspondents(config: ServerConfig) = answer(config, "correspondents", correspondents)
+    override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
+    override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
+    override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
+    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
+    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
+    override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
+    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)
+    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit)
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =
