@@ -68,3 +68,20 @@ Branch: `feat/11-organise-documents`
 - Skipped: trash events collected in `MainActivity`, list patched in place, page-offset tracking in `DocumentsViewModel` — code and tests say it; one `rg` finds it.
 - Skipped: docs/design/layouts.md — already describes Edit details, the More menu's Move to trash and Selecting as built.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green in Docker. 449 tests passed, 0 failed, 0 skipped. Kover line coverage 93.0% (branch 83.4%, bound 80%). Lint clean, debug APK built.
+- Server: not run. `~/.config/paperless-companion/verify.env` is absent, so no live `/api/schema/` was read and no write was tried.
+- Verified: the branch's only `data/` change is `PaperlessApi.labelsUrl`, a web-UI link and not an API call. `PaperlessApiTest` covers its four paths; the routes were checked against `src-ui` routing (v2.20.15 and main) in planning. No new Paperless call: the writes are #7's, unchanged here and covered by their MockWebServer tests.
+- Failed: none
+- Not self-verifiable:
+  - Real server (needs `verify.env` with `PAPERLESS_ALLOW_WRITES=1`): PATCH each field and restore it, bulk `modify_tags` / `set_correspondent` / `set_document_type`, trash, restore from the trash, bulk trash via `/api/documents/delete/`. Confirm that each change shows in the web UI straight after. No real Paperless has answered these writes yet (open since #7).
+  - Long-press on a list row starts selecting, and the feel is right.
+  - The Edit details date picker opens and saves the chosen date.
+  - The keyboard keeps Cancel / Save and the fields visible while typing.
+  - The Undo snackbar stays 8 seconds after a trash, and Undo brings the document back to its place in the list.
+  - TalkBack reads selected rows and the bulk Tags sheet's mixed checkboxes correctly.
+  - A picker search with no match opens the browser at the right Paperless page (tags, correspondents, document types, storage paths; `/attributes/...` on 3.x).
