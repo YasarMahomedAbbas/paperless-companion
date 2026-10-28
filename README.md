@@ -8,6 +8,7 @@ An Android app for scanning paper documents straight into a self-hosted [Paperle
 - **Share to Paperless Scan**: send PDFs and images from any other app.
 - Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and opens the new document in the app.
 - **Open a document**: its pages (pinch to zoom), title, tags and details in a panel you drag up or down, with Share, Download (straight to Downloads on Android 10+, a Save-as picker on 8–9), Get original and Open in Paperless.
+- **Organise documents**: **Edit** in the document view changes its title, date, correspondent, document type, storage path and tags. **Move to trash** (in its More menu) sends it to the Paperless trash, with Undo on the list for 8 seconds. Long-press a document on the list to select several, then change their tags, correspondent (From) or type, or move them all to the trash. Tags and correspondents are created in Paperless itself: a picker with no match offers **Open Paperless**.
 - **Unlock with fingerprint**: when the phone has a screen lock, the app opens only after a fingerprint or the phone's PIN/pattern, and locks again after a minute in the background. The switch is in **Settings** (the gear on the Documents screen).
 
 The app talks only to your own server. It's built for a server reached over the home network or a VPN such as Tailscale, so plain `http://` addresses are allowed.
@@ -52,7 +53,7 @@ Thumbnails go through the app-wide Coil loader that `PaperlessApp` provides: a s
 | `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
 | `AppLock` | Locks the app again (and forgets the unlocked token) after a minute or more in the background, while the lock is on |
 | `CheckForUpdateUseCase` | Asks GitHub for the latest release (`GET /repos/…/releases/latest`), keeps it as the offer when its version code is higher than the installed one, and announces each version once |
-| `DocumentLinkUseCase` | Gives the web address of an uploaded document on the signed-in server, for the viewer's Open in Paperless |
+| `DocumentLinkUseCase`, `LabelsLinkUseCase` | Give the web address of an uploaded document on the signed-in server, for the viewer's Open in Paperless, and of a label list (tags, correspondents, …) for a picker's Open Paperless |
 | `BrowseDocumentsUseCase`, `GetDocumentUseCase`, `OpenDocumentFileUseCase` | One page of documents (`GET /api/documents/`: sort, filter by tags, correspondent and type, or full-text search), one document with its text, and its preview, archived or original file streamed into the app's cache, reporting progress |
 | `ExportDocumentUseCase` | Hands a fetched file to another app (Share) or saves a copy to Downloads or a picked location |
 | `LoadLabelsUseCase` | Every tag, correspondent, document type and storage path, loaded side by side |

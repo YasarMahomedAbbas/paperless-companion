@@ -149,7 +149,7 @@ Settled while building the viewer (#10):
 
 - **New type slots.** The viewer bar's 18/500 title is `viewerTitle` (18 / 24) and a status
   card's 17/500 statement is `statement` (17 / 24), both in `ui/theme/Type.kt`.
-- **Quick actions show Download alone** until #11 adds Edit; the More menu holds Download and
+- **Quick actions showed Download alone** until #11 added Edit beside it (below); the More menu holds Download and
   Open in Paperless. The menu is the stock M3 `DropdownMenu` on `surface`, `r-card`, 244 wide,
   with `MenuItem` rows (48 high, 20dp `mfg` icon, 15 `fg` text).
 - **The photo-original notice** sits in the quick actions under the hint, and the quick actions

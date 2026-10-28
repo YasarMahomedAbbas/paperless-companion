@@ -58,3 +58,13 @@ Branch: `feat/11-organise-documents`
 - Raised: https://github.com/YasarMahomedAbbas/paperless-companion/issues/32 (an edit or bulk change that moves documents out of the active filter or sort order still shifts the pages, so a later load more can skip rows; no longer a crash).
 - API: no new Paperless call. `labelsUrl` builds web-UI routes `/tags`, `/correspondents`, `/documenttypes`, `/storagepaths` (checked against `src-ui` routing in planning). The writes (PATCH / DELETE `/api/documents/{id}/`, `POST /api/trash/` restore, `bulk_edit` `modify_tags` / `set_correspondent` / `set_document_type`, `/api/documents/delete/`) are #7's, unchanged here. `verify.env` is absent, so the live `/api/schema/` was not read; left to self-verification.
 - Layers: clean. `LabelKind` and `DocumentServer.labelsUrl` are domain terms; the paths live only in `data/PaperlessApi.kt`; `ui/` imports no `data/` class. Token untouched; no new storage or manifest change.
+
+## Doc drift
+
+- Applied: README.md:features — new "Organise documents" bullet (Edit details, Move to trash with 8-second Undo, select several to change tags / From / type or trash, no-match Open Paperless); rung 3, the feature list said nothing about writing to documents.
+- Applied: README.md:Architecture use-case table — `DocumentLinkUseCase` row now names `LabelsLinkUseCase` too (new in `domain/usecase/DocumentLinkUseCase.kt`); rung 3.
+- Applied: docs/design/README.md:"Settled while building the viewer (#10)" — "Quick actions show Download alone until #11 adds Edit" made past tense, pointing at #11's entry below; the branch made it false.
+- Skipped: CLAUDE.md — no new cross-cutting rule; the web-UI label paths stay in `data/` as the layer rule already says, and `ArchitectureTest` enforces it.
+- Skipped: trash events collected in `MainActivity`, list patched in place, page-offset tracking in `DocumentsViewModel` — code and tests say it; one `rg` finds it.
+- Skipped: docs/design/layouts.md — already describes Edit details, the More menu's Move to trash and Selecting as built.
+- Stale, fixed separately: none
