@@ -5,7 +5,8 @@ An Android app for scanning paper documents straight into a self-hosted [Paperle
 - **Scan document**: Google's ML Kit document scanner (edge detection, cropping, multiple pages) makes a PDF and uploads it.
 - **Take photo** and **Choose file**: for phones without Google Play services, or for PDFs you already have.
 - **Share to Paperless Scan**: send PDFs and images from any other app.
-- Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and links to the new document.
+- Follows each upload until Paperless has accepted it, shows its reason when it refuses one, and opens the new document in the app.
+- **Open a document**: its pages (pinch to zoom), title, tags and details in a panel you drag up or down, with Share, Download (straight to Downloads on Android 10+, a Save-as picker on 8–9), Get original and Open in Paperless.
 - **Lock with fingerprint**: when the phone has a screen lock, the app opens only after a fingerprint or the phone's PIN/pattern, and locks again after a minute in the background. The switch is in the home screen's menu.
 
 The app talks only to your own server. It's built for a server reached over the home network or a VPN such as Tailscale, so plain `http://` addresses are allowed.
@@ -36,6 +37,7 @@ domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
 data/     PaperlessApi (uploads, login) and PaperlessLibrary (documents, labels, trash, bulk edit), both on
           PaperlessHttp (OkHttp + paperless-ngx REST); Thumbnails + ThumbnailImages (Coil),
           SealedSettingsRepository + KeystoreTokenVault, UriDocuments,
+          PhoneExports (share through the FileProvider, save to Downloads via MediaStore),
           update/ (GitHub Releases, APK download, PackageInstaller, WorkManager, the notification)
 ```
 
@@ -49,8 +51,9 @@ Thumbnails go through the app-wide Coil loader that `PaperlessApp` provides: a s
 | `UploadDocumentUseCase` | `POST /api/documents/post_document/` (with a `Content-Length`: Paperless reads a chunked upload as empty), then polls `GET /api/tasks/?task_id=` until Paperless accepts or refuses the document |
 | `AppLock` | Locks the app again (and forgets the unlocked token) after a minute or more in the background, while the lock is on |
 | `CheckForUpdateUseCase` | Asks GitHub for the latest release (`GET /repos/…/releases/latest`), keeps it as the offer when its version code is higher than the installed one, and announces each version once |
-| `DocumentLinkUseCase` | Gives the web address of an uploaded document on the signed-in server, for the link shown after an upload |
-| `BrowseDocumentsUseCase`, `GetDocumentUseCase`, `OpenDocumentFileUseCase` | One page of documents (`GET /api/documents/`: sort, filter by tags, correspondent and type, or full-text search), one document with its text, and its preview, archived or original file streamed into the app's cache |
+| `DocumentLinkUseCase` | Gives the web address of an uploaded document on the signed-in server, for the viewer's Open in Paperless |
+| `BrowseDocumentsUseCase`, `GetDocumentUseCase`, `OpenDocumentFileUseCase` | One page of documents (`GET /api/documents/`: sort, filter by tags, correspondent and type, or full-text search), one document with its text, and its preview, archived or original file streamed into the app's cache, reporting progress |
+| `ExportDocumentUseCase` | Hands a fetched file to another app (Share) or saves a copy to Downloads or a picked location |
 | `LoadLabelsUseCase` | Every tag, correspondent, document type and storage path, loaded side by side |
 | `UpdateDocumentUseCase`, `DeleteDocumentUseCase`, `TrashUseCase`, `BulkEditUseCase` | Edit one document (`PATCH`), move it to the trash, list and restore the trash, and change or delete many at once (`bulk_edit`; delete posts v10's `/api/documents/delete/` and falls back to `bulk_edit` on Paperless 2) |
 
@@ -67,7 +70,7 @@ There's no toolchain to install: the JDK, Android SDK and Gradle live in a Docke
 ./build.sh install                             # build and adb-install on a USB-connected phone
 ```
 
-Tests cover the domain and data layers and the ViewModels, with the HTTP client tested against MockWebServer. CI fails when line coverage drops below 80%. Compose screens, the Keystore code and the Android glue (content URIs, preferences, the package installer, WorkManager, notifications, Coil) need a device and aren't counted (the excludes are in `app/build.gradle.kts`).
+Tests cover the domain and data layers and the ViewModels, with the HTTP client tested against MockWebServer. CI fails when line coverage drops below 80%. Compose screens, the Keystore code and the Android glue (PDF rendering, content URIs, MediaStore, preferences, the package installer, WorkManager, notifications, Coil) need a device and aren't counted (the excludes are in `app/build.gradle.kts`).
 
 ## CI/CD
 

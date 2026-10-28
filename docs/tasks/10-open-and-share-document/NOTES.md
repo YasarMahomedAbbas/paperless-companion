@@ -53,3 +53,14 @@ Branch: `feat/10-open-and-share-document`
 - Raised: none
 - API: no endpoint added or changed. `GET /api/documents/{id}/preview/` and `/download/?original=true` now report progress from `Content-Length` (null when absent, falling back to a spinner); unchanged from #7's check against the docs and server source at v3.3.4 / v2.20.15. No live schema read (`verify.env` absent); self-verification must confirm `Content-Length` behind the proxy.
 - Layers: clean (`PhoneExports` named only in `AppContainer`; `DocumentExports` and the progress callback carry no Android or Paperless shapes).
+
+## Doc drift
+
+- Applied: README.md:features — the upload line now opens the document in the app (was "links to"), and a new "Open a document" bullet for the viewer, share and download (rung 3).
+- Applied: README.md:Architecture — `PhoneExports` added to the `data/` block; `DocumentLinkUseCase` now serves the viewer's Open in Paperless (was "the link shown after an upload"); `OpenDocumentFileUseCase` reports progress; new `ExportDocumentUseCase` row (rung 3).
+- Applied: README.md:Development — PDF rendering and MediaStore added to the device-only, coverage-excluded list, matching the new kover excludes (rung 3).
+- Applied: docs/design/foundations.md:Type — the viewer bar title's slot is `viewerTitle` (was "—") (rung 4).
+- Skipped: the `statement` type slot, the viewer's fixed failure copy and the panel/menu choices — already recorded in docs/design/README.md § Decisions by this branch.
+- Skipped: the `documents/` FileProvider cache path — the KDoc on `PhoneExports` states it, and sharing fails visibly without it.
+- Skipped: CLAUDE.md — no new cross-cutting rule; `DocumentExports` follows the existing layer rule that `ArchitectureTest` enforces.
+- Stale, fixed separately: none
