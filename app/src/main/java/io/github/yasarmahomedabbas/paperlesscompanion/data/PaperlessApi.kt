@@ -21,16 +21,12 @@ import kotlinx.serialization.json.jsonObject
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
-import okio.BufferedSink
-import okio.source
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 /** PaperlessRepository over the paperless-ngx REST API (token auth). */
@@ -48,21 +44,22 @@ class PaperlessApi(
     }
 
     override suspend fun upload(config: ServerConfig, document: DocumentSource): String {
-        // Open the file first, so a missing file isn't reported as an unreachable server.
-        val stream = withContext(io) {
+        // Read the file first, so a missing file isn't reported as an unreachable server. It is read whole
+        // because the body needs a Content-Length: Paperless (Django under ASGI) sees a chunked upload as empty.
+        val bytes = withContext(io) {
             try {
-                document.open()
+                document.open().use { it.readBytes() }
             } catch (e: Exception) {
                 throw PaperlessException(Kind.UNREADABLE, "Can't read ${document.name}", e)
             }
         }
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
-            .addFormDataPart("document", document.name, StreamBody(stream, document.mimeType))
+            .addFormDataPart("document", document.name, bytes.toRequestBody(document.mimeType.toMediaTypeOrNull()))
             .build()
         val request = authed(config, "api/documents/post_document/").post(body).build()
         // The response is the task id as a bare JSON string.
-        return stream.use { (call(request) as? JsonPrimitive)?.contentOrNull }
+        return (call(request) as? JsonPrimitive)?.contentOrNull
             ?: throw PaperlessException(Kind.SERVER, "Paperless sent no task id")
     }
 
@@ -99,14 +96,6 @@ class PaperlessApi(
                     throw PaperlessException(Kind.UNAUTHORIZED, "Wrong username or password")
                 else -> throw PaperlessException(Kind.SERVER, "Paperless returned HTTP ${it.code}: ${text.take(200)}")
             }
-        }
-    }
-
-    private class StreamBody(private val stream: InputStream, private val mimeType: String) : RequestBody() {
-        override fun contentType(): MediaType? = mimeType.toMediaTypeOrNull()
-        override fun isOneShot() = true
-        override fun writeTo(sink: BufferedSink) {
-            sink.writeAll(stream.source())
         }
     }
 

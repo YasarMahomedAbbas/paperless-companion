@@ -78,6 +78,9 @@ class PaperlessApiTest {
         val request = server.takeRequest()
         assertEquals("/api/documents/post_document/", request.path)
         assertEquals("Token tok", request.getHeader("Authorization"))
+        // Paperless reads a chunked upload as empty ("No file was submitted"), so the length must be sent.
+        assertEquals(null, request.getHeader("Transfer-Encoding"))
+        assertEquals(request.bodySize.toString(), request.getHeader("Content-Length"))
         val body = request.body.readUtf8()
         assertTrue(body.contains("""name="document"; filename="bill.pdf""""))
         assertTrue(body.contains("Content-Type: application/pdf"))
