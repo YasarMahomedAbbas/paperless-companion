@@ -528,6 +528,20 @@ class PaperlessLibraryTest {
     }
 
     @Test
+    fun `bulk delete on Paperless 2 falls back when the router answers 405`() = runTest {
+        // Paperless 2 reads documents/delete/ as the document with id "delete", which takes no POST.
+        respond(405, """{"detail":"Method \"POST\" not allowed."}""")
+        respond(body = """{"result":"OK"}""")
+
+        library.bulkEdit(config, listOf(7, 8), BulkEdit.Delete)
+
+        assertEquals("/api/documents/delete/", server.takeRequest().path)
+        val fallback = server.takeRequest()
+        assertEquals("/api/documents/bulk_edit/", fallback.path)
+        assertEquals("""{"documents":[7,8],"method":"delete","parameters":{}}""", fallback.body.readUtf8())
+    }
+
+    @Test
     fun `a failing delete endpoint is reported, with no fallback`() = runTest {
         respond(500, "kaputt")
 

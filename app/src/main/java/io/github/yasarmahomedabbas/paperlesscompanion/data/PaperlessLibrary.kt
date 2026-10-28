@@ -152,15 +152,14 @@ class PaperlessLibrary(
 
     /**
      * Paperless 3 (API v10) deletes through its own endpoint and keeps `bulk_edit`'s `delete` only as a legacy
-     * method; Paperless 2 has no such endpoint and answers 404, so it gets the `bulk_edit` call.
+     * method. Paperless 2 has no such endpoint, so it gets the `bulk_edit` call. Its router reads
+     * `documents/delete/` as the document with id "delete", which takes no POST: it answers 405, not 404
+     * (404 is kept for a proxy that filters unknown paths).
      */
     private suspend fun bulkDelete(config: ServerConfig, ids: List<Int>) {
-        try {
-            http.json(config, "POST", "api/documents/delete/", body = buildJsonObject { ids(ids) })
-        } catch (e: ServerException) {
-            if (e.kind != Kind.NOT_FOUND) throw e
-            bulkEditCall(config, ids, "delete", JsonObject(emptyMap()))
-        }
+        val body = buildJsonObject { ids(ids) }
+        http.jsonUnless(config, "POST", "api/documents/delete/", NO_SUCH_ENDPOINT, body = body)
+            ?: bulkEditCall(config, ids, "delete", JsonObject(emptyMap()))
     }
 
     private suspend fun bulkEditCall(config: ServerConfig, ids: List<Int>, method: String, parameters: JsonObject) {
@@ -184,6 +183,9 @@ class PaperlessLibrary(
 
         /** Where a file lands before its name is known. A server-given name never starts with a dot. */
         const val DOWNLOAD = ".download"
+
+        /** What Paperless 2 answers for an endpoint only Paperless 3 has (see [bulkDelete]). */
+        val NO_SUCH_ENDPOINT = setOf(404, 405)
 
         val LIST_FIELDS = listOf(
             "id", "title", "created", "added", "modified", "correspondent", "document_type", "storage_path",

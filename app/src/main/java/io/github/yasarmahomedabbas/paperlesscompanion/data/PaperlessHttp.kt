@@ -44,12 +44,21 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
         request: Request,
         client: OkHttpClient = this.client,
         badRequestIsAuth: Boolean = false,
-    ): JsonElement = withContext(io) {
+    ): JsonElement = callUnless(request, emptySet(), client, badRequestIsAuth)!!
+
+    /** Like [call], but answers null instead of throwing when the server answers one of the [absent] codes. */
+    private suspend fun callUnless(
+        request: Request,
+        absent: Set<Int>,
+        client: OkHttpClient = this.client,
+        badRequestIsAuth: Boolean = false,
+    ): JsonElement? = withContext(io) {
         val (code, text) = try {
             client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
         } catch (e: IOException) {
             throw networkError(request.url.host, e)
         }
+        if (code in absent) return@withContext null
         if (code !in 200..299) throw httpError(code, text, badRequestIsAuth)
         runCatching { Json.parseToJsonElement(text) }.getOrElse { JsonPrimitive(text) }
     }
@@ -61,12 +70,25 @@ internal class PaperlessHttp(val client: OkHttpClient, val io: CoroutineDispatch
         path: String,
         query: Map<String, String> = emptyMap(),
         body: JsonElement? = null,
-    ): JsonElement {
+    ): JsonElement = jsonUnless(config, method, path, emptySet(), query, body)!!
+
+    /**
+     * Like [json], but answers null when the server answers one of the [absent] codes: how a caller tells
+     * "this server has no such endpoint" apart from a real failure.
+     */
+    suspend fun jsonUnless(
+        config: ServerConfig,
+        method: String,
+        path: String,
+        absent: Set<Int>,
+        query: Map<String, String> = emptyMap(),
+        body: JsonElement? = null,
+    ): JsonElement? {
         val url = url(config.baseUrl, path).newBuilder()
             .apply { query.forEach { (key, value) -> addQueryParameter(key, value) } }
             .build()
         val requestBody = body?.toString()?.toRequestBody(JSON)
-        return call(authed(config, url).method(method, requestBody).build())
+        return callUnless(authed(config, url).method(method, requestBody).build(), absent)
     }
 
     /**
