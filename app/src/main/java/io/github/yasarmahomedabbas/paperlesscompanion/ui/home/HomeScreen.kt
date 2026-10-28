@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,13 +22,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,8 +70,14 @@ import java.util.Locale
 fun HomeScreen(
     viewModel: HomeViewModel,
     documents: UriDocuments,
-    shared: List<DocumentSource>,
-    onSharedConsumed: () -> Unit,
+    /** Documents shared, scanned, photographed or picked, waiting to be uploaded now that Home is unlocked. */
+    pending: List<DocumentSource>,
+    onPendingConsumed: () -> Unit,
+    /** Every document the screen brings in goes here first, so one that arrives while locked waits. */
+    onDocuments: (List<DocumentSource>) -> Unit,
+    lockAvailable: Boolean,
+    lockEnabled: Boolean,
+    onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -72,26 +86,26 @@ fun HomeScreen(
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(shared) {
-        if (shared.isNotEmpty()) {
-            viewModel.upload(shared)
-            onSharedConsumed()
+    LaunchedEffect(pending) {
+        if (pending.isNotEmpty()) {
+            viewModel.upload(pending)
+            onPendingConsumed()
         }
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pdf?.uri?.let { uri ->
-            viewModel.upload(listOf(documents.from(uri, "Scan ${timestamp()}.pdf")))
+            onDocuments(listOf(documents.from(uri, "Scan ${timestamp()}.pdf")))
         }
     }
     var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = photoUri
-        if (saved && uri != null) viewModel.upload(listOf(documents.from(uri, "Photo ${timestamp()}.jpg")))
+        if (saved && uri != null) onDocuments(listOf(documents.from(uri, "Photo ${timestamp()}.jpg")))
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        viewModel.upload(uris.map { documents.from(it, "Document ${timestamp()}") })
+        if (uris.isNotEmpty()) onDocuments(uris.map { documents.from(it, "Document ${timestamp()}") })
     }
 
     fun scan() {
@@ -137,6 +151,7 @@ fun HomeScreen(
                         viewModel.signOut()
                         onSignedOut()
                     }) { Text("Sign out") }
+                    if (lockAvailable) LockMenu(lockEnabled, onLockChange)
                 },
             )
         },
@@ -196,6 +211,26 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LockMenu(lockEnabled: Boolean, onLockChange: (Boolean) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Lock with fingerprint") },
+                trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
+                onClick = {
+                    open = false
+                    onLockChange(!lockEnabled)
+                },
+            )
         }
     }
 }

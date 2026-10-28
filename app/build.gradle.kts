@@ -89,6 +89,10 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.biometric)
+    implementation(libs.fragment.ktx)
+    // For its theme: the biometric prompt's fingerprint dialog before API 28 is an AppCompat dialog.
+    implementation(libs.appcompat)
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
     implementation(libs.okhttp)

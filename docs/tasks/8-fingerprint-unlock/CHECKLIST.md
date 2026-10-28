@@ -167,36 +167,36 @@ Goal: the app asks for the fingerprint at launch, after a minute away and before
 
 Follow the `design-recipe` skill for the lock screen and the menu.
 
-### [ ] 3.1 — Dependencies
+### [x] 3.1 — Dependencies
 
-Files: `gradle/libs.versions.toml`, `app/build.gradle.kts`. Add `biometric = "1.1.0"` (`androidx.biometric:biometric`), `fragment = "1.8.9"` (`androidx.fragment:fragment-ktx`) and `implementation` them. If `Icons.Default.MoreVert` isn't on the classpath through material3, add `androidx.compose.material:material-icons-core` (BOM-managed).
+Files: `gradle/libs.versions.toml`, `app/build.gradle.kts`. Add `biometric = "1.1.0"` (`androidx.biometric:biometric`), `fragment = "1.8.9"` (`androidx.fragment:fragment-ktx`) and `implementation` them. `Icons.Default.MoreVert` comes with material3 (material-icons-core 1.7.6), so no extra icons dependency. biometric 1.1.0 pulls in AppCompat and its pre-API-28 fingerprint dialog is an AppCompat dialog, so `appcompat = "1.6.1"` (the version already resolved) is declared too and the app theme's parent becomes `Theme.AppCompat.Light.NoActionBar`.
 
-### [ ] 3.2 — The prompt
+### [x] 3.2 — The prompt
 
 File (new): `app/src/main/java/.../ui/lock/UnlockPrompt.kt`
 `fun FragmentActivity.askToUnlock(title: String, onSuccess: () -> Unit, onFailure: (String?) -> Unit)`. Authenticators: API 30+ `BIOMETRIC_STRONG or DEVICE_CREDENTIAL`; API 26–29 `BIOMETRIC_WEAK or DEVICE_CREDENTIAL` (the only combo with a credential fallback androidx supports there). No negative button (device credential provides it). `ERROR_USER_CANCELED` / `ERROR_CANCELED` / `ERROR_NEGATIVE_BUTTON` → `onFailure(null)`; other errors → `onFailure(errString)`. `onAuthenticationFailed` (one bad finger) is ignored: the prompt keeps going.
 
-### [ ] 3.3 — The lock screen
+### [x] 3.3 — The lock screen
 
 File (new): `app/src/main/java/.../ui/lock/LockScreen.kt`
-`@Composable fun LockScreen(protect: Boolean, message: String?, onUnlock: () -> Unit)`. Opaque full-screen on the page ground, consumes all touches. App name; one line: "Unlock to see your documents" (or "Confirm it's you to keep this sign-in" when `protect`); `message` beneath in secondary text; one filled primary "Unlock" button (≥ 48dp). Asks once automatically on first composition (`LaunchedEffect(Unit) { onUnlock() }`).
+`@Composable fun LockScreen(protect: Boolean, message: String?, onUnlock: () -> Unit)`. Opaque full-screen on the page ground, consumes all touches. App name; one line: "Unlock to see your documents" (or "Confirm it's you to keep this sign-in" when `protect`); `message` beneath in secondary text; one filled primary "Unlock" button (≥ 48dp). No `@Preview` (the app has no ui-tooling dependency; recorded in the design manual's Open decisions). Asks once automatically on first composition (`LaunchedEffect(Unit) { onUnlock() }`).
 
-### [ ] 3.4 — MainActivity: the gate
+### [x] 3.4 — MainActivity: the gate
 
 File: `app/src/main/java/.../MainActivity.kt`
 - `ComponentActivity` → `androidx.fragment.app.FragmentActivity`.
 - `GateViewModel` through a new `container.gateViewModelFactory` (`AppContainer`: `AppLock(lock, SystemClock::elapsedRealtime)`).
 - A `LifecycleEventObserver` on the activity: `ON_STOP` → `gate.onBackground()`, `ON_START` → `gate.onForeground()`. Leaving for the device-credential screen or the scanner and coming back within 1 minute doesn't re-lock.
 - Rename `shared` → `pending` (the files waiting for an unlocked Home: shared, scanned, photographed, picked). `pending` is passed to Home only when the state is `Home`; otherwise Home gets `emptyList()`.
-- Render: `SignIn` → `LoginScreen(notice = …)`. `Locked(overlay = false)` → `LockScreen`. `Home` or `Locked(overlay = true)` → `HomeScreen` (keyed by `baseUrl`, last known config held in the activity), with `LockScreen` drawn over it in a `Box` when locked.
+- Render (one `Box`, so Home keeps its place in the composition across a re-lock): `SignIn` → `LoginScreen(notice = …)`. `Locked(overlay = false)` → `LockScreen`. `Home` or `Locked(overlay = true)` → `HomeScreen` (keyed by `baseUrl`, last known config held in the activity), with `LockScreen` drawn over it when locked and Home's semantics cleared so TalkBack can't read it.
 - `onUnlock` → `askToUnlock(...)` → `gate.onUnlocked()` / `gate.onUnlockFailed(it)`.
-- Lock switch → `askToUnlock` → `gate.setLockEnabled(it)`.
+- Lock switch → `askToUnlock` → `gate.setLockEnabled(it)`; a cancelled prompt leaves the switch as it was.
 
-### [ ] 3.5 — HomeScreen and LoginScreen
+### [x] 3.5 — HomeScreen and LoginScreen
 
 Files: `.../ui/home/HomeScreen.kt`, `.../ui/login/LoginScreen.kt`
-- HomeScreen: the scan / photo / file results call a new `onDocuments: (List<DocumentSource>) -> Unit` (MainActivity appends them to `pending`) instead of `viewModel.upload` directly; `shared` → `pending`. New params `lockAvailable: Boolean`, `lockEnabled: Boolean`, `onLockChange: (Boolean) -> Unit`. Top bar: keep "Sign out"; add an icon button (MoreVert, content description "More options") opening a `DropdownMenu` with one item "Lock with fingerprint" and a trailing `Switch`, shown only when `lockAvailable`. Sign out also calls `gate.onSignedOut()` via `onSignedOut`.
-- LoginScreen: new `notice: String?` param, shown above the form in the warning colour when set.
+- HomeScreen: the scan / photo / file results call a new `onDocuments: (List<DocumentSource>) -> Unit` (MainActivity appends them to `pending`) instead of `viewModel.upload` directly; `shared` → `pending`. New params `lockAvailable: Boolean`, `lockEnabled: Boolean`, `onLockChange: (Boolean) -> Unit`. Top bar: keep "Sign out"; add an icon button (MoreVert, content description "More options") opening a `DropdownMenu` with one item "Lock with fingerprint" and a trailing `Switch`, shown only when `lockAvailable`. Sign out also calls `gate.onSignedOut()` via `onSignedOut`. The menu item is the whole touch target; the `Switch` only shows the state.
+- LoginScreen: new `notice: String?` param, shown above the form when set, in the error colour (the theme has no warning colour yet; recorded in the design manual's Open decisions).
 
 ### Verify
 

@@ -63,3 +63,7 @@ These live in `.claude/skills/design-canvas/assets/artboard.dc.html` for the can
 ## Open decisions
 
 - The token values, the typeface and the screen shapes: settled by #6.
+- No `warning` colour in `ui/theme/` yet: the sign-in screen's "sign in again" notice (#8) uses
+  the error colour until #6 adds it.
+- No `@Preview`s: the app has no `ui-tooling` dependency yet, so the lock screen (#8) ships
+  without one, like the other screens.

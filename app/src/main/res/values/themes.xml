@@ -1,4 +1,5 @@
 <resources>
-    <style name="Theme.PaperlessCompanion" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- AppCompat so the biometric prompt's own dialog (a fingerprint dialog before API 28) can be shown. -->
+    <style name="Theme.PaperlessCompanion" parent="Theme.AppCompat.Light.NoActionBar" />
     <color name="ic_launcher_background">#17541F</color>
 </resources>
