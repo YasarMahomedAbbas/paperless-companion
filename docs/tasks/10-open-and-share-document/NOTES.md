@@ -43,3 +43,13 @@ Branch: `feat/10-open-and-share-document`
   - `produceState` tripped lint's `ProduceStateDoesNotAssignValue` (a false positive under K2), so `PdfPages` uses `remember` + `LaunchedEffect` instead.
   - The viewer shows fixed failure copy rather than the view model's `message` (the design checklist forbids server text and HTTP codes); snackbars still carry `userMessage()` for a failed Get original.
   - The plan's extra parts were needed: a skeleton block, a snackbar host and the Download / Open external icons did not exist yet.
+
+## Review
+
+- Fixed:
+  - In full screen a tap on the page never brought the bar back: `PdfPages`' tap detector (`pointerInput(Unit)`) kept the first composition's `onTap`, whose `fullScreen` was false since the viewer opens on quick actions. It now calls the latest one through `rememberUpdatedState` (`ui/viewer/PdfPages.kt`).
+  - Reopening a document reused the closed viewer's ViewModel (keyed only by id in the activity's store): a "Can't reach Paperless" from before the VPN came up stayed until Try again, and after signing out and in to another server the same id showed the old server's document. The key now carries a saveable open counter, so each opening is fresh and a rotation still keeps it (`MainActivity.kt`).
+  - Neither has a unit test: both live in composables that need a device (no Compose UI test setup; `PdfPages` is kover-excluded). Self-verification's device checks should cover the full-screen tap and reopening after a failure.
+- Raised: none
+- API: no endpoint added or changed. `GET /api/documents/{id}/preview/` and `/download/?original=true` now report progress from `Content-Length` (null when absent, falling back to a spinner); unchanged from #7's check against the docs and server source at v3.3.4 / v2.20.15. No live schema read (`verify.env` absent); self-verification must confirm `Content-Length` behind the proxy.
+- Layers: clean (`PhoneExports` named only in `AppContainer`; `DocumentExports` and the progress callback carry no Android or Paperless shapes).

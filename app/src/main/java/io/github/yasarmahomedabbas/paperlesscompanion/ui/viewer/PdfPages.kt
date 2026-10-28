@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +109,9 @@ private fun Pages(document: PdfDocument, fullScreen: Boolean, onTap: () -> Unit,
     var scale by remember { mutableFloatStateOf(1f) }
     var panX by remember { mutableFloatStateOf(0f) }
     val page by remember { derivedStateOf { list.firstVisibleItemIndex + 1 } }
+    // The tap detector below lives as long as the pages; it must call the latest onTap, whose
+    // full-screen check changes as the panel moves.
+    val currentOnTap by rememberUpdatedState(onTap)
     val gutter = if (fullScreen) Spacing.s16 else Spacing.s12
     BoxWithConstraints(
         modifier
@@ -131,7 +135,7 @@ private fun Pages(document: PdfDocument, fullScreen: Boolean, onTap: () -> Unit,
             }
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { onTap() },
+                    onTap = { currentOnTap() },
                     onDoubleTap = {
                         scale = if (scale > 1f) 1f else DOUBLE_TAP_ZOOM
                         panX = 0f

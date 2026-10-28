@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -110,6 +111,9 @@ class MainActivity : FragmentActivity() {
                 val home = current as? GateState.Home ?: lastHome.takeIf { locked?.overlay == true }
                 // The document open in the viewer, kept across rotation; signing out closes it.
                 var openDocumentId by rememberSaveable { mutableStateOf<Int?>(null) }
+                // Counts each opening, so reopening a document gets a fresh viewer rather than the last one's
+                // state (a stale failure, or another sign-in's document under the same id).
+                var viewerOpens by rememberSaveable { mutableIntStateOf(0) }
                 LaunchedEffect(current is GateState.SignIn) { if (current is GateState.SignIn) openDocumentId = null }
 
                 Box(Modifier.fillMaxSize()) {
@@ -119,7 +123,7 @@ class MainActivity : FragmentActivity() {
                             val documentId = openDocumentId
                             if (documentId != null && !showUpdates) {
                                 BackHandler(enabled = locked == null) { openDocumentId = null }
-                                val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId", factory = container.viewerViewModelFactory(documentId))
+                                val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
                                 val saveAs = rememberLauncherForActivityResult(SaveAs()) { uri -> viewer.saveTo(uri?.toString()) }
                                 ViewerScreen(
                                     viewModel = viewer,
@@ -147,7 +151,7 @@ class MainActivity : FragmentActivity() {
                                     onLockChange = ::changeLock,
                                     onSignedOut = gate::onSignedOut,
                                     onOpenUpdates = { showUpdates = true },
-                                    onOpenDocument = { openDocumentId = it },
+                                    onOpenDocument = { viewerOpens++; openDocumentId = it },
                                 )
                             }
                         }
