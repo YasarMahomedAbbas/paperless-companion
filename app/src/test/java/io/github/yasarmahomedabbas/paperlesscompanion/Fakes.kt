@@ -6,7 +6,9 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.VaultLockedException
 import io.github.yasarmahomedabbas.paperlesscompanion.data.VaultVoidedException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ApkFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.AppRelease
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentChanges
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
@@ -186,6 +188,11 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
     override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
     override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
+    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
+    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
+    override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
+    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)
+    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit)
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =

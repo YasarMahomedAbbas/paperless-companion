@@ -81,3 +81,34 @@ enum class DocumentFileKind { PREVIEW, ARCHIVED, ORIGINAL }
 
 /** A document's file, fetched into the app's cache as [file]; [name] is the name to show or save it under. */
 data class DocumentFile(val name: String, val mimeType: String?, val file: File)
+
+/** One field of an edit: [Keep] leaves it as it is, [To] sets it (`To(null)` clears a field that may be empty). */
+sealed interface Change<out T> {
+    data object Keep : Change<Nothing>
+    data class To<T>(val value: T) : Change<T>
+}
+
+/** What to change on one document; every field is kept unless given. */
+data class DocumentChanges(
+    val title: Change<String> = Change.Keep,
+    val created: Change<LocalDate> = Change.Keep,
+    val correspondentId: Change<Int?> = Change.Keep,
+    val documentTypeId: Change<Int?> = Change.Keep,
+    val storagePathId: Change<Int?> = Change.Keep,
+    val tagIds: Change<List<Int>> = Change.Keep,
+    val archiveSerialNumber: Change<Int?> = Change.Keep,
+) {
+    val isEmpty: Boolean
+        get() = listOf(title, created, correspondentId, documentTypeId, storagePathId, tagIds, archiveSerialNumber)
+            .all { it == Change.Keep }
+}
+
+/** One change applied to many documents at once. A null id clears that field. */
+sealed interface BulkEdit {
+    data class ModifyTags(val add: Set<Int>, val remove: Set<Int>) : BulkEdit
+    data class SetCorrespondent(val id: Int?) : BulkEdit
+    data class SetDocumentType(val id: Int?) : BulkEdit
+    data class SetStoragePath(val id: Int?) : BulkEdit
+    /** Moves them to the trash. */
+    data object Delete : BulkEdit
+}

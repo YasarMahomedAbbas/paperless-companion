@@ -176,7 +176,7 @@ File: `app/build.gradle.kts` kover excludes: `"*.data.ThumbnailImages*"`, `"*.da
 
 Goal: a use case can change a document's details, move it to the trash, list and restore the trash, and bulk edit tags, correspondent, type, storage path or delete, with bulk delete working on 2.x and 3.x.
 
-### [ ] 4.1 — Domain
+### [x] 4.1 — Domain
 
 File: `domain/model/Documents.kt`:
 - `sealed interface Change<out T> { data object Keep : Change<Nothing>; data class To<T>(val value: T) : Change<T> }`.
@@ -185,19 +185,19 @@ File: `domain/model/Documents.kt`:
 
 File: `domain/repository/Repositories.kt`, add to `DocumentLibrary`: `update(config, id, changes): Document`, `delete(config, id)`, `trash(config, page: Int, pageSize: Int): DocumentPage`, `restore(config, ids: List<Int>)`, `bulkEdit(config, ids: List<Int>, edit: BulkEdit)`.
 
-### [ ] 4.2 — `PaperlessLibrary` (write half)
+### [x] 4.2 — `PaperlessLibrary` (write half)
 
 - `update`: `PATCH api/documents/{id}/` with only the changed keys: `title`, `created` (ISO date), `correspondent`, `document_type`, `storage_path`, `tags`, `archive_serial_number`, where `To(null)` → JSON null. The answer is parsed with `toDocument()`.
 - `delete`: `DELETE api/documents/{id}/`.
 - `trash`: `GET api/trash/?page=&page_size=`, parsed like documents (v9 `all` ignored).
 - `restore`: `POST api/trash/` `{"documents":[…],"action":"restore"}`.
-- `bulkEdit`: `POST api/documents/bulk_edit/` with `modify_tags {add_tags, remove_tags}` (both always sent), or `set_correspondent {correspondent}`, `set_document_type {document_type}`, `set_storage_path {storage_path}` (null clears). For `Delete`: `POST api/documents/delete/` `{"documents":[…]}`, and on `NOT_FOUND` (2.x has no such endpoint) the same ids via `bulk_edit` `{"method":"delete","parameters":{}}`. Comment why. An empty id list → returns without a call.
+- `bulkEdit`: `POST api/documents/bulk_edit/` with `modify_tags {add_tags, remove_tags}` (both always sent), or `set_correspondent {correspondent}`, `set_document_type {document_type}`, `set_storage_path {storage_path}` (null clears). For `Delete`: `POST api/documents/delete/` `{"documents":[…]}`, and on `NOT_FOUND` (2.x has no such endpoint) the same ids via `bulk_edit` `{"method":"delete","parameters":{}}`. Comment why. An empty id list → returns without a call (for `restore` too).
 
-### [ ] 4.3 — Use cases
+### [x] 4.3 — Use cases
 
 File: `domain/usecase/EditDocumentsUseCase.kt` (new): `UpdateDocumentUseCase(id, changes): Document` (an empty `changes` → `IllegalArgumentException`, no call), `DeleteDocumentUseCase(id)`, `TrashUseCase { suspend fun list(page = 1, pageSize = 25): DocumentPage; suspend fun restore(ids: List<Int>) }`, `BulkEditUseCase(ids, edit)`.
 
-### [ ] 4.4 — Tests
+### [x] 4.4 — Tests
 
 - `PaperlessLibraryTest`: PATCH bodies (keep, set, clear, date format), the answer parsed, DELETE path and method, trash list in v9 and v10 shapes, restore body, each bulk edit body, delete via `/documents/delete/`, fallback to `bulk_edit` on 404 (two requests, in order), a 500 on the new endpoint → `SERVER` with **no** fallback, 400 → `SERVER` with the server's text.
 - `DocumentUseCasesTest`: each write use case signed in and signed out; the empty-changes refusal.

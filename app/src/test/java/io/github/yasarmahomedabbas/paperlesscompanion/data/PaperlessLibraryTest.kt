@@ -1,6 +1,9 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Change
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentChanges
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
@@ -362,5 +365,183 @@ class PaperlessLibraryTest {
         expectError(Kind.NOT_FOUND) { library.file(config, 99, DocumentFileKind.PREVIEW) }
 
         assertTrue(File(files, "99-preview").list()!!.isEmpty())
+    }
+
+    // --- edits ---
+
+    @Test
+    fun `update sends only what changes, null clearing, and reads the answer`() = runTest {
+        respond(body = listDoc.dropLast(1) + ""","content":"text"}""")
+
+        val document = library.update(
+            config, 7,
+            DocumentChanges(
+                title = Change.To("Power bill"),
+                created = Change.To(LocalDate.of(2024, 3, 1)),
+                correspondentId = Change.To(null),
+                tagIds = Change.To(listOf(1, 5)),
+                archiveSerialNumber = Change.To(12),
+            ),
+        )
+
+        assertEquals(expectedListDoc.copy(content = "text"), document)
+        val request = server.takeRequest()
+        assertEquals("PATCH", request.method)
+        assertEquals("/api/documents/7/", request.path)
+        assertTrue(request.getHeader("Content-Type")!!.startsWith("application/json"))
+        assertEquals(
+            """{"title":"Power bill","created":"2024-03-01","correspondent":null,"tags":[1,5],"archive_serial_number":12}""",
+            request.body.readUtf8(),
+        )
+    }
+
+    @Test
+    fun `update sets and clears the type and storage path`() = runTest {
+        respond(body = listDoc)
+        library.update(config, 7, DocumentChanges(documentTypeId = Change.To(3), storagePathId = Change.To(null)))
+        assertEquals("""{"document_type":3,"storage_path":null}""", server.takeRequest().body.readUtf8())
+
+        respond(body = listDoc)
+        library.update(config, 7, DocumentChanges(tagIds = Change.To(emptyList())))
+        assertEquals("""{"tags":[]}""", server.takeRequest().body.readUtf8())
+    }
+
+    @Test
+    fun `a refused update carries the server's reason`() = runTest {
+        respond(400, """{"archive_serial_number":["Document with this Archive serial number already exists."]}""")
+
+        val e = expectError(Kind.SERVER) { library.update(config, 7, DocumentChanges(archiveSerialNumber = Change.To(12))) }
+
+        assertTrue(e.message!!.contains("already exists"))
+    }
+
+    @Test
+    fun `delete moves the document to the trash`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        library.delete(config, 7)
+
+        val request = server.takeRequest()
+        assertEquals("DELETE", request.method)
+        assertEquals("/api/documents/7/", request.path)
+        assertEquals("Token tok", request.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `deleting a gone document is not found`() = runTest {
+        respond(404, """{"detail":"Not found."}""")
+        expectError(Kind.NOT_FOUND) { library.delete(config, 7) }
+    }
+
+    @Test
+    fun `trash reads a Paperless 2 page (with all)`() = runTest {
+        respond(body = """{"count":1,"next":null,"all":[7],"results":[$listDoc]}""")
+
+        val page = library.trash(config, 2, 10)
+
+        assertEquals(listOf(expectedListDoc), page.documents)
+        val request = server.takeRequest()
+        assertEquals("/api/trash/", request.requestUrl!!.encodedPath)
+        assertEquals("2", request.query("page"))
+        assertEquals("10", request.query("page_size"))
+    }
+
+    @Test
+    fun `trash reads a Paperless 3 page (without all)`() = runTest {
+        respond(body = """{"count":40,"next":"http://x/api/trash/?page=2","previous":null,"results":[$listDoc]}""")
+
+        val page = library.trash(config, 1, 25)
+
+        assertEquals(40, page.total)
+        assertTrue(page.hasMore)
+        assertEquals(listOf(expectedListDoc), page.documents)
+    }
+
+    @Test
+    fun `restore posts the ids with the restore action`() = runTest {
+        respond(body = """{"result":"OK","doc_ids":[7,8]}""")
+
+        library.restore(config, listOf(7, 8))
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/trash/", request.path)
+        assertEquals("""{"documents":[7,8],"action":"restore"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `restoring or editing nothing asks nothing`() = runTest {
+        library.restore(config, emptyList())
+        library.bulkEdit(config, emptyList(), BulkEdit.Delete)
+        library.bulkEdit(config, emptyList(), BulkEdit.SetCorrespondent(1))
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `each bulk edit sends its method and parameters`() = runTest {
+        val expected = listOf(
+            BulkEdit.ModifyTags(add = setOf(3, 1), remove = setOf(2)) to
+                """"method":"modify_tags","parameters":{"add_tags":[1,3],"remove_tags":[2]}""",
+            BulkEdit.ModifyTags(add = setOf(1), remove = emptySet()) to
+                """"method":"modify_tags","parameters":{"add_tags":[1],"remove_tags":[]}""",
+            BulkEdit.SetCorrespondent(4) to """"method":"set_correspondent","parameters":{"correspondent":4}""",
+            BulkEdit.SetCorrespondent(null) to """"method":"set_correspondent","parameters":{"correspondent":null}""",
+            BulkEdit.SetDocumentType(5) to """"method":"set_document_type","parameters":{"document_type":5}""",
+            BulkEdit.SetDocumentType(null) to """"method":"set_document_type","parameters":{"document_type":null}""",
+            BulkEdit.SetStoragePath(6) to """"method":"set_storage_path","parameters":{"storage_path":6}""",
+            BulkEdit.SetStoragePath(null) to """"method":"set_storage_path","parameters":{"storage_path":null}""",
+        )
+        for ((edit, body) in expected) {
+            respond(body = """{"result":"OK"}""")
+            library.bulkEdit(config, listOf(7, 8), edit)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/api/documents/bulk_edit/", request.path)
+            assertEquals("""{"documents":[7,8],$body}""", request.body.readUtf8())
+        }
+    }
+
+    @Test
+    fun `bulk delete uses the Paperless 3 delete endpoint`() = runTest {
+        respond(body = """{"result":"OK"}""")
+
+        library.bulkEdit(config, listOf(7, 8), BulkEdit.Delete)
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/documents/delete/", request.path)
+        assertEquals("""{"documents":[7,8]}""", request.body.readUtf8())
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `bulk delete on Paperless 2 falls back to bulk_edit delete`() = runTest {
+        respond(404, "<h1>Not Found</h1>")
+        respond(body = """{"result":"OK"}""")
+
+        library.bulkEdit(config, listOf(7, 8), BulkEdit.Delete)
+
+        assertEquals("/api/documents/delete/", server.takeRequest().path)
+        val fallback = server.takeRequest()
+        assertEquals("/api/documents/bulk_edit/", fallback.path)
+        assertEquals("""{"documents":[7,8],"method":"delete","parameters":{}}""", fallback.body.readUtf8())
+    }
+
+    @Test
+    fun `a failing delete endpoint is reported, with no fallback`() = runTest {
+        respond(500, "kaputt")
+
+        expectError(Kind.SERVER) { library.bulkEdit(config, listOf(7), BulkEdit.Delete) }
+
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `a refused bulk edit carries the server's reason`() = runTest {
+        respond(400, """{"parameters":["Tag 99 does not exist"]}""")
+
+        val e = expectError(Kind.SERVER) { library.bulkEdit(config, listOf(7), BulkEdit.ModifyTags(setOf(99), emptySet())) }
+
+        assertTrue(e.message!!.contains("Tag 99 does not exist"))
     }
 }

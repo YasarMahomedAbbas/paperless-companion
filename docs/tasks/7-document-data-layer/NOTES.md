@@ -23,3 +23,20 @@ Branch: `feat/7-document-data-layer`
   - No live schema was available: the docs site and public demo were behind a Cloudflare challenge, and `verify.env` is absent. Every call was checked against the docs source and the server source at v3.3.4 and v2.20.15 instead. Self-verification must read the live `/api/schema/` and try each call against a real server.
   - The Coil 3.0.4 disk-cache key override (`options.copy(diskCacheKey=…)` via a delegating fetcher) is planned from the library's design and must be confirmed against its API while implementing.
   - Thumbnails on a device can only be seen once #9 adds a screen.
+
+## Implementation
+
+- Shipped:
+  - `data/PaperlessHttp.kt:35`: the shared plumbing (token header, error mapping with 404 → `NOT_FOUND`, `json`, a streamed `download` at :76 through a `.part` file, `pages` at :108). `PaperlessApi` delegates to it with its signature unchanged; `PaperlessApiTest` passes unedited.
+  - `domain/repository/Repositories.kt:37`: `DocumentLibrary` (list/search, one document, the four label lists, files, update, delete, trash, restore, bulk edit), with its models in `domain/model/Documents.kt` and use cases in `domain/usecase/DocumentsUseCase.kt`, `LoadLabelsUseCase.kt`, `EditDocumentsUseCase.kt`.
+  - `data/PaperlessLibrary.kt`: the Paperless implementation; bulk delete posts `/api/documents/delete/` and falls back to `bulk_edit` `delete` on 404 (`bulkDelete`, :157). `data/PaperlessJson.kt`: document/tag/label parsing, `parseHighlights` (:74), `fileName` (:130).
+  - `data/Thumbnails.kt:25`: `ServerTokenInterceptor` plus the thumbnail URL and cache key; `data/ThumbnailImages.kt`: the Coil 3.0.4 glue (`ThumbnailFetcherFactory` :24, `ThumbnailKeyer`, `thumbnailImageLoader` :42). `AppContainer.kt:94`: `PaperlessApp` is Coil's `SingletonImageLoader.Factory`.
+  - Coil 3.0.4 (`coil-compose`, `coil-network-okhttp`) added; it keeps OkHttp at 4.12.0. Kover excludes the Coil glue only.
+- Tests: full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) green: 274 passed / 0 failed, line coverage 96.3%, `ArchitectureTest` green. New: `PaperlessHttpTest` 10, `PaperlessLibraryTest` 35, `PaperlessJsonTest` 21, `ThumbnailsTest` 8, `DocumentUseCasesTest` 28.
+- Outstanding: the device-only check (thumbnails show and survive a restart from the disk cache) waits for #9. Every call still needs trying against a real server and its live `/api/schema/` (self-verification).
+- Contradicted the plan:
+  - `pages` does not follow `next` as an absolute URL: it takes only `next`'s query and applies it to the same path at the signed-in address, so a proxy-built `next` with an inner host or scheme never receives the token. It also stops after 1000 pages. Checklist 1.2 edited to match.
+  - The file name is only known once the server answers, so `file` downloads to `<folder>/.download` and renames it; path separators in a name become `_` (not dropped), and leading dots are dropped too. Checklist 3.2 edited.
+  - `ThumbnailFetcher.Factory` became `ThumbnailFetcherFactory` (the fetcher it returns is Coil's own network fetcher, so there is no `ThumbnailFetcher` class); the kover pattern still matches. Checklist 3.3 edited.
+  - Coil 3.0.4 checked: `Options.copy(diskCacheKey = …)` compiles and `NetworkFetcher` reads `options.diskCacheKey`; its default cache strategy does not parse the response's `Cache-Control`, so the thumb endpoint's `no-cache` doesn't force a refetch. Confirm on a device with #9.
+  - `restore` with an empty id list makes no call, like `bulkEdit`.
