@@ -1,0 +1,47 @@
+# Notes — A permission refusal (403) tells the user to sign in again
+
+Issue: #21 — A permission refusal (403) tells the user to sign in again (https://github.com/YasarMahomedAbbas/paperless-companion/issues/21)
+Branch: `fix/21-forbidden-is-not-signed-out`
+
+## Planning
+
+- Approach: a new domain `ServerException.Kind.FORBIDDEN` with its own `userMessage()` ("You don't have permission to do that in Paperless."). `PaperlessHttp` maps 403 to FORBIDDEN on every signed-in call and keeps 401 (and 400/403 on sign-in) as UNAUTHORIZED. `badRequestIsAuth` becomes `signIn`.
+- Decided (the pipeline took this on the user's behalf; flags: api, ux): every signed-in call maps 403 to FORBIDDEN, meaning the document library plus upload and task status, not only the library calls the issue names. Sign-in keeps 400/401/403 as UNAUTHORIZED. Reason: Paperless's first authenticator (`PaperlessBasicAuthentication`) answers non-Basic requests with a `Token` auth header, so a missing or invalid token is 401. A 403 on a signed-in call therefore means the token works but the user lacks the permission, upload (`add_document`) included.
+- Decided (routine, by the planner): keep the "Wrong username or password" text on UNAUTHORIZED; no ViewModel or screen changes, since they already show `userMessage()`; FORBIDDEN's exception message carries "Paperless returned HTTP 403: <body>" for logs.
+- Open risks: on a server with remote-user API auth enabled (`PAPERLESS_ENABLE_HTTP_REMOTE_USER_API`), `PaperlessRemoteUserAuthentication` comes first and has no auth header, so DRF answers a bad token with 403. Such a user would see "no permission" instead of "sign in again". The Paperless docs site refused automated fetches, so the docs were read from the repo source, and `verify.env` is absent, so the live schema and real-server status codes weren't checked.
+
+## Implementation
+
+- Shipped:
+  - `ServerException.Kind.FORBIDDEN` with its KDoc (`domain/model/Models.kt:51-54`) and its message "You don't have permission to do that in Paperless." (`domain/usecase/UploadDocumentUseCase.kt:88`).
+  - `PaperlessHttp.httpError` (`data/PaperlessHttp.kt:192-203`): 401, and 400/403 on a sign-in, stay UNAUTHORIZED ("Wrong username or password"); any other 403 is FORBIDDEN ("Paperless returned HTTP 403: <body>"). `badRequestIsAuth` is now `signIn` in `call`/`callUnless`/`httpError` and `PaperlessApi`'s private `call`; `download` passes `signIn = false`. `PaperlessApi.login` passes `signIn = true` (`data/PaperlessApi.kt:42`).
+  - `EditDocumentsUseCase.kt:10-11` comment names FORBIDDEN.
+  - Tests: `PaperlessLibraryTest` 403 on documents/update/file (file leaves nothing behind), `PaperlessApiTest` 403 on upload/task → FORBIDDEN and 403/401 on login → UNAUTHORIZED, `UploadDocumentUseCaseTest` FORBIDDEN's message doesn't say to sign in.
+- Failing-first: with the domain kind and the tests in place but the old mapping, the five new 403 → FORBIDDEN tests failed (they got UNAUTHORIZED): 91 tests, 5 failed. After the mapping change, all pass.
+- Tests: full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) BUILD SUCCESSFUL; debug unit tests 330 passed / 0 failed.
+- Outstanding: none.
+- Contradicted the plan: none.
+
+## Review
+
+- Fixed: none. Checked: every `Kind` consumer (`userMessage()` is the only exhaustive `when`; `LoginViewModel` still gets UNAUTHORIZED from sign-in; the upload status loop treats FORBIDDEN like any non-network error and reports it once), `download`'s separate error path (passes `signIn = false`, covered by the file test), and every Done-when item against the diff. Nothing from Out of scope is in the diff.
+- Raised: none.
+- API: no request or response shape changed; only status-code meaning. `POST /api/token/` (400/401/403 → UNAUTHORIZED), and every token-authed call (`/api/documents/…`, `post_document`, `/api/tasks/`): 401 → UNAUTHORIZED, 403 → FORBIDDEN, matching Paperless's auth classes and permission docs as read from the repo source at planning. Same in v9 and v10. Live schema not checked: `verify.env` absent.
+- Layers: clean. `FORBIDDEN` and its message are in the app's words; no status code or Paperless string left `data/`.
+
+## Doc drift
+
+- No drift found. Checked against the diff: CLAUDE.md's Paperless API section (names `PaperlessApi`, `PaperlessLibrary`, `PaperlessHttp`, all still there), README's architecture block (`PaperlessHttp`), feature, server-support and use-case table lines, and docs/design's notice tones ("a wrong password is a refusal" still holds: sign-in keeps 400/401/403 as UNAUTHORIZED). No doc describes how status codes map to error kinds.
+- Skipped: the new 401-vs-403 rule (403 on a signed-in call is FORBIDDEN, not signed out). The KDoc on `PaperlessHttp.httpError` and `ServerException.Kind` states it, and `PaperlessApiTest` / `PaperlessLibraryTest` enforce it, so a future session would not get it wrong.
+- Skipped: the remote-user API auth caveat (a bad token there answers 403, shown as "no permission"). It's an open risk recorded in Planning, not a rule to follow, and no user-facing doc covers server auth modes.
+- Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` BUILD SUCCESSFUL; debug unit tests 330 passed / 0 failed, release unit tests 327 passed / 0 failed; debug line coverage 94.3%, koverVerify passed; lint 0 errors (23 warnings); debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent, so no server address or token).
+- Verified: every 401/403 mapping in the Done-when list through the MockWebServer tests (403 on documents, update, file, upload and task status → FORBIDDEN; 401 and 403 on sign-in → UNAUTHORIZED; existing 400-on-sign-in and 401-on-upload/documents tests still pass), and FORBIDDEN's user message in `UploadDocumentUseCaseTest`.
+- Failed: none
+- Not self-verifiable: the planned read-only real-server check (a bogus token on `GET /api/documents/?page_size=1` answers 401, not 403; a bad sign-in on `/api/token/` answers 400) needs `verify.env`. Device: none.

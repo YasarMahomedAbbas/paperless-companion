@@ -7,7 +7,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 
-// Changing documents on the signed-in server. Every one throws ServerException, UNAUTHORIZED when signed out.
+// Changing documents on the signed-in server. Every one throws ServerException: UNAUTHORIZED when signed out,
+// FORBIDDEN when the user may not change it.
 
 /** Saves [DocumentChanges] and returns the document as the server now has it. Nothing to change is refused. */
 class UpdateDocumentUseCase(private val library: DocumentLibrary, private val settings: SettingsRepository) {

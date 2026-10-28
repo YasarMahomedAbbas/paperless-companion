@@ -66,6 +66,8 @@ class PaperlessLibraryTest {
 
     private fun RecordedRequest.query(name: String): String? = requestUrl!!.queryParameter(name)
 
+    private val noPermission = """{"detail":"You do not have permission to perform this action."}"""
+
     private val listDoc = """{"id":7,"title":"Power bill","created":"2024-03-01","added":"2024-03-02T10:00:00Z",""" +
         """"modified":"2024-03-03T11:30:00.123456+01:00","correspondent":2,"document_type":3,"storage_path":null,""" +
         """"tags":[1,5],"archive_serial_number":12,"original_file_name":"scan.pdf","page_count":2,"mime_type":"application/pdf"}"""
@@ -202,6 +204,18 @@ class PaperlessLibraryTest {
     fun `an expired token is unauthorized`() = runTest {
         respond(401, """{"detail":"Invalid token."}""")
         expectError(Kind.UNAUTHORIZED) { library.documents(config, DocumentQuery()) }
+    }
+
+    @Test
+    fun `a permission refusal is forbidden, not a rejected login`() = runTest {
+        respond(403, noPermission)
+        expectError(Kind.FORBIDDEN) { library.documents(config, DocumentQuery()) }
+    }
+
+    @Test
+    fun `a refused update for lack of permission is forbidden`() = runTest {
+        respond(403, noPermission)
+        expectError(Kind.FORBIDDEN) { library.update(config, 7, DocumentChanges(title = Change.To("Power bill"))) }
     }
 
     // --- one document ---
@@ -373,6 +387,15 @@ class PaperlessLibraryTest {
         respond(404, """{"detail":"Not found."}""")
 
         expectError(Kind.NOT_FOUND) { library.file(config, 99, DocumentFileKind.PREVIEW) }
+
+        assertTrue(File(files, "99-preview").list()!!.isEmpty())
+    }
+
+    @Test
+    fun `a refused file download for lack of permission is forbidden and leaves nothing behind`() = runTest {
+        respond(403, noPermission)
+
+        expectError(Kind.FORBIDDEN) { library.file(config, 99, DocumentFileKind.PREVIEW) }
 
         assertTrue(File(files, "99-preview").list()!!.isEmpty())
     }
