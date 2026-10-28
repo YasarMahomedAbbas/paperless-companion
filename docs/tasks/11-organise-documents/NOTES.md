@@ -21,3 +21,12 @@ Branch: `feat/11-organise-documents`
   - Checkpoints 3–5 depend on #9 and #10 merging. Their final names (the list's ViewModel and row, the viewer's ViewModel and panel, navigation, sheets, snackbar, dialog) may differ from the checklist; implement-plan records each in "Contradicted the plan".
   - No real Paperless has ever answered these write calls (open since #7). Self-verification needs `verify.env` with `PAPERLESS_ALLOW_WRITES=1` to prove "shows in the web UI straight after".
   - A 403 on a document the user doesn't own reads as "sign in again" until #21 lands.
+
+## Implementation (in progress — stopped at the 3.0 gate)
+
+- Shipped so far:
+  - Checkpoint 1 (`0be13a3`): `LabelKind` (`domain/model/Documents.kt`), `DocumentServer.labelsUrl` (`domain/repository/Repositories.kt`) built in `data/PaperlessApi.kt` next to `documentUrl`, `LabelsLinkUseCase` (`domain/usecase/DocumentLinkUseCase.kt`), `EditForm` / `changesFrom` / `LabelsStatus` / `EditDetailsUiState` (`ui/edit/EditDetailsUiState.kt`), `EditDetailsViewModel` (`ui/edit/EditDetailsViewModel.kt`), `matching` / `chosenFirst` (`ui/edit/PickerFilter.kt`).
+  - Checkpoint 2 (`5ed21c8`): `Document.with(BulkEdit)` (`domain/model/DocumentEdits.kt`), `TrashViewModel` (`ui/documents/TrashViewModel.kt`), `TagMark` / `tagMarks` / `toggled` / `bulkTagChange` (`ui/documents/BulkTags.kt`), `SelectionViewModel` (`ui/documents/SelectionViewModel.kt`). `FakeLibrary` gained `updateFailure`, `updateGate` and `writeFailure`.
+- Tests: full `testDebugUnitTest koverVerify` green, 335 passed / 0 failed.
+- Stopped at 3.0: #9 (no PR yet) and #10 (PR #25 open) are both still OPEN, so checkpoints 3–5 can't start (Q1, option 1). Resume implement-plan at 3.0 once both are merged.
+- Contradicted the plan: none. Small additions written into the checklist text: `undo()` is ignored with no offer or while working; `SelectionViewModel.change` is ignored with nothing selected and falls back to "Couldn't change them".
