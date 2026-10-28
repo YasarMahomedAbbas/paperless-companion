@@ -18,7 +18,7 @@ Problem: the views we saved in the Paperless web UI, a document's notes and "mor
     - **v9** also sends `show_on_dashboard` / `show_in_sidebar` on each view.
     - **v10** (Paperless 3 default) drops them. They live in `GET /api/ui_settings/` → `settings.saved_views.dashboard_views_visible_ids` / `sidebar_views_visible_ids` (int arrays), with the order in `settings.saved_views.dashboard_views_sort_order` / `sidebar_views_sort_order` (`docs/api.md` § Version 10; `src-ui/src/app/data/ui-settings.ts`; the keys are nested by `settings.service.ts`: `general-settings:` dropped, `:` → nesting, `-` → `_`).
   - **Filter rules → query parameters**: the web UI's `queryParamsFromFilterRules` (`src-ui/src/app/utils/query-params.ts`) over the table in `src-ui/src/app/data/filter-rule-type.ts` (both at v3.3.4).
-    - Rules 19 (`title_content`) and 41 (`text`) go to `text`. Rules 0 (`title`) and 40 (`title_search`) go to `title_search`.
+    - Rules 19 (`title_content`) and 49 (`text`) go to `text`. Rules 0 (`title`) and 48 (`title_search`) go to `title_search`. (Planning said 41 and 40; at v3.3.4 those are the custom-field rules `has_custom_fields` and `custom_fields__id__none`.)
     - A null value goes to `isnull_filtervar=1`, and the value `-1` (NEGATIVE_NULL_FILTER_VALUE) goes to `isnull_filtervar=0`.
     - `multi` types join their values with commas. Boolean types send `1`/`0` for `"true"`/`"1"` or anything else.
   - **Notes**:
@@ -55,7 +55,7 @@ Paths below are under `app/src/main/java/io/github/yasarmahomedabbas/paperlessco
 ## Test plan
 
 - Unit, data (`PaperlessViewsTest`, pure): rule → parameter translation for each branch:
-  - text (19, 41) and title (0, 40);
+  - text (19, 49) and title (0, 48);
   - null → isnull=1, and `-1` → isnull=0;
   - multi rules joined with commas, in the order given;
   - booleans ("true", "1", "false");
@@ -158,7 +158,7 @@ Files: `Fakes.kt`, `data/PaperlessLibraryTest.kt`, `data/PaperlessJsonTest.kt`, 
 
 Goal: the domain lists the saved views (with home and quick-filter flags, in the server's order) and lists a view's documents. The data layer turns the view's rules into exactly the web UI's parameters, on v9 and v10.
 
-### [ ] 2.1 — Domain
+### [x] 2.1 — Domain
 
 Files: `domain/model/Documents.kt`, `domain/repository/Repositories.kt`, `domain/usecase/SavedViewsUseCase.kt` (new)
 - Add the model:
@@ -178,18 +178,18 @@ Files: `domain/model/Documents.kt`, `domain/repository/Repositories.kt`, `domain
 - `DocumentLibrary.savedViews(config): SavedViews`.
 - `class SavedViewsUseCase(library, settings) { suspend operator fun invoke(): SavedViews }`.
 
-### [ ] 2.2 — Rule translation
+### [x] 2.2 — Rule translation
 
 File: `data/PaperlessViews.kt` (new, `internal`)
 - `internal data class ViewRule(val type: Int, val value: String?)` and `internal data class ViewFilter(val params: Map<String, String>, val ordering: String)`.
 - `internal fun viewFilter(rules: List<ViewRule>, sortField: String?, sortReverse: Boolean): ViewFilter`:
   - It follows `queryParamsFromFilterRules` at v3.3.4 rule for rule, with a private table `id → RuleType(filtervar, isnullFiltervar, multi, boolean)` copied from `filter-rule-type.ts` at v3.3.4 (every id in `FILTER_RULE_TYPES`).
-  - An unknown rule type is dropped.
+  - An unknown rule type is dropped, and so is a null value with no `isnull` parameter (the web UI leaves null parameters out of the request).
   - Ordering is `(if (sortReverse) "-" else "") + (sortField ?: "created")`, and `-created` when `sortField` is null and `sortReverse` is true.
   - KDoc names the two source files and the tag.
 - `internal fun JsonObject.toViewRules()` reads `filter_rules`. Each `value` is a string, a number as a string, or null.
 
-### [ ] 2.3 — Paperless implementation
+### [x] 2.3 — Paperless implementation
 
 File: `data/PaperlessLibrary.kt`
 - `savedViews`:
@@ -207,7 +207,7 @@ File: `data/PaperlessLibrary.kt`
   - `similarTo` together with `view` is not used by the UI (2.1 KDoc). If both are set, `similarTo` wins, and the view's search parameters are dropped as for text.
 - KDoc on `documents` explaining the merge.
 
-### [ ] 2.4 — Fakes and tests
+### [x] 2.4 — Fakes and tests
 
 Files: `Fakes.kt`, `data/PaperlessViewsTest.kt` (new), `data/PaperlessLibraryTest.kt`, `domain/DocumentUseCasesTest.kt`
 - `FakeLibrary`:

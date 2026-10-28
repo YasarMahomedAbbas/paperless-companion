@@ -42,7 +42,8 @@ enum class DocumentSort { CREATED, ADDED, MODIFIED, TITLE, CORRESPONDENT, DOCUME
 /**
  * Which documents to list. A blank [text] counts as none. With [text], results come in relevance order
  * and [sort] is ignored. With [similarTo], the documents most like that one come first, and [text] and
- * [sort] are ignored. A document must carry every one of [tagIds].
+ * [sort] are ignored. A document must carry every one of [tagIds]. With [view], only that saved view's
+ * documents are listed, narrowed by the other fields; [similarTo] isn't meant to be combined with it.
  */
 data class DocumentQuery(
     val text: String? = null,
@@ -55,12 +56,33 @@ data class DocumentQuery(
     val pageSize: Int = 25,
     /** Documents like this one, most alike first; [text] and [sort] are ignored. */
     val similarTo: Int? = null,
+    /** Only the documents this saved view shows; the other fields narrow it further. */
+    val view: Int? = null,
+    /** With [view], use the view's own order instead of [sort]. */
+    val viewOrder: Boolean = false,
 ) {
     init {
         require(page >= 1) { "page starts at 1" }
         require(pageSize in 1..100) { "pageSize is 1 to 100" }
     }
 }
+
+/**
+ * A list someone saved in the server's web interface: [onHome] when it shows on its home (dashboard),
+ * [quickFilter] when it's in its quick list (sidebar).
+ */
+data class SavedView(
+    val id: Int,
+    val name: String,
+    val onHome: Boolean,
+    val quickFilter: Boolean,
+)
+
+/**
+ * The saved views: [home] are the home views in the server's home order; [all] is every view, the
+ * quick-filter ones first in the server's order, then the rest by name.
+ */
+data class SavedViews(val home: List<SavedView>, val all: List<SavedView>)
 
 data class Tag(
     val id: Int,

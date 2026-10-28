@@ -18,6 +18,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -277,6 +279,15 @@ class FakeLibrary : DocumentLibrary {
     }
 
     override suspend fun notesEnabled(config: ServerConfig) = answer(config, "notesEnabled", notesEnabled, notesFailure)
+
+    var savedViews = SavedViews(
+        home = listOf(SavedView(7, "Inbox", onHome = true, quickFilter = true)),
+        all = listOf(SavedView(7, "Inbox", onHome = true, quickFilter = true), SavedView(8, "Taxes", onHome = false, quickFilter = false)),
+    )
+    /** Thrown by savedViews() only. */
+    var savedViewsFailure: Exception? = null
+
+    override suspend fun savedViews(config: ServerConfig) = answer(config, "savedViews", savedViews, savedViewsFailure)
 }
 
 /** Records each export as "<call> <name>[ <location>]", answering [savedAs] or throwing [failure]. */

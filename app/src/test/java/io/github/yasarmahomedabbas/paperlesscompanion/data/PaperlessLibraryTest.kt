@@ -9,11 +9,14 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
@@ -707,5 +710,210 @@ class PaperlessLibraryTest {
     fun `more like this for a document out of reach is forbidden`() = runTest {
         respond(403, """{"detail":"Invalid more_like_id"}""")
         expectError(Kind.FORBIDDEN) { library.documents(config, DocumentQuery(similarTo = 99)) }
+    }
+
+    // --- saved views ---
+
+    /** Answers by path, for calls made side by side; an unknown path is 404. */
+    private fun route(vararg answers: Pair<String, MockResponse>) {
+        val byPath = answers.toMap()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) =
+                byPath[request.requestUrl!!.encodedPath] ?: MockResponse().setResponseCode(404)
+        }
+    }
+
+    private fun ok(body: String) = MockResponse().setBody(body)
+
+    private fun v9View(id: Int, name: String, home: Boolean, quick: Boolean, rules: String = "[]") =
+        """{"id":$id,"name":"$name","show_on_dashboard":$home,"show_in_sidebar":$quick,"sort_field":"created",""" +
+            """"sort_reverse":true,"filter_rules":$rules,"owner":1,"user_can_change":true}"""
+
+    private fun v10View(id: Int, name: String, rules: String = "[]", sort: String = "\"created\"", reverse: Boolean = true) =
+        """{"id":$id,"name":"$name","sort_field":$sort,"sort_reverse":$reverse,"filter_rules":$rules,""" +
+            """"page_size":null,"display_mode":null,"display_fields":null,"owner":1,"user_can_change":true}"""
+
+    private fun viewsPage(vararg views: String) = """{"count":${views.size},"next":null,"previous":null,"results":[${views.joinToString(",")}]}"""
+
+    private val sortOrders = """"dashboard_views_sort_order":[3,1],"sidebar_views_sort_order":[2,4]"""
+
+    @Test
+    fun `saved views on API v9 take the flags from each view, and the order from the settings`() = runTest {
+        route(
+            "/api/saved_views/" to ok(
+                viewsPage(
+                    v9View(1, "Inbox", home = true, quick = false),
+                    v9View(2, "Taxes", home = false, quick = true),
+                    v9View(3, "Bills", home = true, quick = false),
+                    v9View(4, "Recent", home = false, quick = true),
+                    v9View(5, "archive", home = true, quick = true),
+                    v9View(6, "Zebra", home = false, quick = false),
+                ),
+            ),
+            // The ids here disagree with the views' own flags, which win on v9.
+            "/api/ui_settings/" to ok("""{"settings":{"saved_views":{"dashboard_views_visible_ids":[6],"sidebar_views_visible_ids":[6],$sortOrders}}}"""),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(listOf(3, 1, 5), views.home.map { it.id })
+        assertEquals(listOf(2, 4, 5, 3, 1, 6), views.all.map { it.id })
+        assertEquals(SavedView(5, "archive", onHome = true, quickFilter = true), views.all[2])
+        val request = server.takeRequest().takeIf { it.requestUrl!!.encodedPath == "/api/saved_views/" } ?: server.takeRequest()
+        assertEquals("100", request.query("page_size"))
+    }
+
+    @Test
+    fun `saved views on API v10 take the flags and the order from the settings`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(1, "Inbox"), v10View(2, "Taxes"), v10View(3, "Bills"), v10View(4, "Recent"), v10View(5, "Alpha"))),
+            "/api/ui_settings/" to ok(
+                """{"user":{"id":1},"settings":{"saved_views":{"dashboard_views_visible_ids":[1,3,5],""" +
+                    """"sidebar_views_visible_ids":[2,4,5],$sortOrders,"warn_on_unsaved_change":true}},"permissions":[]}""",
+            ),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(listOf(3, 1, 5), views.home.map { it.id })
+        assertEquals(listOf(2, 4, 5, 3, 1), views.all.map { it.id })
+        assertEquals(
+            SavedViews(
+                home = listOf(SavedView(3, "Bills", true, false), SavedView(1, "Inbox", true, false), SavedView(5, "Alpha", true, true)),
+                all = listOf(
+                    SavedView(2, "Taxes", false, true), SavedView(4, "Recent", false, true), SavedView(5, "Alpha", true, true),
+                    SavedView(3, "Bills", true, false), SavedView(1, "Inbox", true, false),
+                ),
+            ),
+            views,
+        )
+    }
+
+    @Test
+    fun `settings without saved views give no home or quick views`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(2, "b"), v10View(1, "A"))),
+            "/api/ui_settings/" to ok("""{"settings":{}}"""),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(emptyList<SavedView>(), views.home)
+        assertEquals(listOf(1, 2), views.all.map { it.id })
+    }
+
+    @Test
+    fun `failing settings are ignored when every view carries its flags`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v9View(1, "Inbox", home = true, quick = true))),
+            "/api/ui_settings/" to MockResponse().setResponseCode(500),
+        )
+        assertEquals(listOf(1), library.savedViews(config).home.map { it.id })
+    }
+
+    @Test
+    fun `failing settings fail the views when they hold the flags`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(1, "Inbox"))),
+            "/api/ui_settings/" to MockResponse().setResponseCode(500),
+        )
+        expectError(Kind.SERVER) { library.savedViews(config) }
+    }
+
+    private val viewRules = """[{"rule_type":6,"value":"5"},{"rule_type":3,"value":"2"},{"rule_type":49,"value":"bill"},""" +
+        """{"rule_type":5,"value":"true"}]"""
+
+    private suspend fun loadView() {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(7, "Bills", rules = viewRules, sort = "\"title\"", reverse = false))),
+            "/api/ui_settings/" to ok("""{"settings":{}}"""),
+            "/api/documents/" to ok("""{"count":0,"results":[]}"""),
+        )
+        library.savedViews(config)
+        server.takeRequest()
+        server.takeRequest()
+    }
+
+    @Test
+    fun `a view's documents get its parameters and the app's paging and fields`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, page = 2, pageSize = 50))
+
+        val request = server.takeRequest()
+        assertEquals("/api/documents/", request.requestUrl!!.encodedPath)
+        assertEquals("5", request.query("tags__id__all"))
+        assertEquals("2", request.query("correspondent__id"))
+        assertEquals("bill", request.query("text"))
+        assertEquals("1", request.query("is_in_inbox"))
+        assertEquals("title", request.query("ordering"))
+        assertEquals("2", request.query("page"))
+        assertEquals("50", request.query("page_size"))
+        assertFalse("content" in request.query("fields")!!.split(","))
+        assertEquals(1, server.requestCount - 2)
+    }
+
+    @Test
+    fun `the user's filters narrow a view`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, tagIds = setOf(9, 1), correspondentId = 4, documentTypeId = 3))
+
+        val request = server.takeRequest()
+        assertEquals("1,5,9", request.query("tags__id__all"))
+        assertEquals("4", request.query("correspondent__id"))
+        assertEquals("3", request.query("document_type__id"))
+        assertEquals("-created", request.query("ordering"))
+    }
+
+    @Test
+    fun `typed text replaces the view's own search`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, text = " power "))
+
+        val request = server.takeRequest()
+        assertEquals("power", request.query("query"))
+        assertNull(request.query("text"))
+        assertNull(request.query("title_search"))
+        assertNull(request.query("ordering"))
+        assertEquals("5", request.query("tags__id__all"))
+    }
+
+    @Test
+    fun `more like this replaces a view's search too`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, similarTo = 3))
+
+        val request = server.takeRequest()
+        assertEquals("3", request.query("more_like_id"))
+        assertNull(request.query("text"))
+        assertNull(request.query("ordering"))
+    }
+
+    @Test
+    fun `a view not loaded yet is fetched by id first, once`() = runTest {
+        route(
+            "/api/saved_views/7/" to ok(v10View(7, "Bills", rules = viewRules)),
+            "/api/documents/" to ok("""{"count":0,"results":[]}"""),
+        )
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true))
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, page = 2))
+
+        assertEquals("/api/saved_views/7/", server.takeRequest().path)
+        val first = server.takeRequest()
+        assertEquals("/api/documents/", first.requestUrl!!.encodedPath)
+        assertEquals("bill", first.query("text"))
+        assertEquals("-created", first.query("ordering"))
+        assertEquals("/api/documents/", server.takeRequest().requestUrl!!.encodedPath)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `a gone view is not found`() = runTest {
+        respond(404, """{"detail":"No SavedView matches the given query."}""")
+        expectError(Kind.NOT_FOUND) { library.documents(config, DocumentQuery(view = 99)) }
     }
 }

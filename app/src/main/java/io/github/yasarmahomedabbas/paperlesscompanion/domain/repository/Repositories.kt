@@ -14,6 +14,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -83,6 +84,9 @@ interface DocumentLibrary {
 
     /** False when the server's owner switched notes off. */
     suspend fun notesEnabled(config: ServerConfig): Boolean
+
+    /** The lists saved in the server's web interface, in its order. */
+    suspend fun savedViews(config: ServerConfig): SavedViews
 }
 
 /**

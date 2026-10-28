@@ -22,6 +22,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocument
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.TrashUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UpdateDocumentUseCase
 import kotlinx.coroutines.test.runTest
@@ -328,5 +329,24 @@ class DocumentUseCasesTest {
         val query = DocumentQuery(similarTo = 7)
         BrowseDocumentsUseCase(library, signedIn)(query)
         assertEquals(listOf(query), library.queries)
+    }
+
+    // --- saved views ---
+
+    @Test
+    fun `saved views come from the signed-in server`() = runTest {
+        assertSame(library.savedViews, SavedViewsUseCase(library, signedIn)())
+        assertEquals(listOf("savedViews"), library.calls)
+        assertEquals(listOf(CONFIG), library.configs)
+    }
+
+    @Test
+    fun `saved views signed out are not signed in`() = runTest {
+        expectSignedOut { SavedViewsUseCase(library, signedOut)() }
+    }
+
+    @Test
+    fun `saved views pass a server error through`() = runTest {
+        expectPassedThrough { SavedViewsUseCase(library, signedIn)() }
     }
 }
