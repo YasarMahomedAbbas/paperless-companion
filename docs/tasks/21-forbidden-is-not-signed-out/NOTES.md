@@ -35,3 +35,13 @@ Branch: `fix/21-forbidden-is-not-signed-out`
 - Skipped: the new 401-vs-403 rule (403 on a signed-in call is FORBIDDEN, not signed out). The KDoc on `PaperlessHttp.httpError` and `ServerException.Kind` states it, and `PaperlessApiTest` / `PaperlessLibraryTest` enforce it, so a future session would not get it wrong.
 - Skipped: the remote-user API auth caveat (a bad token there answers 403, shown as "no permission"). It's an open risk recorded in Planning, not a rule to follow, and no user-facing doc covers server auth modes.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` BUILD SUCCESSFUL; debug unit tests 330 passed / 0 failed, release unit tests 327 passed / 0 failed; debug line coverage 94.3%, koverVerify passed; lint 0 errors (23 warnings); debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent, so no server address or token).
+- Verified: every 401/403 mapping in the Done-when list through the MockWebServer tests (403 on documents, update, file, upload and task status → FORBIDDEN; 401 and 403 on sign-in → UNAUTHORIZED; existing 400-on-sign-in and 401-on-upload/documents tests still pass), and FORBIDDEN's user message in `UploadDocumentUseCaseTest`.
+- Failed: none
+- Not self-verifiable: the planned read-only real-server check (a bogus token on `GET /api/documents/?page_size=1` answers 401, not 403; a bad sign-in on `/api/token/` answers 400) needs `verify.env`. Device: none.
