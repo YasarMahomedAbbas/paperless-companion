@@ -16,6 +16,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -156,6 +157,7 @@ class FakeServer(
     }
 
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
+    override fun labelsUrl(config: ServerConfig, kind: LabelKind) = "${config.baseUrl}/labels/$kind"
 }
 
 fun doc(id: Int = 1, title: String = "Bill $id") =
@@ -171,13 +173,18 @@ class FakeLibrary : DocumentLibrary {
     var storagePaths = listOf(Label(4, "Bills", 6))
     var file = DocumentFile("bill.pdf", "application/pdf", File("bill.pdf"))
     var failure: Exception? = null
+    /** Thrown by update() only, so the label calls still answer. */
+    var updateFailure: Exception? = null
+    /** While set, update() waits for it, so a test can look at a save in flight. */
+    var updateGate: CompletableDeferred<Unit>? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
 
-    private fun <T> answer(config: ServerConfig, call: String, value: T): T {
+    private fun <T> answer(config: ServerConfig, call: String, value: T, only: Exception? = null): T {
         calls += call
         configs += config
         failure?.let { throw it }
+        only?.let { throw it }
         return value
     }
 
@@ -188,7 +195,10 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun documentTypes(config: ServerConfig) = answer(config, "documentTypes", documentTypes)
     override suspend fun storagePaths(config: ServerConfig) = answer(config, "storagePaths", storagePaths)
     override suspend fun file(config: ServerConfig, id: Int, kind: DocumentFileKind) = answer(config, "file $id $kind", file)
-    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
+    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges): Document {
+        updateGate?.await()
+        return answer(config, "update $id $changes", document, updateFailure)
+    }
     override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
     override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)

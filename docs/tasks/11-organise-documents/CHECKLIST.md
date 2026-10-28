@@ -57,7 +57,7 @@ Paths below are under `app/src/main/java/io/github/yasarmahomedabbas/paperlessco
 
 Goal: everything the Edit details screen and its pickers show exists as tested state, with no UI yet.
 
-### [ ] 1.1 — Link to a label's page in the web UI
+### [x] 1.1 — Link to a label's page in the web UI
 
 Files: `domain/model/Documents.kt`, `domain/repository/Repositories.kt`, `data/PaperlessApi.kt`, `domain/usecase/DocumentLinkUseCase.kt`, test `Fakes.kt`, `data/PaperlessApiTest.kt`
 - `enum class LabelKind { TAG, CORRESPONDENT, DOCUMENT_TYPE, STORAGE_PATH }` in `Documents.kt`.
@@ -66,7 +66,7 @@ Files: `domain/model/Documents.kt`, `domain/repository/Repositories.kt`, `data/P
 - `class LabelsLinkUseCase(server, settings) { operator fun invoke(kind: LabelKind): String? }`, null when signed out, mirroring `DocumentLinkUseCase` in the same file.
 - `FakeServer.labelsUrl` gives `"${config.baseUrl}/labels/$kind"`. Tests: one `PaperlessApiTest` case per kind; `DocumentLinkUseCaseTest` gets signed-in and signed-out cases for `LabelsLinkUseCase`.
 
-### [ ] 1.2 — Edit form state
+### [x] 1.2 — Edit form state
 
 File: `ui/edit/EditDetailsUiState.kt` (new)
 - `data class EditForm(val title: String, val created: LocalDate?, val correspondentId: Int?, val documentTypeId: Int?, val storagePathId: Int?, val tagIds: List<Int>)`, with `companion fun from(document: Document)`.
@@ -74,7 +74,7 @@ File: `ui/edit/EditDetailsUiState.kt` (new)
 - `sealed interface LabelsStatus { Loading; data class Loaded(val labels: Labels); data class Failed(val message: String) }`.
 - `data class EditDetailsUiState(val form: EditForm, val original: EditForm, val labels: LabelsStatus = Loading, val titleError: String? = null, val saving: Boolean = false, val saveFailed: String? = null, val saved: Document? = null)` with `val hasChanges get() = !form.changesFrom(original).isEmpty`.
 
-### [ ] 1.3 — EditDetailsViewModel
+### [x] 1.3 — EditDetailsViewModel
 
 File: `ui/edit/EditDetailsViewModel.kt` (new)
 `class EditDetailsViewModel(document: Document, private val update: UpdateDocumentUseCase, private val loadLabels: LoadLabelsUseCase, private val labelsLink: LabelsLinkUseCase) : ViewModel()`, `val state: StateFlow<EditDetailsUiState>`. It loads labels on `init`.
@@ -83,14 +83,14 @@ File: `ui/edit/EditDetailsViewModel.kt` (new)
 - `save()`: ignored while `saving`. A blank title sets `titleError = "A document needs a title."` and stops. With no changes it sets `saved = document` (the original) without a call. Otherwise it calls `update(document.id, changes)`: success sets `saved`, failure sets `saveFailed` (`userMessage()` or "Couldn't save the changes") and keeps the form.
 - `fun labelsUrl(kind: LabelKind): String? = labelsLink(kind)`.
 
-### [ ] 1.4 — Picker filtering
+### [x] 1.4 — Picker filtering
 
 File: `ui/edit/PickerFilter.kt` (new)
 `internal fun <T> List<T>.matching(query: String, name: (T) -> String): List<T>`: case-insensitive `contains` on the trimmed query; a blank query returns the list. `internal fun List<Tag>.chosenFirst(chosen: Collection<Int>): Pair<List<Tag>, List<Tag>>` gives the chosen tags in the form's order and then the rest in the server's order (the sheet draws a divider between them).
 
-### [ ] 1.5 — Tests
+### [x] 1.5 — Tests
 
-Files: `ui/EditDetailsViewModelTest.kt` (new), `ui/PickerFilterTest.kt` (new); `Fakes.kt` gains `var updateFailure: Exception?` on `FakeLibrary`, thrown only by `update` (the label calls must still answer).
+Files: `ui/EditDetailsViewModelTest.kt` (new), `ui/PickerFilterTest.kt` (new); `Fakes.kt` gains `var updateFailure: Exception?` on `FakeLibrary`, thrown only by `update` (the label calls must still answer), and `var updateGate: CompletableDeferred<Unit>?` so a test can hold a save in flight.
 The cases in the test plan's first two bullets.
 
 ### Verify

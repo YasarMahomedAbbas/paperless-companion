@@ -1,6 +1,7 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
@@ -93,6 +94,14 @@ class PaperlessApi(
 
     /** The document's details page in the Paperless web UI (not an API endpoint). */
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId/details"
+
+    /** A label kind's management page in the Paperless web UI. 3.x redirects these to /attributes/<section>; 2.x serves them as they are. */
+    override fun labelsUrl(config: ServerConfig, kind: LabelKind) = "${config.baseUrl}/" + when (kind) {
+        LabelKind.TAG -> "tags"
+        LabelKind.CORRESPONDENT -> "correspondents"
+        LabelKind.DOCUMENT_TYPE -> "documenttypes"
+        LabelKind.STORAGE_PATH -> "storagepaths"
+    }
 
     private fun url(baseUrl: String, path: String) = PaperlessHttp.url(baseUrl, path)
 
