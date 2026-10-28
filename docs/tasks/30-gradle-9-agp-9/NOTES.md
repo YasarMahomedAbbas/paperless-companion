@@ -31,3 +31,15 @@ Branch: `chore/30-gradle-9-agp-9`
 - Raised: none
 - API: no Paperless call changed (method, path, query, body, response parsing identical); only the transport moved to OkHttp 5. Upload `Content-Length` and v9/v10 `/api/tasks/` tests pass unedited. Live schema not read: `verify.env` absent.
 - Layers: clean (no new imports; `okhttp3` still only in `data/`).
+
+## Doc drift
+
+- Applied: README.md:CI/CD (Release bullet) — `release.yml`'s apksigner path, `docker/Dockerfile`'s `BUILD_TOOLS` and AGP's expected build-tools must move together; a Dependabot AGP bump would otherwise pass CI and break only at the release tag (rung 3).
+- Skipped: Gradle/AGP/Kotlin/library versions — no doc names a version; `libs.versions.toml` and the Dockerfile are the source.
+- Skipped: built-in Kotlin (`kotlin.android` only `apply false` at the root) — AGP 9 errors clearly if the plugin is re-applied in the app module.
+- Skipped: `material-icons-core` now declared explicitly — dropping it fails the compile; `docs/design/README.md`'s mention of `material-icons-core` stays true.
+- Skipped: compileSdk 37 / targetSdk 35 — stated in `app/build.gradle.kts`; nothing in the docs names an SDK level.
+- Skipped: OkHttp 5 non-null `Response.body` — enforced by the compiler; CLAUDE.md's MockWebServer and upload `Content-Length` claims are still true (tests unchanged and green).
+- Skipped: `build.sh`'s shared image tag across parallel worktrees — transient, gone once this merges.
+- Checked, still true: README Development commands and `build.sh` usage, CI/CD bullets against `ci.yml` / `release.yml`, CLAUDE.md's check command and `koverVerifyDebug` CI claim, "JDK, Android SDK and Gradle live in a Docker image".
+- Stale, fixed separately: none
