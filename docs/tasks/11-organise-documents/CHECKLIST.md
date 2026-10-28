@@ -103,35 +103,35 @@ The cases in the test plan's first two bullets.
 
 Goal: trashing (one or many) with an 8-second Undo, selection, and the three bulk changes exist as tested state, with no UI yet.
 
-### [ ] 2.1 — Apply a bulk change locally
+### [x] 2.1 — Apply a bulk change locally
 
 File: `domain/model/DocumentEdits.kt` (new)
 `fun Document.with(edit: BulkEdit): Document`. `ModifyTags` drops `remove` and appends each of `add` the document lacks, keeping its order. `SetCorrespondent`, `SetDocumentType` and `SetStoragePath` set the id (null clears). `Delete` returns the document unchanged. Test: `domain/DocumentEditTest.kt`.
 
-### [ ] 2.2 — TrashViewModel
+### [x] 2.2 — TrashViewModel
 
 File: `ui/documents/TrashViewModel.kt` (new)
 `class TrashViewModel(private val delete: DeleteDocumentUseCase, private val bulkEdit: BulkEditUseCase, private val trash: TrashUseCase, private val undoMillis: Long = 8_000) : ViewModel()`. It is activity-scoped: it outlives the viewer, so the Undo shows on the list.
 - `data class Undoable(val ids: List<Int>, val message: String)`, where the message is "Moved to trash" for one and "3 moved to trash" for many. `data class TrashUiState(val working: Boolean = false, val undoable: Undoable? = null, val failure: String? = null)`.
 - `sealed interface TrashEvent { data class Trashed(val ids: List<Int>); data class Restored(val ids: List<Int>) }` on `val events: SharedFlow<TrashEvent>`.
 - `fun trash(ids: List<Int>)`: ignored while `working` or for none. One id uses `delete`, more use `bulkEdit(ids, BulkEdit.Delete)`. Success emits `Trashed` and sets `undoable`, replacing any earlier one, and a job clears it after `undoMillis`. Failure sets `failure` (`userMessage()` or "Couldn't move it to the trash").
-- `fun undo()`: cancels the timer, calls `trash.restore(ids)`, then emits `Restored`. Failure sets `failure = "Couldn't bring it back: <reason>"`.
+- `fun undo()`: ignored with no offer or while `working`; cancels the timer, clears the offer, calls `trash.restore(ids)`, then emits `Restored`. Failure sets `failure = "Couldn't bring it back: <reason>"`.
 - `fun undoShown()` (the snackbar timed out or was swiped away) clears `undoable`; `fun failureShown()` clears `failure`.
 
-### [ ] 2.3 — Bulk tag marks
+### [x] 2.3 — Bulk tag marks
 
 File: `ui/documents/BulkTags.kt` (new)
 `enum class TagMark { ALL, SOME, NONE }`. `internal fun tagMarks(documents: List<Document>, tags: List<Tag>): Map<Int, TagMark>`. `internal fun TagMark.toggled()`: SOME → ALL, ALL → NONE, NONE → ALL. `internal fun bulkTagChange(start: Map<Int, TagMark>, now: Map<Int, TagMark>): BulkEdit.ModifyTags?` adds the tags that became ALL and removes those that became NONE, and is null when nothing changed. Test: `ui/BulkTagsTest.kt`.
 
-### [ ] 2.4 — SelectionViewModel
+### [x] 2.4 — SelectionViewModel
 
 File: `ui/documents/SelectionViewModel.kt` (new)
 `class SelectionViewModel(private val bulkEdit: BulkEditUseCase) : ViewModel()`.
 - `data class SelectionUiState(val selected: Set<Int> = emptySet(), val working: Boolean = false, val failure: String? = null) { val selecting get() = selected.isNotEmpty() }`.
 - `start(id)`, `toggle(id)` (dropping the last one stops selecting), `selectAll(loadedIds: List<Int>)` (exactly the rows already loaded), `stop()`.
-- `fun change(edit: BulkEdit)` for `ModifyTags`, `SetCorrespondent` and `SetDocumentType`, and `fun changeTags(start, now)` via `bulkTagChange` (null makes no call). Both are ignored while `working`. Success emits `Changed(ids, edit)` on `val changes: SharedFlow<Changed>` and stops selecting. Failure keeps the selection and sets `failure`; `failureShown()` clears it. Trash goes through `TrashViewModel` (the screen passes the selected ids, then calls `stop()` on `Trashed`).
+- `fun change(edit: BulkEdit)` for `ModifyTags`, `SetCorrespondent` and `SetDocumentType`, and `fun changeTags(start, now)` via `bulkTagChange` (null makes no call). Both are ignored while `working` or with nothing selected. Success emits `Changed(ids, edit)` on `val changes: SharedFlow<Changed>` and stops selecting. Failure keeps the selection and sets `failure` (`userMessage()` or "Couldn't change them"); `failureShown()` clears it. Trash goes through `TrashViewModel` (the screen passes the selected ids, then calls `stop()` on `Trashed`).
 
-### [ ] 2.5 — Tests
+### [x] 2.5 — Tests
 
 Files: `domain/DocumentEditTest.kt`, `ui/TrashViewModelTest.kt`, `ui/BulkTagsTest.kt`, `ui/SelectionViewModelTest.kt` (all new). `Fakes.kt`: `FakeLibrary` gains `var writeFailure: Exception?`, thrown by `delete`, `restore` and `bulkEdit` only.
 The cases in the test plan's third to sixth bullets, on virtual time for the Undo window.

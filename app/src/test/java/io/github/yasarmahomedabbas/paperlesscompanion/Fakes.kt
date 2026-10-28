@@ -177,6 +177,8 @@ class FakeLibrary : DocumentLibrary {
     var updateFailure: Exception? = null
     /** While set, update() waits for it, so a test can look at a save in flight. */
     var updateGate: CompletableDeferred<Unit>? = null
+    /** Thrown by delete(), restore() and bulkEdit() only. */
+    var writeFailure: Exception? = null
     val calls = mutableListOf<String>()
     val configs = mutableListOf<ServerConfig>()
 
@@ -199,10 +201,10 @@ class FakeLibrary : DocumentLibrary {
         updateGate?.await()
         return answer(config, "update $id $changes", document, updateFailure)
     }
-    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
+    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit, writeFailure)
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
-    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)
-    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit)
+    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit, writeFailure)
+    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit, writeFailure)
 }
 
 fun release(version: String = "0.2.0", versionCode: Long = 200, notes: String = "Fixes") =
