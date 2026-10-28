@@ -47,6 +47,11 @@ object AppIcons {
     )
     val Download = outline("Download", "M12 4v11M7 10l5 5 5-5M5 20h14")
     val OpenExternal = outline("OpenExternal", "M14 4h6v6M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5")
+    val Calendar = outline("Calendar", "M5 5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "M8 3v4M16 3v4M4 10h16")
+    val Edit = outline("Edit", "M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4")
+    val Trash = outline("Trash", "M4 7h16M10 11v6M14 11v6", "M6 7l1 13h10l1-13M9 7V4h6v3")
+    val Tag = outline("Tag", "M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z", "M8 7.5v.01")
+    val DocumentType = outline("DocumentType", "M6 3h8l5 5v13H6z", "M14 3v5h5M9 13h6M9 17h6")
 }
 
 private const val EYE = "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"

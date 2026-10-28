@@ -149,7 +149,7 @@ Settled while building the viewer (#10):
 
 - **New type slots.** The viewer bar's 18/500 title is `viewerTitle` (18 / 24) and a status
   card's 17/500 statement is `statement` (17 / 24), both in `ui/theme/Type.kt`.
-- **Quick actions show Download alone** until #11 adds Edit; the More menu holds Download and
+- **Quick actions showed Download alone** until #11 added Edit beside it (below); the More menu holds Download and
   Open in Paperless. The menu is the stock M3 `DropdownMenu` on `surface`, `r-card`, 244 wide,
   with `MenuItem` rows (48 high, 20dp `mfg` icon, 15 `fg` text).
 - **The photo-original notice** sits in the quick actions under the hint, and the quick actions
@@ -162,3 +162,41 @@ Settled while building the viewer (#10):
 - **The full-screen tab** is the panel's own handle shrunk to 120 × 48; the rest of the panel
   slides below the screen edge. The page pill ("Page 1 of 3") is a `raised` fully round pill at
   the top centre of the pages, 13 `fg`.
+
+Settled while building Organise documents (#11):
+
+- **Picker field** gained what the Edit details form needs: an optional label above it (read
+  with the value by TalkBack as one button), tags as wrapping pills (`TagPill` with `onRaised`,
+  a `surface` pill on the `field` ground), and a `Date` variant with a calendar icon in place of
+  the chevron. While the labels load, a set field reads "Loading…"; if they fail, "Unknown".
+- **Edit and Download** sit side by side as two `Secondary` buttons in the quick actions and at
+  the foot of all details; Edit is disabled until the document has loaded.
+- **Picker sheets** share one load-failed card ("Couldn't load the choices", Try again) and one
+  no-match card ("No tag called '…'", with Open Paperless as its `Secondary` button). A picker
+  with nothing in it at all says "No tags yet". The tags picker pins the tags chosen when it
+  opened above the divider, so a tick never moves the row under the finger.
+- **Mixed checkbox** (`MixedChoiceRow`) is a `raised` box with a 2dp `mfg` ring and a 10 × 2
+  dash, exposed to TalkBack as a tri-state checkbox.
+- **The date picker** is Material's own `DatePickerDialog` on `surface`, `r-sheet`, with text
+  OK and Cancel.
+- **Discard changes?** reads "Your changes to this document haven't been saved." with Keep
+  editing and a `DestructiveText` Discard.
+- **Move to trash** is the More menu's last item, after a `border` divider, in `destructive`;
+  it is disabled until the document has loaded. Its confirm is an `AppDialog` with the
+  `Destructive` button. A trash that fails stays on the viewer as a snackbar.
+- **The Undo snackbar** shows on the list, not the viewer (the viewer closes on success). It has
+  no time-out of its own: the app's 8-second offer decides when it goes, and swiping it away
+  ends the offer. The Add button rises 64 above it while it shows.
+- **Selecting** keeps the search field and chips under the selection bar; only the title row
+  gives way. A tap toggles a row, a long-press on a row while selecting toggles it too, and
+  Back stops selecting before it stops searching. The bulk bar sits 12 from the sides (the
+  card gutter), 24 above the bottom, with a 6dp shadow, and is disabled while a change is on
+  its way.
+- **Bulk sheets.** The bulk Tags sheet is titled "Tags for 3 documents", has no chosen-first
+  divider (the marks are mixed), and its pinned bar counts the tags changed ("1 tag changed")
+  beside Done. From and Type reuse the single-choice picker with nothing marked, since the
+  selected documents differ; "None" clears it on all of them.
+- **Bulk trash** confirms with "Move 3 documents to trash?" and "They go to the Paperless trash.
+  You can bring them back from there." (the titles aren't listed). Its Undo is the same
+  snackbar, "3 moved to trash".
+- **Snackbars** can be swiped away sideways (`AppSnackbarHost`).

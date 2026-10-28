@@ -66,6 +66,9 @@ data class Tag(
 /** A correspondent, document type or storage path. */
 data class Label(val id: Int, val name: String, val documentCount: Int?)
 
+/** The four kinds of label a document can carry. */
+enum class LabelKind { TAG, CORRESPONDENT, DOCUMENT_TYPE, STORAGE_PATH }
+
 data class Labels(
     val tags: List<Tag>,
     val correspondents: List<Label>,

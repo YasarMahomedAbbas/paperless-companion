@@ -12,6 +12,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -31,6 +32,9 @@ interface DocumentServer {
 
     /** The address of a document's page in the server's own web interface. */
     fun documentUrl(config: ServerConfig, documentId: Int): String
+
+    /** Where the server's own web interface manages this kind of label (new ones are made there). */
+    fun labelsUrl(config: ServerConfig, kind: LabelKind): String
 }
 
 /** The documents already on the server, and the labels they carry. Implementations throw ServerException on any failure. */

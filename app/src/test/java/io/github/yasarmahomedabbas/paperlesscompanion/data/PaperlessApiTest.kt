@@ -3,6 +3,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.data
 import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
 import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
@@ -51,6 +52,14 @@ class PaperlessApiTest {
     @Test
     fun `documentUrl points at the document's details page`() {
         assertEquals("http://paperless:8000/documents/5/details", api.documentUrl(CONFIG, 5))
+    }
+
+    @Test
+    fun `labelsUrl points at each label kind's page in the web UI`() {
+        assertEquals("http://paperless:8000/tags", api.labelsUrl(CONFIG, LabelKind.TAG))
+        assertEquals("http://paperless:8000/correspondents", api.labelsUrl(CONFIG, LabelKind.CORRESPONDENT))
+        assertEquals("http://paperless:8000/documenttypes", api.labelsUrl(CONFIG, LabelKind.DOCUMENT_TYPE))
+        assertEquals("http://paperless:8000/storagepaths", api.labelsUrl(CONFIG, LabelKind.STORAGE_PATH))
     }
 
     @Test

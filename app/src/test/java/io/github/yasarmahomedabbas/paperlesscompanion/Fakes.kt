@@ -16,6 +16,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -157,6 +158,7 @@ class FakeServer(
     }
 
     override fun documentUrl(config: ServerConfig, documentId: Int) = "${config.baseUrl}/documents/$documentId"
+    override fun labelsUrl(config: ServerConfig, kind: LabelKind) = "${config.baseUrl}/labels/$kind"
 }
 
 fun doc(id: Int = 1, title: String = "Bill $id") =
@@ -184,6 +186,12 @@ class FakeLibrary : DocumentLibrary {
     /** With a gate set, file() waits on it (after reporting progress), so a test can look at a fetch in flight. */
     var fileGate: CompletableDeferred<Unit>? = null
     var failure: Exception? = null
+    /** Thrown by update() only, so the label calls still answer. */
+    var updateFailure: Exception? = null
+    /** While set, update() waits for it, so a test can look at a save in flight. */
+    var updateGate: CompletableDeferred<Unit>? = null
+    /** Thrown by delete(), restore() and bulkEdit() only. */
+    var writeFailure: Exception? = null
     /** When set, documents() answers with what it returns for the query (and throws what it throws) instead of [page]. */
     var pages: ((DocumentQuery) -> DocumentPage)? = null
     /** When set, documents() waits on it before answering, so a test can look at a load in flight. */
@@ -193,10 +201,11 @@ class FakeLibrary : DocumentLibrary {
     /** Every documents() query, recorded before it waits or fails. */
     val queries = mutableListOf<DocumentQuery>()
 
-    private fun <T> answer(config: ServerConfig, call: String, value: T): T {
+    private fun <T> answer(config: ServerConfig, call: String, value: T, only: Exception? = null): T {
         calls += call
         configs += config
         failure?.let { throw it }
+        only?.let { throw it }
         return value
     }
 
@@ -233,11 +242,14 @@ class FakeLibrary : DocumentLibrary {
         fileFailure?.let { calls += "file $id $kind"; throw it }
         return answer(config, "file $id $kind", files[kind] ?: file)
     }
-    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges) = answer(config, "update $id $changes", document)
-    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit)
+    override suspend fun update(config: ServerConfig, id: Int, changes: DocumentChanges): Document {
+        updateGate?.await()
+        return answer(config, "update $id $changes", document, updateFailure)
+    }
+    override suspend fun delete(config: ServerConfig, id: Int) = answer(config, "delete $id", Unit, writeFailure)
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
-    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit)
-    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit)
+    override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit, writeFailure)
+    override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit, writeFailure)
 }
 
 /** Records each export as "<call> <name>[ <location>]", answering [savedAs] or throwing [failure]. */
