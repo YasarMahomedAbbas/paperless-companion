@@ -13,6 +13,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLin
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.ExportDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
 import kotlinx.coroutines.async
@@ -70,6 +71,10 @@ data class ViewerUiState(
     val message: String? = null,
     /** The document as last loaded or saved; Edit details starts from it. */
     val document: Document? = null,
+    /** Notes are on at the server; known once the details loaded. */
+    val notesEnabled: Boolean = false,
+    /** How many notes the document has, or null while unknown. */
+    val noteCount: Int? = null,
 )
 
 /** What the screen does once, outside itself: hand a file to another app, ask where to save, open a browser. */
@@ -90,6 +95,7 @@ class ViewerViewModel(
     private val openFile: OpenDocumentFileUseCase,
     private val documentLink: DocumentLinkUseCase,
     private val export: ExportDocumentUseCase,
+    private val notes: NotesUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ViewerUiState(documentId))
     val state: StateFlow<ViewerUiState> = _state.asStateFlow()
@@ -179,8 +185,13 @@ class ViewerViewModel(
     /** Edit details saved [document]: the panel shows it as the server now has it. */
     fun showUpdated(document: Document) {
         if (document.id != documentId) return
-        _state.update { it.copy(document = document, details = DetailsState.Ready(document.details(labels))) }
+        _state.update {
+            it.copy(document = document, details = DetailsState.Ready(document.details(labels)), noteCount = document.noteCount ?: it.noteCount)
+        }
     }
+
+    /** The Notes screen added one: the panel's count follows. */
+    fun notesChanged(count: Int) = _state.update { it.copy(noteCount = count) }
 
     /** Snackbar text from elsewhere (a trash that failed). */
     fun showMessage(message: String) = _state.update { it.copy(message = message) }
@@ -216,15 +227,32 @@ class ViewerViewModel(
                     null
                 }
             }
+            // Whether notes are on only decides if the Notes row shows: when unknown, it shows.
+            val loadingNotesEnabled = async {
+                try {
+                    notes.enabled()
+                } catch (e: ServerException) {
+                    true
+                }
+            }
             val document = try {
                 getDocument(documentId)
             } catch (e: ServerException) {
                 loadingLabels.cancel()
+                loadingNotesEnabled.cancel()
                 _state.update { it.copy(details = DetailsState.Failed(e.userMessage(), e.isNetwork)) }
                 return@launch
             }
             labels = loadingLabels.await()
-            _state.update { it.copy(details = DetailsState.Ready(document.details(labels)), document = document) }
+            val notesEnabled = loadingNotesEnabled.await()
+            _state.update {
+                it.copy(
+                    details = DetailsState.Ready(document.details(labels)),
+                    document = document,
+                    notesEnabled = notesEnabled,
+                    noteCount = document.noteCount,
+                )
+            }
         }
     }
 

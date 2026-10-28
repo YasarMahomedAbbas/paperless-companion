@@ -313,14 +313,14 @@ Files: `ui/documents/DocumentsScreen.kt`, `ui/viewer/ViewerScreen.kt`, `MainActi
 
 Goal: all details shows a Notes row ("Notes · 3", or "No notes yet") when notes are on. It opens a Notes screen that lists them newest first and adds one.
 
-### [ ] 5.1 — Viewer knows about notes
+### [x] 5.1 — Viewer knows about notes
 
 Files: `ui/viewer/ViewerViewModel.kt`, `AppContainer.kt`
 - `ViewerViewModel` gains `notes: NotesUseCase`. On load it calls `notes.enabled()` alongside the document, and a failure counts as enabled.
 - `ViewerUiState` gains `notesEnabled: Boolean = false` (true once known) and `noteCount: Int?` from `document.noteCount`.
 - `fun notesChanged(count: Int)` updates `noteCount` after the Notes screen adds one.
 
-### [ ] 5.2 — NotesViewModel
+### [x] 5.2 — NotesViewModel
 
 File: `ui/notes/NotesViewModel.kt` (new)
 - `sealed interface NotesStatus { Loading; Loaded; Failed(val message: String, val unreachable: Boolean) }`.
@@ -329,20 +329,20 @@ File: `ui/notes/NotesViewModel.kt` (new)
   - It loads on `init`. `retry()` loads again.
   - `setDraft(String)` sets the draft and clears `addFailed`.
   - `add()`: ignored while `adding` or when the draft is blank. On success the draft clears and `notes` becomes the answer. On failure `addFailed` is `userMessage()` or "Couldn't add the note", and the draft is kept.
-  - `val count: Int` is `notes.size` once loaded.
+  - `val count: Int?` is `notes.size` once loaded, null before (the viewer keeps its own count then).
   - Failures use `userMessage()`, with `unreachable` for UNREACHABLE / NO_ANSWER, mirroring `DocumentsViewModel.failure()`.
 
-### [ ] 5.3 — Notes screen and the panel row
+### [x] 5.3 — Notes screen and the panel row
 
 Files: `ui/notes/NotesScreen.kt` (new), `ui/viewer/ViewerScreen.kt`, `MainActivity.kt`, `AppContainer.kt`. Apply `design-recipe`: a stack screen with the form bar's back arrow, titled "Notes", the document title as the subtitle.
 - Loaded: cards newest first, each with the text (15 `fg`, selectable) and "Ann · 3 Oct 2026, 09:14" (13 `mfg`; just the date when there's no author).
 - Bottom area pinned above the keyboard (`imePadding`): a multi-line `AppTextField` "Add a note" and a `Primary` **Add** button, disabled while blank or adding. A failure shows as a notice banner above the field.
 - States: skeleton (three note-card blocks), empty ("No notes yet", with the field as its action), load failed (status card, Try again; unreachable wording per the manual).
-- `AllDetails` gets a `DetailRow("Notes", "3" / "None")`, made clickable (≥ 48dp, role button, "Open notes") only when `notesEnabled`. It is hidden entirely when notes are off.
+- `AllDetails` gets a `DetailRow("Notes", "3" / "None" / "Open" when the count is unknown)`, clickable (≥ 48dp, role button, "Open notes", trailing chevron). It shows only when `notesEnabled`, so it is hidden entirely when notes are off. `DetailRow` gained `onClick`/`onClickLabel`, `BackBar` an optional `subtitle`, and `AppTextField` a `multiLine` variant for this screen.
 - `MainActivity`: `openNotesFor: Int?` (`rememberSaveable`) shows `NotesScreen` over the viewer. Back returns to the viewer, which calls `notesChanged(count)`.
 - `AppContainer`: a `notesViewModelFactory(documentId)`, mirroring `viewerViewModelFactory(documentId)`. `MainActivity` builds it with `viewModel<NotesViewModel>(key = "notes-$documentId-$notesOpens", …)`.
 
-### [ ] 5.4 — Tests and manual
+### [x] 5.4 — Tests and manual
 
 Files: `ui/NotesViewModelTest.kt` (new), `ui/ViewerViewModelTest.kt`, `docs/design/README.md`
 - The cases in the test plan's Notes and Viewer bullets.

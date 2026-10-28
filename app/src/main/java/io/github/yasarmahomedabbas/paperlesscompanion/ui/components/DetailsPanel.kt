@@ -1,5 +1,6 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.components
 
+import androidx.compose.material3.Icon
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -160,14 +161,25 @@ fun DetailsPanel(
     }
 }
 
-/** One line of the details' definition list: label 14 `mfg` left, value 15 `fg` right, divided by `border-muted`. */
+/**
+ * One line of the details' definition list: label 14 `mfg` left, value 15 `fg` right, divided by `border-muted`.
+ * With [onClick] the whole row is a button (read with [onClickLabel]) ending in a chevron, as the Notes row.
+ */
 @Composable
-fun DetailRow(label: String, value: String, modifier: Modifier = Modifier) {
+fun DetailRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+) {
     val colors = MaterialTheme.colorScheme
-    Column(modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+    val tap = if (onClick != null) Modifier.clickable(onClickLabel = onClickLabel, role = Role.Button, onClick = onClick) else Modifier
+    Column(modifier.fillMaxWidth().then(tap).semantics(mergeDescendants = true) {}) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = Spacing.s12),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s16),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             Text(
@@ -177,6 +189,9 @@ fun DetailRow(label: String, value: String, modifier: Modifier = Modifier) {
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f),
             )
+            if (onClick != null) {
+                Icon(AppIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            }
         }
         HorizontalDivider(color = colors.outlineVariant, thickness = 1.dp)
     }

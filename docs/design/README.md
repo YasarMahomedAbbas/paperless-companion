@@ -226,3 +226,18 @@ Settled while building saved views, notes and more like this (#12):
 - **Nothing similar** says "Nothing like "<title>"" with "Paperless found no other document
   like this one." (or, with filters on, "No document like this one carries every one of these
   filters.") and "Show all documents", which ends the mode and clears the filters.
+- **The Notes row** is the last line of all details, "Notes" with the count ("3", "None", or
+  "Open" when the server didn't say), a trailing chevron, and the whole row a button ("Open
+  notes" to TalkBack). `DetailRow` gained `onClick` for it. The row is hidden until the server's
+  notes switch is known, and stays hidden when it is off; not knowing counts as on.
+- **The Notes screen** is a pushed screen over the viewer: `BackBar` "Notes" with the document's
+  title under it (`BackBar` gained an optional one-line `subtitle`, 14 `mfg`). Notes are
+  `surface` cards on the 12 card gutter, newest first: the text (15 `fg`, selectable) over
+  "Ann · 3 Oct 2026, 09:14" (13 `mfg`). "Add a note" is pinned at the bottom above the keyboard:
+  a multi-line `AppTextField` (`multiLine`, up to five lines) beside a `Primary` **Add**, which
+  is disabled while blank and busy while adding.
+- **Notes states**: a skeleton of three note cards; empty is a status card, "No notes yet" /
+  "Write the first one below. …", with the field as its action (no button); a failed load is
+  the usual status card with Try again ("Can't reach Paperless" for the network, otherwise
+  "Couldn't load the notes"); a failed add is a `Refused` notice banner above the field, and the
+  text stays. A speech-bubble icon (`Note`) is drawn in `AppIcons.kt` for the empty state.

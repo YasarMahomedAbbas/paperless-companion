@@ -31,3 +31,19 @@ Branch: `feat/12-saved-views-and-notes`
   - The note endpoints answer some failures with HTTP 200 and `{"error": …}`; the client treats that as a failure. MockWebServer can't show what a real server sends on other edge cases.
   - On 2.x (Whoosh), `more_like_id` may include the source document itself in the results; v3 excludes it. Self-verification should check on the real server.
   - The note added during write verification stays on the self-uploaded document, because delete is out of scope.
+
+## Implementation
+
+- Shipped:
+  - Notes and more like this, data and domain: `DocumentLibrary.notes` / `addNote` / `notesEnabled` (`data/PaperlessLibrary.kt:257-271`, 200 + `{"error"}` read as SERVER), `JsonObject.toNote()` (`data/PaperlessJson.kt:49`), `Document.noteCount`, `DocumentQuery.similarTo` → `more_like_id` with no `query`/`ordering` (`data/PaperlessLibrary.kt:59`), `NotesUseCase` (`domain/usecase/NotesUseCase.kt`).
+  - Saved views, data and domain: `SavedView` / `SavedViews`, `DocumentQuery.view` / `viewOrder`, `SavedViewsUseCase`; the v3.3.4 rule table and `queryParamsFromFilterRules` port (`data/PaperlessViews.kt:23`, table at `:73`); `savedViews()` reading v9 flags on the view or v10 ids from `ui_settings`, both ordered by the `*_sort_order` arrays (`data/PaperlessLibrary.kt:105`); `documents()` merging a view's parameters with the user's tags, correspondent, type, text and sort, the view filter cached per server and id or fetched by id (`data/PaperlessLibrary.kt:59-100`).
+  - Saved views in the list: view chips first in the chip row, a Views chip and the "Saved views" sheet (`ui/documents/ViewsSheet.kt:28`), `chooseView` / `clearView` and "View's order" (`ui/documents/DocumentsViewModel.kt:145`), an empty-view state with "Show all documents".
+  - More like this: the viewer's More menu item (`ui/viewer/ViewerScreen.kt:264`), `showSimilar` / `clearSimilar` (`ui/documents/DocumentsViewModel.kt:161-180`), the removable "Like: <title>" chip, the sort chip disabled, a "Nothing like …" empty state; `MainActivity.kt:237` closes the viewer and starts it.
+  - Notes: the Notes row in all details (`ui/viewer/ViewerScreen.kt:385`), `ViewerViewModel` `notesEnabled` / `noteCount` / `notesChanged`, `NotesViewModel` (`ui/notes/NotesViewModel.kt:36`) and `NotesScreen` (`ui/notes/NotesScreen.kt:62`), opened over the viewer from `MainActivity.kt:233`.
+  - Component variants: `DetailRow(onClick, onClickLabel)`, `BackBar(subtitle)`, `AppTextField(multiLine)`; icons `Views`, `Similar`, `Note` in `AppIcons.kt`. The manual's § Decisions has the "#12" entries.
+- Tests: full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) passed: 520 debug unit tests, 0 failed, 0 skipped; koverVerify, lintDebug (warnings only) and assembleDebug green. The Gradle run executed no `testReleaseUnitTest` task in this build.
+- Outstanding: none of the checklist's tasks. The device-only checks (chip row scrolling with view chips, the Notes screen with the keyboard open, TalkBack on the Views sheet and notes) and every real-server check are for self-verification; no live `/api/schema/` has been read yet.
+- Contradicted the plan:
+  - The planning notes gave the simple title/text rules as 40 and 41. At v3.3.4 (`filter-rule-type.ts`) they are 48 (`title_search`) and 49 (`text`); 40/41 are `custom_fields__id__none` and `has_custom_fields`. The table follows the source, and the checklist's References and test plan were corrected.
+  - The web UI leaves out any parameter whose value is null (`abstract-paperless-service.ts` `list`), so a null value on a rule without an `isnull` parameter is dropped rather than sent.
+  - Small shape changes, written back into the checklist: `NotesViewModel.count` is `Int?` (null before the notes load); `clearSimilar(alsoFilters)` serves the "Show all documents" empty state; the Notes row reads "Open" when the server gave no count; an empty saved view has its own state ("Nothing in <view>").

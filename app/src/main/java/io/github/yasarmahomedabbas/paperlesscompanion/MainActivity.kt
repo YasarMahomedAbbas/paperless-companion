@@ -11,6 +11,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerEvent
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.notes.NotesScreen
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.notes.NotesViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerScreen
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerViewModel
 import android.content.Intent
@@ -136,6 +138,9 @@ class MainActivity : FragmentActivity() {
                 // Edit details open over the viewer; each opening gets a fresh form.
                 var editing by rememberSaveable { mutableStateOf(false) }
                 var editOpens by rememberSaveable { mutableIntStateOf(0) }
+                // The Notes screen opens over the viewer of this document; each opening loads them afresh.
+                var openNotesFor by rememberSaveable { mutableStateOf<Int?>(null) }
+                var notesOpens by rememberSaveable { mutableIntStateOf(0) }
                 LaunchedEffect(current is GateState.SignIn) {
                     if (current is GateState.SignIn) {
                         openDocumentId = null
@@ -174,7 +179,21 @@ class MainActivity : FragmentActivity() {
                                     val viewer = viewModel<ViewerViewModel>(key = "viewer-$documentId-$viewerOpens", factory = container.viewerViewModelFactory(documentId))
                                     val editingDocument = viewer.state.collectAsState().value.document
                                     // The form starts from the viewer's document; after the app was killed the viewer loads it again first.
-                                    if (editing && editingDocument != null) {
+                                    val notesFor = openNotesFor
+                                    if (notesFor == documentId && !editing) {
+                                        val notes = viewModel<NotesViewModel>(
+                                            key = "notes-$documentId-$notesOpens",
+                                            factory = container.notesViewModelFactory(documentId),
+                                        )
+                                        NotesScreen(
+                                            viewModel = notes,
+                                            title = editingDocument?.title.orEmpty(),
+                                            onBack = {
+                                                notes.count?.let(viewer::notesChanged)
+                                                openNotesFor = null
+                                            },
+                                        )
+                                    } else if (editing && editingDocument != null) {
                                         EditDetailsScreen(
                                             viewModel = viewModel<EditDetailsViewModel>(
                                                 key = "edit-$documentId-$editOpens",
@@ -209,6 +228,10 @@ class MainActivity : FragmentActivity() {
                                                 editing = true
                                             },
                                             onTrash = { trash.trash(listOf(documentId)) },
+                                            onOpenNotes = {
+                                                notesOpens++
+                                                openNotesFor = documentId
+                                            },
                                             onMoreLikeThis = { document ->
                                                 openDocumentId = null
                                                 list.showSimilar(document.id, document.title)
@@ -228,6 +251,7 @@ class MainActivity : FragmentActivity() {
                                         onOpenDocument = {
                                             viewerOpens++
                                             editing = false
+                                            openNotesFor = null
                                             openDocumentId = it
                                         },
                                         trash = trash,

@@ -16,6 +16,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLin
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.ExportDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.OpenDocumentFileUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.DetailsState
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.DocumentDetails
@@ -74,6 +75,7 @@ class ViewerViewModelTest {
         OpenDocumentFileUseCase(library, settings),
         DocumentLinkUseCase(FakeServer(), settings),
         ExportDocumentUseCase(exports),
+        NotesUseCase(library, settings),
     )
 
     /** Collects every event the view model sends from now on, as it is sent. */
@@ -500,5 +502,54 @@ class ViewerViewModelTest {
         advanceUntilIdle()
 
         assertTrue(events.isEmpty())
+    }
+
+    // --- notes ---
+
+    @Test
+    fun `notes are on once the details load, with the document's count`() = runTest(main.dispatcher) {
+        library.document = bill.copy(noteCount = 3)
+        val vm = viewModel()
+        assertFalse(vm.state.value.notesEnabled)
+
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.notesEnabled)
+        assertEquals(3, vm.state.value.noteCount)
+        assertTrue("notesEnabled" in library.calls)
+    }
+
+    @Test
+    fun `notes switched off at the server hide the row`() = runTest(main.dispatcher) {
+        library.notesEnabled = false
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.notesEnabled)
+    }
+
+    @Test
+    fun `not knowing whether notes are on counts as on`() = runTest(main.dispatcher) {
+        library.notesFailure = ServerException(Kind.FORBIDDEN, "403")
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.notesEnabled)
+        assertTrue(vm.state.value.details is DetailsState.Ready)
+    }
+
+    @Test
+    fun `the count follows the Notes screen and an edit`() = runTest(main.dispatcher) {
+        library.document = bill.copy(noteCount = 1)
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.notesChanged(2)
+        assertEquals(2, vm.state.value.noteCount)
+
+        vm.showUpdated(bill.copy(title = "Renamed"))
+        assertEquals("an edit that doesn't say keeps the count", 2, vm.state.value.noteCount)
+        vm.showUpdated(bill.copy(noteCount = 4))
+        assertEquals(4, vm.state.value.noteCount)
     }
 }

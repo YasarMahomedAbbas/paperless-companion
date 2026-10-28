@@ -51,6 +51,8 @@ object AppIcons {
     val Edit = outline("Edit", "M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4")
     val Trash = outline("Trash", "M4 7h16M10 11v6M14 11v6", "M6 7l1 13h10l1-13M9 7V4h6v3")
     val Tag = outline("Tag", "M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z", "M8 7.5v.01")
+    /** A speech bubble with two lines: a document's notes. */
+    val Note = outline("Note", "M5 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H10l-5 4v-4H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z", "M8 8.5h8M8 12h5")
     /** Two documents, one behind the other: "More like this". */
     val Similar = outline("Similar", "M9 3h7l4 4v11H9z", "M16 3v4h4M6 7v14h9")
     /** A bookmark: the saved views. */
