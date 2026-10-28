@@ -1,12 +1,12 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui
 
 import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
-import io.github.yasarmahomedabbas.paperlesscompanion.FakePaperless
+import io.github.yasarmahomedabbas.paperlesscompanion.FakeServer
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
 import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.home.HomeViewModel
@@ -24,9 +24,9 @@ class HomeViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
-    private val paperless = FakePaperless()
+    private val server = FakeServer()
     private val settings = FakeSettings(CONFIG)
-    private val viewModel = HomeViewModel(UploadDocumentUseCase(paperless, settings), settings)
+    private val viewModel = HomeViewModel(UploadDocumentUseCase(server, settings), settings)
 
     private val uploads get() = viewModel.state.value.uploads
 
@@ -49,32 +49,32 @@ class HomeViewModelTest {
 
     @Test
     fun `a failed upload can be retried`() = runTest(main.dispatcher) {
-        paperless.uploadResult = { throw PaperlessException(PaperlessException.Kind.UNREACHABLE, "down") }
+        server.uploadResult = { throw ServerException(ServerException.Kind.UNREACHABLE, "down") }
         viewModel.upload(listOf(document()))
         advanceUntilIdle()
         assertTrue(uploads.single().state is UploadState.Failed)
 
-        paperless.uploadResult = { "task-2" }
+        server.uploadResult = { "task-2" }
         viewModel.retry(uploads.single().id)
         advanceUntilIdle()
 
         assertEquals(UploadState.Done(42), uploads.single().state)
-        assertEquals(2, paperless.uploads.size)
+        assertEquals(2, server.uploads.size)
     }
 
     @Test
     fun `retry after a failed status check checks again instead of uploading again`() = runTest(main.dispatcher) {
-        paperless.taskAlwaysFails = PaperlessException(PaperlessException.Kind.NO_ANSWER, "timeout")
+        server.taskAlwaysFails = ServerException(ServerException.Kind.NO_ANSWER, "timeout")
         viewModel.upload(listOf(document()))
         advanceUntilIdle()
         assertEquals("task-1", (uploads.single().state as UploadState.Failed).taskId)
 
-        paperless.taskAlwaysFails = null
+        server.taskAlwaysFails = null
         viewModel.retry(uploads.single().id)
         advanceUntilIdle()
 
         assertEquals(UploadState.Done(42), uploads.single().state)
-        assertEquals(1, paperless.uploads.size)
+        assertEquals(1, server.uploads.size)
     }
 
     @Test
@@ -86,13 +86,13 @@ class HomeViewModelTest {
         viewModel.retry(999)
         advanceUntilIdle()
 
-        assertEquals(1, paperless.uploads.size)
+        assertEquals(1, server.uploads.size)
     }
 
     @Test
     fun `unexpected errors become a failed upload instead of a crash`() = runTest(main.dispatcher) {
         viewModel.upload(listOf(DocumentSource("x.pdf", "application/pdf") { error("unused") }))
-        paperless.uploadResult = { throw IllegalStateException("surprise") }
+        server.uploadResult = { throw IllegalStateException("surprise") }
         advanceUntilIdle()
 
         assertEquals(UploadState.Failed("surprise"), uploads.single().state)
@@ -102,7 +102,7 @@ class HomeViewModelTest {
     fun `clear finished keeps uploads that are still running`() = runTest(main.dispatcher) {
         viewModel.upload(listOf(document("done.pdf")))
         advanceUntilIdle()
-        paperless.tasks[0] = paperless.tasks[0].copy(status = io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus.RUNNING)
+        server.tasks[0] = server.tasks[0].copy(status = io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus.RUNNING)
         viewModel.upload(listOf(document("busy.pdf")))
         main.dispatcher.scheduler.runCurrent()
 

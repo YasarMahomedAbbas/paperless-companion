@@ -45,26 +45,26 @@ The pipeline settled these decisions:
 
 Goal: the domain says `DocumentServer` and `ServerException`, and every test passes unchanged apart from the renames.
 
-### [ ] 1.1 — Rename the repository interface
+### [x] 1.1 — Rename the repository interface
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/repository/Repositories.kt`
 - `interface PaperlessRepository` → `interface DocumentServer`. Methods are unchanged (`login`, `upload`, `task`).
 - New KDoc: "The document server the app signs in and uploads to. Implementations throw ServerException on any failure."
 
-### [ ] 1.2 — Rename the exception and make the model KDoc neutral
+### [x] 1.2 — Rename the exception and make the model KDoc neutral
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Models.kt`
 - `class PaperlessException(kind, message, cause)` → `class ServerException(...)`. `Kind` is unchanged.
 - KDoc only: `ServerConfig` becomes "A document server and the API token that signs in to it". `UploadState` and `TaskInfo` comments say "the server" instead of "Paperless". `TaskInfo` and `TaskStatus` keep their names.
 
-### [ ] 1.3 — Update the users
+### [x] 1.3 — Update the users
 
 Files: `domain/usecase/LoginUseCase.kt`, `domain/usecase/UploadDocumentUseCase.kt`, `ui/login/LoginViewModel.kt`, `data/PaperlessApi.kt`, `AppContainer.kt` (all under `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/`)
 - Replace the type names. Rename the constructor parameters `paperless: PaperlessRepository` → `server: DocumentServer` in both use cases, and `private val paperless` → `private val server` in `AppContainer`.
 - `PaperlessApi` KDoc: "DocumentServer over the paperless-ngx REST API (token auth)."
 - **Leave every user-visible string as it is**, including `userMessage()`'s "Paperless" wording and "Paperless refused the document" (decision Q2). Only code comments change.
 
-### [ ] 1.4 — Rename in the tests
+### [x] 1.4 — Rename in the tests
 
 Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/Fakes.kt` and every test that uses these names
 - `FakePaperless` → `FakeServer : DocumentServer`, with KDoc "Scripted server: …". Test fields `paperless` → `server`.

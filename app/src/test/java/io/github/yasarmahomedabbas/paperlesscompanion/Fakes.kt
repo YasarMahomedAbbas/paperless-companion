@@ -4,7 +4,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,12 +26,12 @@ class FakeSettings(var config: ServerConfig? = null) : SettingsRepository {
     override fun clear() { config = null }
 }
 
-/** Scripted Paperless: login and upload results are fixed, task() replays [tasks] then repeats the last one. */
-class FakePaperless(
+/** Scripted server: login and upload results are fixed, task() replays [tasks] then repeats the last one. */
+class FakeServer(
     var loginResult: () -> String = { "token-123" },
     var uploadResult: () -> String = { "task-1" },
     val tasks: MutableList<TaskInfo> = mutableListOf(TaskInfo(TaskStatus.SUCCESS, "ok", 42)),
-) : PaperlessRepository {
+) : DocumentServer {
     /** Thrown by task() before it replays [tasks]: the first ones once each, [taskAlwaysFails] every time. */
     val taskFailures = mutableListOf<Exception>()
     var taskAlwaysFails: Exception? = null

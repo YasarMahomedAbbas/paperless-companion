@@ -2,7 +2,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
@@ -42,7 +42,7 @@ class LoginViewModel(private val login: LoginUseCase) : ViewModel() {
 }
 
 private fun Throwable.loginMessage(): String = when {
-    this is PaperlessException && kind == PaperlessException.Kind.UNAUTHORIZED -> "Wrong username or password"
-    this is PaperlessException -> userMessage()
+    this is ServerException && kind == ServerException.Kind.UNAUTHORIZED -> "Wrong username or password"
+    this is ServerException -> userMessage()
     else -> message ?: "Sign-in failed"
 }

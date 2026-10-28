@@ -2,8 +2,8 @@ package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException.Kind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskStatus
@@ -39,8 +39,8 @@ class PaperlessApiTest {
     private suspend fun expectError(kind: Kind, block: suspend () -> Unit) {
         try {
             block()
-            fail("expected PaperlessException($kind)")
-        } catch (e: PaperlessException) {
+            fail("expected ServerException($kind)")
+        } catch (e: ServerException) {
             assertEquals(kind, e.kind)
         }
     }
@@ -107,7 +107,7 @@ class PaperlessApiTest {
         try {
             api.upload(config, document())
             fail()
-        } catch (e: PaperlessException) {
+        } catch (e: ServerException) {
             assertEquals(Kind.SERVER, e.kind)
             assertTrue(e.message!!.contains("500"))
         }
@@ -198,7 +198,7 @@ class PaperlessApiTest {
         try {
             api.task(config, "t")
             fail()
-        } catch (e: PaperlessException) {
+        } catch (e: ServerException) {
             assertTrue(e.message!!.startsWith("can't connect to ${server.hostName}: "))
         }
     }
@@ -211,7 +211,7 @@ class PaperlessApiTest {
         try {
             quick.task(config, "t")
             fail()
-        } catch (e: PaperlessException) {
+        } catch (e: ServerException) {
             assertEquals(Kind.NO_ANSWER, e.kind)
             assertTrue(e.message!!.contains("timeout"))
         }

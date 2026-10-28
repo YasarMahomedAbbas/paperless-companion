@@ -7,7 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yasarmahomedabbas.paperlesscompanion.data.KeystoreSettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessApi
 import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.PaperlessRepository
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentServer
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.UploadDocumentUseCase
@@ -18,13 +18,13 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 class AppContainer(context: Context) {
     val settings: SettingsRepository = KeystoreSettingsRepository(context)
     val documents = UriDocuments(context.contentResolver)
-    private val paperless: PaperlessRepository = PaperlessApi()
+    private val server: DocumentServer = PaperlessApi()
 
     val loginViewModelFactory = viewModelFactory {
-        initializer { LoginViewModel(LoginUseCase(paperless, settings)) }
+        initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
     val homeViewModelFactory = viewModelFactory {
-        initializer { HomeViewModel(UploadDocumentUseCase(paperless, settings), settings) }
+        initializer { HomeViewModel(UploadDocumentUseCase(server, settings), settings) }
     }
 }
 

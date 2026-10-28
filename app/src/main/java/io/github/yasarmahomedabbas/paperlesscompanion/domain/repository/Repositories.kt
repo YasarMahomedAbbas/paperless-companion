@@ -4,8 +4,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.TaskInfo
 
-/** The Paperless REST API. Implementations throw PaperlessException on any failure. */
-interface PaperlessRepository {
+/** The document server the app signs in and uploads to. Implementations throw ServerException on any failure. */
+interface DocumentServer {
     /** Exchanges a username and password for an API token. */
     suspend fun login(baseUrl: String, username: String, password: String): String
 
