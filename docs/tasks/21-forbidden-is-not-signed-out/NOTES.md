@@ -28,3 +28,10 @@ Branch: `fix/21-forbidden-is-not-signed-out`
 - Raised: none.
 - API: no request or response shape changed; only status-code meaning. `POST /api/token/` (400/401/403 → UNAUTHORIZED), and every token-authed call (`/api/documents/…`, `post_document`, `/api/tasks/`): 401 → UNAUTHORIZED, 403 → FORBIDDEN, matching Paperless's auth classes and permission docs as read from the repo source at planning. Same in v9 and v10. Live schema not checked: `verify.env` absent.
 - Layers: clean. `FORBIDDEN` and its message are in the app's words; no status code or Paperless string left `data/`.
+
+## Doc drift
+
+- No drift found. Checked against the diff: CLAUDE.md's Paperless API section (names `PaperlessApi`, `PaperlessLibrary`, `PaperlessHttp`, all still there), README's architecture block (`PaperlessHttp`), feature, server-support and use-case table lines, and docs/design's notice tones ("a wrong password is a refusal" still holds: sign-in keeps 400/401/403 as UNAUTHORIZED). No doc describes how status codes map to error kinds.
+- Skipped: the new 401-vs-403 rule (403 on a signed-in call is FORBIDDEN, not signed out). The KDoc on `PaperlessHttp.httpError` and `ServerException.Kind` states it, and `PaperlessApiTest` / `PaperlessLibraryTest` enforce it, so a future session would not get it wrong.
+- Skipped: the remote-user API auth caveat (a bad token there answers 403, shown as "no permission"). It's an open risk recorded in Planning, not a rule to follow, and no user-facing doc covers server auth modes.
+- Stale, fixed separately: none
