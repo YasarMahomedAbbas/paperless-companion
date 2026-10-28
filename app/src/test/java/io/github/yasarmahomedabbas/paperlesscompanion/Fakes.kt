@@ -177,6 +177,8 @@ class FakeLibrary : DocumentLibrary {
     var progress = listOf<Pair<Long, Long?>>()
     /** Thrown by file() alone, so a test can fail the file while the document loads. */
     var fileFailure: Exception? = null
+    /** Thrown by document() alone. */
+    var documentFailure: Exception? = null
     /** Thrown by the four label lists alone. */
     var labelFailure: Exception? = null
     /** With a gate set, file() waits on it (after reporting progress), so a test can look at a fetch in flight. */
@@ -193,7 +195,10 @@ class FakeLibrary : DocumentLibrary {
     }
 
     override suspend fun documents(config: ServerConfig, query: DocumentQuery) = answer(config, "documents $query", page)
-    override suspend fun document(config: ServerConfig, id: Int) = answer(config, "document $id", document)
+    override suspend fun document(config: ServerConfig, id: Int): Document {
+        documentFailure?.let { calls += "document $id"; throw it }
+        return answer(config, "document $id", document)
+    }
     override suspend fun tags(config: ServerConfig) = label(config, "tags", tags)
     override suspend fun correspondents(config: ServerConfig) = label(config, "correspondents", correspondents)
     override suspend fun documentTypes(config: ServerConfig) = label(config, "documentTypes", documentTypes)

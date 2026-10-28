@@ -132,7 +132,7 @@ Goal: a file fetch reports its progress, and the domain can share a cached docum
 
 Goal: `ViewerViewModel` drives everything the viewer shows and does, and is fully tested without a screen.
 
-### [ ] 2.1 — `ViewerViewModel`
+### [x] 2.1 — `ViewerViewModel`
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/viewer/ViewerViewModel.kt` (new)
 
@@ -189,7 +189,7 @@ class ViewerViewModel(
 - `messageShown()`.
 - Errors use `ServerException.userMessage()`; `unreachable = kind == UNREACHABLE || kind == NO_ANSWER`.
 
-### [ ] 2.2 — Tests
+### [x] 2.2 — Tests
 
 File: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/ViewerViewModelTest.kt` (new). Mirror `UpdatesViewModelTest` (the `Dispatchers.setMain` rule / `runTest`), using `FakeLibrary`, `FakeExports` and a fake settings. Cover every Unit row of the test plan for `ViewerViewModel`.
 
