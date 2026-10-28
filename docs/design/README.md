@@ -4,9 +4,9 @@ The house style, written as recipes, so every screen built without a designer in
 still looks like one app. The `design-recipe` skill applies it in code; `design-canvas` draws
 it as mockups.
 
-**Status: settled by #6, waiting on the user's approval of the canvas.** The rules and tokens
-below are what the #6 design canvas is drawn with. `ui/theme/` implements them once the canvas
-is approved (the last step of #6), and #9, #10 and #11 build on that theme.
+**Status: approved on the #6 canvas review (2026-10-28).** The rules and tokens below are what
+the #6 design canvas is drawn with and what `ui/theme/` implements; the shared parts live in
+`ui/components/`. #9, #10 and #11 build on that theme.
 
 | File | What it holds |
 | --- | --- |
@@ -96,3 +96,22 @@ A screen that can't follow the manual records why here.
 - **Unlock again after 5 minutes** in the background (#8 owns the behaviour), changeable in
   Settings.
 - **Token values** (slate, green, Figtree, corners) as in the table above.
+
+Settled while building the theme (#6), where the manual left a range or a gap:
+
+- **Type slots.** `bodyMedium` is 14 / 21 (secondary lines); explanations under a screen title
+  use the theme's `lead` (15 / 22). `labelLarge` is 15 / 500 for button labels and the filled
+  buttons use `primaryButton` (16 / 600); `labelMedium` (14 / 500) is field labels and section
+  headings. `cardTitle` is 16 / 22 at 500. Every other M3 slot is Figtree at 400 or 500 so
+  nothing falls back to Roboto.
+- **Notice banner tones** follow the colour rules rather than "problems are amber": `Info`
+  (info icon, `mfg`), `Unreachable` (no-connection icon, `warning`), `Refused` (alert,
+  `destructive`). A wrong password is a refusal; a server the phone can't reach is the network.
+- **Icons** that `material-icons-core` lacks (eye, no-connection, alert, document, triangle)
+  are drawn in `ui/components/AppIcons.kt` from the canvas's strokes; the extended icon set
+  would add megabytes to an unminified APK.
+- **Today's home** keeps its upload-first layout until #9 makes Documents the home: Scan
+  document is its one primary, Take photo and Choose file are secondaries, the uploads sit
+  under an "Uploads" heading, and the scanner's camera message is an `Info` notice banner.
+- **Sign in** uses the 20 page gutter (the canvas drew 24) and its field's own label is drawn
+  inside the field's decoration so TalkBack reads it with the field.

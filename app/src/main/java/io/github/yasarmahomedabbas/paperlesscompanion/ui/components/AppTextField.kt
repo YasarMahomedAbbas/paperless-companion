@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,16 +72,12 @@ fun AppTextField(
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.labelGap)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = if (showError) colors.error else colors.onSurfaceVariant)
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
-                    contentDescription = label
-                    if (showError) error(errorText ?: "$label is wrong")
-                },
+                .semantics { if (showError) error(errorText ?: "Check the ${label.lowercase()}") },
             enabled = enabled,
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
@@ -91,30 +86,35 @@ fun AppTextField(
             keyboardOptions = if (password) keyboardOptions.copy(keyboardType = KeyboardType.Password) else keyboardOptions,
             keyboardActions = keyboardActions,
             interactionSource = interaction,
+            // The label is drawn inside the decoration so TalkBack reads it with the field and a
+            // tap on it focuses the field, as with Material's own text fields.
             decorationBox = { inner ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 52.dp)
-                        .background(colors.surfaceContainerHigh, shape)
-                        .then(if (ring != null) Modifier.border(2.dp, ring, shape) else Modifier)
-                        .padding(start = Spacing.s16, end = if (password) Spacing.s4 else Spacing.s16),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        if (value.isEmpty() && placeholder != null) {
-                            Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.labelGap)) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = if (showError) colors.error else colors.onSurfaceVariant)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .background(colors.surfaceContainerHigh, shape)
+                            .then(if (ring != null) Modifier.border(2.dp, ring, shape) else Modifier)
+                            .padding(start = Spacing.s16, end = if (password) Spacing.s4 else Spacing.s16),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            if (value.isEmpty() && placeholder != null) {
+                                Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                            }
+                            inner()
                         }
-                        inner()
-                    }
-                    if (password) {
-                        IconButton(onClick = { shown = !shown }) {
-                            Icon(
-                                if (shown) AppIcons.VisibilityOff else AppIcons.Visibility,
-                                contentDescription = if (shown) "Hide password" else "Show password",
-                                tint = colors.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
+                        if (password) {
+                            IconButton(onClick = { shown = !shown }) {
+                                Icon(
+                                    if (shown) AppIcons.VisibilityOff else AppIcons.Visibility,
+                                    contentDescription = if (shown) "Hide password" else "Show password",
+                                    tint = colors.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
                 }

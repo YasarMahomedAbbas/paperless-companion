@@ -135,6 +135,26 @@ class UploadDocumentUseCaseTest {
         assertTrue(last.message.contains("VPN"))
         assertTrue(last.message.contains("boom"))
         assertEquals(null, last.taskId)
+        assertTrue(last.unreachable)
+    }
+
+    @Test
+    fun `a refusal is not mistaken for an unreachable server`() = runTest {
+        paperless.tasks[0] = TaskInfo(TaskStatus.FAILURE, "duplicate", null)
+        assertFalse((upload(document()).toList().last() as UploadState.Failed).unreachable)
+
+        paperless.uploadResult = { throw PaperlessException(Kind.SERVER, "413") }
+        assertFalse((upload(document()).toList().last() as UploadState.Failed).unreachable)
+    }
+
+    @Test
+    fun `status checks that never get through count as unreachable, still processing does not`() = runTest {
+        paperless.taskAlwaysFails = PaperlessException(Kind.UNREACHABLE, "refused")
+        assertTrue((upload(document()).toList().last() as UploadState.Failed).unreachable)
+
+        paperless.taskAlwaysFails = null
+        paperless.tasks[0] = TaskInfo(TaskStatus.RUNNING, null, null)
+        assertFalse((upload(document()).toList().last() as UploadState.Failed).unreachable)
     }
 
     @Test
