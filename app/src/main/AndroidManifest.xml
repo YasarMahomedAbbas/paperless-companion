@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- To check whether Play services, which runs the document scanner, has camera access. -->
+    <queries>
+        <package android:name="com.google.android.gms" />
+    </queries>
+
     <!-- Cleartext is allowed because the server is reached over the LAN or Tailscale, often by plain http. -->
     <application
         android:name=".PaperlessApp"

@@ -1,8 +1,11 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.home
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,6 +68,7 @@ fun HomeScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
+    var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(shared) {
         if (shared.isNotEmpty()) {
@@ -96,9 +100,22 @@ fun HomeScreen(
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
             .build()
         GmsDocumentScanning.getClient(options).getStartScanIntent(activity)
-            .addOnSuccessListener { scanLauncher.launch(IntentSenderRequest.Builder(it).build()) }
+            .addOnSuccessListener {
+                // The scanner runs inside Play services, so it is Play services that needs the camera, not this app.
+                // On GrapheneOS's sandboxed Play it starts without it, and the scanner only says to go and enable it.
+                if (context.packageManager.checkPermission(Manifest.permission.CAMERA, PLAY_SERVICES) != PackageManager.PERMISSION_GRANTED) {
+                    notice = "The scanner runs in Google Play services, which needs camera access. " +
+                        "Open settings, then Permissions → Camera → Allow only while using the app."
+                    playServicesNeedsCamera = true
+                    return@addOnSuccessListener
+                }
+                notice = null
+                playServicesNeedsCamera = false
+                scanLauncher.launch(IntentSenderRequest.Builder(it).build())
+            }
             .addOnFailureListener {
                 notice = "The scanner needs Google Play services, which this phone doesn't have. Use Take photo instead."
+                playServicesNeedsCamera = false
             }
     }
 
@@ -144,6 +161,13 @@ fun HomeScreen(
             notice?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                if (playServicesNeedsCamera) {
+                    TextButton(onClick = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", PLAY_SERVICES, null)),
+                        )
+                    }) { Text("Open settings") }
+                }
             }
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,5 +226,7 @@ private fun UploadCard(item: UploadItem, onRetry: () -> Unit, onOpen: (Int) -> U
         }
     }
 }
+
+private const val PLAY_SERVICES = "com.google.android.gms"
 
 private fun timestamp(): String = SimpleDateFormat("yyyy-MM-dd HH-mm-ss", Locale.ROOT).format(Date())
