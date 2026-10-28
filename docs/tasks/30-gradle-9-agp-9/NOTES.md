@@ -24,3 +24,10 @@ Branch: `chore/30-gradle-9-agp-9`
 - Outstanding: none from the checklist. New deprecation warnings (not errors), left for a follow-up because each is a behaviour change, not a bump: `AnchoredDraggableState(...)` constructor in `ui/components/DetailsPanel.kt:66` (move thresholds to `AnchoredDraggableDefaults.flingBehavior`), and `createComposeRule` in `src/testDebug/.../LoginScreenTest.kt:35` (the v2 API switches to `StandardTestDispatcher`). Device-only checks (install over the current release, ML Kit scanner opening) stay with self-verification / the Release run.
 - Risk noticed: `build.sh` tags its image `paperless-companion-build` for every worktree, so while this branch and an older-Dockerfile worktree build in parallel they retag the shared image back and forth; a parallel pipeline on the old image would run AGP 8.7 against the new SDK (or vice versa) for a moment. Gone once this merges and other branches merge main.
 - Contradicted the plan: none.
+
+## Review
+
+- Fixed: none. Checked and kept: the dropped `body?` / `?:` fallbacks (OkHttp 5 gives a non-null, possibly empty body, so error paths still surface the status code and an empty download still fails on length/digest as before); `release.yml`'s apksigner at build-tools 36.0.0 exists on the runner because `assembleRelease` on AGP 9.4.1 needs it; Kover excludes and the Robolectric offline wiring unchanged in meaning; `robolectric.properties` still pins sdk 35, matching the new SDK jar; signing config, version-code formula and asset name untouched. Every Done-when item and ticked task is in the diff; nothing from Out of scope is.
+- Raised: none
+- API: no Paperless call changed (method, path, query, body, response parsing identical); only the transport moved to OkHttp 5. Upload `Content-Length` and v9/v10 `/api/tasks/` tests pass unedited. Live schema not read: `verify.env` absent.
+- Layers: clean (no new imports; `okhttp3` still only in `data/`).
