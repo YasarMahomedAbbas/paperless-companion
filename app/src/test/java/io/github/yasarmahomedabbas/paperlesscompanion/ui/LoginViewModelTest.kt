@@ -1,10 +1,10 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui
 
-import io.github.yasarmahomedabbas.paperlesscompanion.FakePaperless
+import io.github.yasarmahomedabbas.paperlesscompanion.FakeServer
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException.Kind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginField
@@ -24,8 +24,8 @@ class LoginViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
-    private val paperless = FakePaperless()
-    private val viewModel = LoginViewModel(LoginUseCase(paperless, FakeSettings()))
+    private val server = FakeServer()
+    private val viewModel = LoginViewModel(LoginUseCase(server, FakeSettings()))
 
     private fun fillIn() {
         viewModel.onServerUrl("paperless:8000")
@@ -49,7 +49,7 @@ class LoginViewModelTest {
 
     @Test
     fun `wrong credentials show a friendly error`() = runTest(main.dispatcher) {
-        paperless.loginResult = { throw PaperlessException(Kind.UNAUTHORIZED, "401") }
+        server.loginResult = { throw ServerException(Kind.UNAUTHORIZED, "401") }
         fillIn()
 
         viewModel.submit()
@@ -63,7 +63,7 @@ class LoginViewModelTest {
 
     @Test
     fun `an unreachable server hints at the VPN`() = runTest(main.dispatcher) {
-        paperless.loginResult = { throw PaperlessException(Kind.UNREACHABLE, "timeout") }
+        server.loginResult = { throw ServerException(Kind.UNREACHABLE, "timeout") }
         fillIn()
 
         viewModel.submit()
@@ -76,7 +76,7 @@ class LoginViewModelTest {
 
     @Test
     fun `a server error marks no field and is not a network problem`() = runTest(main.dispatcher) {
-        paperless.loginResult = { throw PaperlessException(Kind.SERVER, "Paperless returned 500") }
+        server.loginResult = { throw ServerException(Kind.SERVER, "Paperless returned 500") }
         fillIn()
 
         viewModel.submit()
@@ -106,7 +106,7 @@ class LoginViewModelTest {
 
         assertTrue(viewModel.state.value.error!!.contains("server address"))
         assertEquals(LoginField.SERVER, viewModel.state.value.errorField)
-        assertTrue(paperless.logins.isEmpty())
+        assertTrue(server.logins.isEmpty())
     }
 
     @Test
@@ -127,6 +127,6 @@ class LoginViewModelTest {
         viewModel.submit()
         advanceUntilIdle()
 
-        assertEquals(1, paperless.logins.size)
+        assertEquals(1, server.logins.size)
     }
 }

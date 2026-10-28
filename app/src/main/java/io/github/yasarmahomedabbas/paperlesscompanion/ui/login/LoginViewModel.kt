@@ -2,7 +2,7 @@ package io.github.yasarmahomedabbas.paperlesscompanion.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.normalizeServerUrl
@@ -51,7 +51,7 @@ class LoginViewModel(private val login: LoginUseCase) : ViewModel() {
                             busy = false,
                             error = e.loginMessage(),
                             errorField = e.field(current),
-                            unreachable = e is PaperlessException && e.isNetwork,
+                            unreachable = e is ServerException && e.isNetwork,
                         )
                     }
                 }
@@ -61,21 +61,21 @@ class LoginViewModel(private val login: LoginUseCase) : ViewModel() {
 
 private fun LoginUiState.clearError() = copy(error = null, errorField = null, unreachable = false)
 
-private val PaperlessException.isNetwork
-    get() = kind == PaperlessException.Kind.UNREACHABLE || kind == PaperlessException.Kind.NO_ANSWER
+private val ServerException.isNetwork
+    get() = kind == ServerException.Kind.UNREACHABLE || kind == ServerException.Kind.NO_ANSWER
 
 /** Which field a failed sign-in is about, if any. Input problems are checked in the use case's order. */
 private fun Throwable.field(input: LoginUiState): LoginField? = when {
-    this is PaperlessException && isNetwork -> LoginField.SERVER
-    this is PaperlessException && kind == PaperlessException.Kind.UNAUTHORIZED -> LoginField.PASSWORD
-    this is PaperlessException -> null
+    this is ServerException && isNetwork -> LoginField.SERVER
+    this is ServerException && kind == ServerException.Kind.UNAUTHORIZED -> LoginField.PASSWORD
+    this is ServerException -> null
     normalizeServerUrl(input.serverUrl) == null -> LoginField.SERVER
     input.username.isBlank() -> LoginField.USERNAME
     else -> LoginField.PASSWORD
 }
 
 private fun Throwable.loginMessage(): String = when {
-    this is PaperlessException && kind == PaperlessException.Kind.UNAUTHORIZED -> "Wrong username or password"
-    this is PaperlessException -> userMessage()
+    this is ServerException && kind == ServerException.Kind.UNAUTHORIZED -> "Wrong username or password"
+    this is ServerException -> userMessage()
     else -> message ?: "Sign-in failed"
 }

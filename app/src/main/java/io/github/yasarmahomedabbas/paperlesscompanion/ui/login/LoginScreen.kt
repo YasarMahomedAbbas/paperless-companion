@@ -42,11 +42,12 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.Spacing
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.lead
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel, onSignedIn: (ServerConfig) -> Unit) {
+fun LoginScreen(viewModel: LoginViewModel, notice: String?, onSignedIn: (ServerConfig) -> Unit) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(state.signedIn) { state.signedIn?.let(onSignedIn) }
     LoginContent(
         state = state,
+        notice = notice,
         onServerUrl = viewModel::onServerUrl,
         onUsername = viewModel::onUsername,
         onPassword = viewModel::onPassword,
@@ -56,7 +57,8 @@ fun LoginScreen(viewModel: LoginViewModel, onSignedIn: (ServerConfig) -> Unit) {
 
 /**
  * Sign in (docs/design/layouts.md § Sign in): a form. Logo tile, name and one line about the
- * network, a notice over the fields when signing in failed (with the field it's about marked),
+ * network, an info notice when the app sent the user back here (#8), a notice over the fields
+ * when signing in failed (with the field it's about marked),
  * the three fields, the note about the token, and Sign in pinned above the keyboard.
  */
 @Composable
@@ -66,6 +68,7 @@ private fun LoginContent(
     onUsername: (String) -> Unit,
     onPassword: (String) -> Unit,
     onSubmit: () -> Unit,
+    notice: String? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
@@ -101,6 +104,11 @@ private fun LoginContent(
                 style = MaterialTheme.typography.lead,
                 color = colors.onSurfaceVariant,
             )
+            // Why the app is back at sign-in (the stored sign-in was voided, #8): something to know, not a refusal.
+            notice?.let {
+                Spacer(Modifier.height(Spacing.s24))
+                NoticeBanner(it, tone = NoticeTone.Info)
+            }
             state.error?.let { error ->
                 Spacer(Modifier.height(Spacing.s24))
                 NoticeBanner(error, tone = if (state.unreachable) NoticeTone.Unreachable else NoticeTone.Refused)

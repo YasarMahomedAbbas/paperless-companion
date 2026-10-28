@@ -11,6 +11,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,7 +21,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,10 +46,10 @@ import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
-import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.UploadState
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.isFinished
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppButton
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ButtonVariant
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.LargeTitleBar
@@ -59,10 +67,17 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    documents: UriDocuments,
-    shared: List<DocumentSource>,
-    onSharedConsumed: () -> Unit,
+    documents: DocumentFiles,
+    /** Documents shared, scanned, photographed or picked, waiting to be uploaded now that Home is unlocked. */
+    pending: List<DocumentSource>,
+    onPendingConsumed: () -> Unit,
+    /** Every document the screen brings in goes here first, so one that arrives while locked waits. */
+    onDocuments: (List<DocumentSource>) -> Unit,
+    lockAvailable: Boolean,
+    lockEnabled: Boolean,
+    onLockChange: (Boolean) -> Unit,
     onSignedOut: () -> Unit,
+    onOpenUpdates: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -70,26 +85,26 @@ fun HomeScreen(
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var playServicesNeedsCamera by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(shared) {
-        if (shared.isNotEmpty()) {
-            viewModel.upload(shared)
-            onSharedConsumed()
+    LaunchedEffect(pending) {
+        if (pending.isNotEmpty()) {
+            viewModel.upload(pending)
+            onPendingConsumed()
         }
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
         GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pdf?.uri?.let { uri ->
-            viewModel.upload(listOf(documents.from(uri, "Scan ${timestamp()}.pdf")))
+            onDocuments(listOf(documents.from(uri.toString(), "Scan ${timestamp()}.pdf")))
         }
     }
     var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = photoUri
-        if (saved && uri != null) viewModel.upload(listOf(documents.from(uri, "Photo ${timestamp()}.jpg")))
+        if (saved && uri != null) onDocuments(listOf(documents.from(uri.toString(), "Photo ${timestamp()}.jpg")))
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        viewModel.upload(uris.map { documents.from(it, "Document ${timestamp()}") })
+        if (uris.isNotEmpty()) onDocuments(uris.map { documents.from(it.toString(), "Document ${timestamp()}") })
     }
 
     fun scan() {
@@ -143,13 +158,18 @@ fun HomeScreen(
         },
         onClearFinished = viewModel::clearFinished,
         onRetry = viewModel::retry,
-        onOpen = { id -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(state.documentUrl(id)))) },
+        onOpen = { id -> viewModel.documentUrl(id)?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } },
+        lockAvailable = lockAvailable,
+        lockEnabled = lockEnabled,
+        onLockChange = onLockChange,
+        onOpenUpdates = onOpenUpdates,
     )
 }
 
 /**
  * Today's home until #9 makes Documents the home (layouts.md): a list shape whose only section
- * is the uploads. The large title bar with Sign out, the server line, Scan as the one primary
+ * is the uploads. The large title bar with its overflow menu (Updates, the fingerprint lock,
+ * Sign out), the server line, Scan as the one primary
  * action with Take photo and Choose file as secondaries, the scanner notice, then the upload
  * cards under "Uploads".
  */
@@ -167,6 +187,10 @@ private fun HomeContent(
     onClearFinished: () -> Unit,
     onRetry: (Long) -> Unit,
     onOpen: (Int) -> Unit,
+    lockAvailable: Boolean = false,
+    lockEnabled: Boolean = false,
+    onLockChange: (Boolean) -> Unit = {},
+    onOpenUpdates: () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     LazyColumn(
@@ -178,7 +202,7 @@ private fun HomeContent(
     ) {
         item(key = "title") {
             LargeTitleBar("Paperless Scan") {
-                AppButton("Sign out", onSignOut, variant = ButtonVariant.Text)
+                OverflowMenu(lockAvailable, lockEnabled, onLockChange, onOpenUpdates, onSignOut)
             }
         }
         item(key = "server") {
@@ -244,6 +268,49 @@ private fun HomeContent(
                     else -> null
                 },
                 onAction = { if (documentId != null) onOpen(documentId) else onRetry(item.id) },
+            )
+        }
+    }
+}
+
+/** The title bar's ⋮ menu: Updates (#13), Lock with fingerprint when the phone can (#8), Sign out. */
+@Composable
+private fun OverflowMenu(
+    lockAvailable: Boolean,
+    lockEnabled: Boolean,
+    onLockChange: (Boolean) -> Unit,
+    onOpenUpdates: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Updates") },
+                onClick = {
+                    open = false
+                    onOpenUpdates()
+                },
+            )
+            if (lockAvailable) {
+                DropdownMenuItem(
+                    text = { Text("Lock with fingerprint") },
+                    trailingIcon = { Switch(checked = lockEnabled, onCheckedChange = null) },
+                    onClick = {
+                        open = false
+                        onLockChange(!lockEnabled)
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Sign out") },
+                onClick = {
+                    open = false
+                    onSignOut()
+                },
             )
         }
     }

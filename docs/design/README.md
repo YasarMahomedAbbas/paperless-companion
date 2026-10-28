@@ -115,3 +115,16 @@ Settled while building the theme (#6), where the manual left a range or a gap:
   under an "Uploads" heading, and the scanner's camera message is an `Info` notice banner.
 - **Sign in** uses the 20 page gutter (the canvas drew 24) and its field's own label is drawn
   inside the field's decoration so TalkBack reads it with the field.
+
+Settled when #6 met #8 and #13 on `main`:
+
+- The sign-in screen's "sign in again" notice (#8) is an `Info` notice banner, not error text:
+  it explains why the app is back at sign-in and refuses nothing.
+- The home's ⋮ menu (Updates, Lock with fingerprint, Sign out) moved into the large title bar
+  as its only action, with the stock Material 3 dropdown until the manual has a menu recipe.
+- The Updates screen (#13) and the lock screen (#8) are still stock Material 3 parts on the new
+  theme; restyling them with `ui/components/` is follow-up work. The Updates screen has no
+  skeleton or separate empty state: the offer is stored on the phone, so nothing loads, and
+  "Up to date" is the empty state. A failed *Check now* is its error, with *Check now* as Try
+  again; it says to check the connection rather than the home network or VPN, since GitHub
+  isn't on the home network.

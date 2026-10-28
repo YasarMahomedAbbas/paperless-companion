@@ -1,8 +1,8 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.domain
 
-import io.github.yasarmahomedabbas.paperlesscompanion.FakePaperless
+import io.github.yasarmahomedabbas.paperlesscompanion.FakeServer
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
-import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.PaperlessException
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoginUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.normalizeServerUrl
@@ -13,9 +13,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LoginUseCaseTest {
-    private val paperless = FakePaperless()
+    private val server = FakeServer()
     private val settings = FakeSettings()
-    private val login = LoginUseCase(paperless, settings)
+    private val login = LoginUseCase(server, settings)
 
     @Test
     fun `signs in, saves the server and token`() = runTest {
@@ -24,7 +24,7 @@ class LoginUseCaseTest {
         val expected = ServerConfig("http://paperless:8000", "token-123")
         assertEquals(expected, result.getOrThrow())
         assertEquals(expected, settings.config)
-        assertEquals(Triple("http://paperless:8000", "anna", "pw"), paperless.logins.single())
+        assertEquals(Triple("http://paperless:8000", "anna", "pw"), server.logins.single())
     }
 
     @Test
@@ -32,23 +32,23 @@ class LoginUseCaseTest {
         val result = login("  ", "anna", "pw")
 
         assertTrue(result.exceptionOrNull() is IllegalArgumentException)
-        assertTrue(paperless.logins.isEmpty())
+        assertTrue(server.logins.isEmpty())
     }
 
     @Test
     fun `rejects missing credentials`() = runTest {
         assertTrue(login("paperless", "", "pw").isFailure)
         assertTrue(login("paperless", "anna", "").isFailure)
-        assertTrue(paperless.logins.isEmpty())
+        assertTrue(server.logins.isEmpty())
     }
 
     @Test
     fun `passes Paperless errors through and saves nothing`() = runTest {
-        paperless.loginResult = { throw PaperlessException(PaperlessException.Kind.UNAUTHORIZED, "nope") }
+        server.loginResult = { throw ServerException(ServerException.Kind.UNAUTHORIZED, "nope") }
 
         val error = login("paperless", "anna", "wrong").exceptionOrNull()
 
-        assertEquals(PaperlessException.Kind.UNAUTHORIZED, (error as PaperlessException).kind)
+        assertEquals(ServerException.Kind.UNAUTHORIZED, (error as ServerException).kind)
         assertNull(settings.config)
     }
 }
