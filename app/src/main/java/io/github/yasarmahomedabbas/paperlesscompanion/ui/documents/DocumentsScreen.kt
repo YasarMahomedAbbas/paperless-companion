@@ -72,6 +72,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.edit.PickerChoices
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentThumbnail
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Labels
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SearchHit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -248,6 +250,11 @@ fun DocumentsScreen(
             onRemoveTag = documents::removeTag,
             onRemoveCorrespondent = documents::removeCorrespondent,
             onRemoveDocumentType = documents::removeDocumentType,
+            onChooseView = documents::chooseView,
+            onClearView = documents::clearView,
+            onOpenViews = { sheet = DocumentsSheet.VIEWS },
+            onClearSimilar = { documents.clearSimilar() },
+            onShowAll = { documents.clearSimilar(alsoFilters = true) },
             onAdd = { sheet = DocumentsSheet.ADD },
             onOpenSettings = onOpenSettings,
             onClearFinished = uploads::clearFinished,
@@ -309,6 +316,15 @@ fun DocumentsScreen(
                 sheet = null
                 documents.stopPreview()
             },
+        )
+        DocumentsSheet.VIEWS -> ViewsSheet(
+            views = state.views?.all.orEmpty(),
+            chosen = state.view?.id,
+            onChoose = {
+                sheet = null
+                documents.chooseView(it)
+            },
+            onDismiss = { sheet = null },
         )
         DocumentsSheet.BULK_TAGS -> {
             val start = remember(selectionState.selected, state.labels) {
@@ -372,7 +388,7 @@ private fun <T> Labels?.choices(of: (Labels) -> List<T>): PickerChoices<T> =
     if (this == null) PickerChoices.Failed else PickerChoices.Ready(of(this))
 
 /** The sheets (and the bulk trash dialog) Documents opens over itself. */
-enum class DocumentsSheet { ADD, SORT, FILTERS, BULK_TAGS, BULK_FROM, BULK_TYPE, BULK_TRASH }
+enum class DocumentsSheet { ADD, SORT, FILTERS, VIEWS, BULK_TAGS, BULK_FROM, BULK_TYPE, BULK_TRASH }
 
 /** What the Documents screen can be asked to do; a class so the previews can pass no-ops. */
 class DocumentsScreenActions(
@@ -388,6 +404,13 @@ class DocumentsScreenActions(
     val onRemoveTag: (Int) -> Unit = {},
     val onRemoveCorrespondent: () -> Unit = {},
     val onRemoveDocumentType: () -> Unit = {},
+    val onChooseView: (SavedView) -> Unit = {},
+    val onClearView: () -> Unit = {},
+    val onOpenViews: () -> Unit = {},
+    /** Ends "More like this" (its chip). */
+    val onClearSimilar: () -> Unit = {},
+    /** Ends "More like this" and drops the filters (its empty state). */
+    val onShowAll: () -> Unit = {},
     val onAdd: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onClearFinished: () -> Unit = {},
@@ -521,12 +544,38 @@ private fun DocumentsContent(
 /** How far the Add button rises over a snackbar: the snackbar's height and a gap. */
 private val SNACKBAR_LIFT = 64.dp
 
-/** Filters (with how many are on), one removable chip per applied filter, then the sort order. */
+/**
+ * "Like: <title>" while showing similar documents, else the home saved views (the chosen one marked) and
+ * a chosen view that isn't a home one; then Views, Filters (with how many are on), one removable chip per
+ * applied filter, and the sort order.
+ */
 @Composable
 private fun FilterChips(state: DocumentsUiState, actions: DocumentsScreenActions, modifier: Modifier = Modifier) {
     val filters = state.filters
     val labels = state.labels
+    val views = state.views
+    val similar = state.similar
     ChipRow(modifier) {
+        if (similar != null) {
+            AppChip(
+                "Like: ${similar.title.ellipsised(SIMILAR_TITLE_MAX)}",
+                actions.onClearSimilar,
+                variant = ChipVariant.Removable,
+                contentDescription = "Stop showing documents like ${similar.title}",
+            )
+        }
+        if (similar == null) views?.home?.forEach { view ->
+            val chosen = state.view?.id == view.id
+            AppChip(
+                view.name,
+                { actions.onChooseView(view) },
+                variant = if (chosen) ChipVariant.Selected else ChipVariant.Unselected,
+            )
+        }
+        state.view?.takeIf { chosen -> views?.home.orEmpty().none { it.id == chosen.id } }?.let { chosen ->
+            AppChip(chosen.name, actions.onClearView, variant = ChipVariant.Selected, contentDescription = "Stop showing ${chosen.name}")
+        }
+        if (!views?.all.isNullOrEmpty()) AppChip("Views", actions.onOpenViews, leadingIcon = AppIcons.Views)
         if (filters.isEmpty) {
             AppChip("Filters", actions.onOpenFilters, leadingIcon = AppIcons.Filters)
         } else {
@@ -543,15 +592,21 @@ private fun FilterChips(state: DocumentsUiState, actions: DocumentsScreenActions
                 labels.documentTypes.firstOrNull { it.id == id }?.let { RemovableChip(it.name, actions.onRemoveDocumentType) }
             }
         }
-        // While searching, results come by relevance, so there is no order to choose.
+        // While searching or showing similar documents, results come by relevance, so there is no order to choose.
+        val sortable = state.text.isBlank() && similar == null
         AppChip(
             state.sortLabel,
             actions.onOpenSort,
-            leadingIcon = if (state.text.isBlank()) AppIcons.Sort else null,
-            enabled = state.text.isBlank(),
+            leadingIcon = if (sortable) AppIcons.Sort else null,
+            enabled = sortable,
         )
     }
 }
+
+/** How much of a title the "Like:" chip shows before an ellipsis. */
+private const val SIMILAR_TITLE_MAX = 24
+
+private fun String.ellipsised(max: Int) = if (length <= max) this else take(max - 1).trimEnd() + "…"
 
 @Composable
 private fun RemovableChip(name: String, onRemove: () -> Unit) {
@@ -627,21 +682,50 @@ private fun DocumentList(
             }
             ListStatus.Empty -> item(key = "empty") {
                 val filtered = state.text.isNotBlank() || !state.filters.isEmpty
+                val view = state.view
+                val similar = state.similar
+                val emptyView = view != null && !filtered
+                if (similar != null) {
+                    StatusCard(
+                        icon = AppIcons.Search,
+                        tone = StatusTone.Empty,
+                        statement = "Nothing like \"${similar.title}\"",
+                        hint = if (filtered) {
+                            "No document like this one carries every one of these filters."
+                        } else {
+                            "Paperless found no other document like this one."
+                        },
+                        actionLabel = "Show all documents",
+                        onAction = actions.onShowAll,
+                        modifier = Modifier.padding(vertical = Spacing.s24),
+                    )
+                    return@item
+                }
                 StatusCard(
-                    icon = if (filtered) AppIcons.Search else AppIcons.File,
+                    icon = if (filtered || emptyView) AppIcons.Search else AppIcons.File,
                     tone = StatusTone.Empty,
                     statement = when {
                         state.text.isNotBlank() -> "Nothing matches \"${state.text.trim()}\""
                         filtered -> "No documents match"
+                        view != null -> "Nothing in ${view.name}"
                         else -> "No documents yet"
                     },
                     hint = when {
                         state.text.isNotBlank() -> "Search looks inside every document, OCR text included. Try another word, or clear the filters."
                         filtered -> "No document carries every one of these filters."
+                        emptyView -> "No document is in this saved view right now."
                         else -> "Scan a letter, take a photo or pick a file, and it shows up here once Paperless has read it."
                     },
-                    actionLabel = if (filtered) "Clear filters" else "Add a document",
-                    onAction = if (filtered) actions.onClearFilters else actions.onAdd,
+                    actionLabel = when {
+                        filtered -> "Clear filters"
+                        emptyView -> "Show all documents"
+                        else -> "Add a document"
+                    },
+                    onAction = when {
+                        filtered -> actions.onClearFilters
+                        emptyView -> actions.onClearView
+                        else -> actions.onAdd
+                    },
                     modifier = Modifier.padding(vertical = Spacing.s24),
                 )
             }
@@ -807,4 +891,52 @@ private fun DocumentsNeedsCameraPreview() = DocumentsPreview(
     previewUploads.take(1),
     notice = "The scanner runs in Google Play services, which needs camera access. " +
         "Open settings, then Permissions → Camera → Allow only while using the app.",
+)
+
+private val previewViews = SavedViews(
+    home = listOf(SavedView(1, "Inbox", true, true), SavedView(2, "This month", true, false)),
+    all = listOf(SavedView(1, "Inbox", true, true), SavedView(3, "Tax 2026", false, true), SavedView(2, "This month", true, false)),
+)
+
+@Preview(name = "Saved views — chips", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsViewsPreview() = DocumentsPreview(
+    DocumentsUiState(views = previewViews, rows = previewRows, total = 60, status = ListStatus.Loaded),
+)
+
+@Preview(name = "Saved views — one chosen", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsViewChosenPreview() = DocumentsPreview(
+    DocumentsUiState(
+        views = previewViews,
+        view = previewViews.home.first(),
+        viewOrder = true,
+        rows = previewRows.take(2),
+        total = 2,
+        status = ListStatus.Loaded,
+    ),
+)
+
+@Preview(name = "Saved views — empty view", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsViewEmptyPreview() = DocumentsPreview(
+    DocumentsUiState(views = previewViews, view = previewViews.all[1], viewOrder = true, total = 0, status = ListStatus.Empty),
+)
+
+@Preview(name = "More like this", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSimilarPreview() = DocumentsPreview(
+    DocumentsUiState(
+        views = previewViews,
+        similar = Similar(1, "Electricity bill — October 2026, City Power"),
+        rows = previewRows.drop(1),
+        total = 4,
+        status = ListStatus.Loaded,
+    ),
+)
+
+@Preview(name = "More like this — nothing", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsSimilarEmptyPreview() = DocumentsPreview(
+    DocumentsUiState(similar = Similar(1, "Car licence renewal"), total = 0, status = ListStatus.Empty),
 )

@@ -8,11 +8,15 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileK
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
@@ -226,7 +230,7 @@ class PaperlessLibraryTest {
 
         val document = library.document(config, 7)
 
-        assertEquals(expectedListDoc.copy(content = "Dear customer"), document)
+        assertEquals(expectedListDoc.copy(content = "Dear customer", noteCount = 0), document)
         val request = server.takeRequest()
         assertEquals("/api/documents/7/", request.path)
         assertEquals("GET", request.method)
@@ -590,5 +594,340 @@ class PaperlessLibraryTest {
         val e = expectError(Kind.SERVER) { library.bulkEdit(config, listOf(7), BulkEdit.ModifyTags(setOf(99), emptySet())) }
 
         assertTrue(e.message!!.contains("Tag 99 does not exist"))
+    }
+
+    // --- notes ---
+
+    private val notesJson = """[""" +
+        """{"id":3,"note":"Paid in full","created":"2026-10-03T09:14:00Z","user":{"id":1,"username":"ann","first_name":"Ann","last_name":"Lee"}},""" +
+        """{"id":2,"note":"Asked for a copy","created":"2026-10-02T08:00:00+02:00","user":{"id":2,"username":"bob","first_name":"","last_name":""}},""" +
+        """{"id":1,"note":"Old","created":"2026-10-01T09:00:00Z","user":null}""" +
+        """]"""
+
+    private val expectedNotes = listOf(
+        Note(3, "Paid in full", Instant.parse("2026-10-03T09:14:00Z"), "Ann Lee"),
+        Note(2, "Asked for a copy", Instant.parse("2026-10-02T06:00:00Z"), "bob"),
+        Note(1, "Old", Instant.parse("2026-10-01T09:00:00Z"), null),
+    )
+
+    @Test
+    fun `notes reads the list with each author`() = runTest {
+        respond(body = notesJson)
+
+        assertEquals(expectedNotes, library.notes(config, 7))
+
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/api/documents/7/notes/", request.path)
+        assertEquals("Token tok", request.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `notes sent oldest first, as Paperless 3 does, come newest first`() = runTest {
+        val oldestFirst = """[""" +
+            """{"id":1,"note":"Old","created":"2026-10-01T09:00:00Z","user":null},""" +
+            """{"id":2,"note":"Asked for a copy","created":"2026-10-02T08:00:00+02:00","user":{"id":2,"username":"bob","first_name":"","last_name":""}},""" +
+            """{"id":3,"note":"Paid in full","created":"2026-10-03T09:14:00Z","user":{"id":1,"username":"ann","first_name":"Ann","last_name":"Lee"}}""" +
+            """]"""
+        respond(body = oldestFirst)
+        assertEquals(expectedNotes, library.notes(config, 7))
+
+        respond(body = oldestFirst)
+        assertEquals(expectedNotes, library.addNote(config, 7, "Paid in full"))
+    }
+
+    @Test
+    fun `a note error answered with 200 is a server error`() = runTest {
+        respond(body = """{"error":"Error retrieving notes, check logs for more detail."}""")
+        val e = expectError(Kind.SERVER) { library.notes(config, 7) }
+        assertEquals("Paperless couldn't load the notes", e.message)
+    }
+
+    @Test
+    fun `notes that aren't a list are a server error`() = runTest {
+        respond(body = """{"detail":"odd"}""")
+        val e = expectError(Kind.SERVER) { library.notes(config, 7) }
+        assertEquals("Paperless sent no notes", e.message)
+    }
+
+    @Test
+    fun `notes without the permission are forbidden`() = runTest {
+        respond(403, noPermission)
+        expectError(Kind.FORBIDDEN) { library.notes(config, 7) }
+    }
+
+    @Test
+    fun `adding a note posts it as JSON and reads the answered list`() = runTest {
+        respond(body = notesJson)
+
+        assertEquals(expectedNotes, library.addNote(config, 7, "Paid in full"))
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/documents/7/notes/", request.path)
+        assertTrue(request.getHeader("Content-Type")!!.startsWith("application/json"))
+        assertEquals("""{"note":"Paid in full"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `a note save error answered with 200 is a server error`() = runTest {
+        respond(body = """{"error":"Error saving note, check logs for more detail."}""")
+        val e = expectError(Kind.SERVER) { library.addNote(config, 7, "x") }
+        assertEquals("Paperless couldn't save the note", e.message)
+    }
+
+    @Test
+    fun `notes are on unless the web interface switched them off`() = runTest {
+        respond(body = """{"user":{"id":1},"settings":{"dark_mode":{"enabled":false}},"permissions":[]}""")
+        assertTrue(library.notesEnabled(config))
+        assertEquals("/api/ui_settings/", server.takeRequest().path)
+
+        respond(body = """{"settings":{"notes_enabled":false}}""")
+        assertFalse(library.notesEnabled(config))
+
+        respond(body = """{"settings":{"notes_enabled":true}}""")
+        assertTrue(library.notesEnabled(config))
+
+        respond(body = """{"settings":{"notes_enabled":"maybe"}}""")
+        assertTrue(library.notesEnabled(config))
+
+        respond(body = """{}""")
+        assertTrue(library.notesEnabled(config))
+    }
+
+    @Test
+    fun `document counts its notes, and a list leaves the count unknown`() = runTest {
+        respond(body = listDoc.dropLast(1) + ""","notes":[{"id":1},{"id":2}]}""")
+        assertEquals(2, library.document(config, 7).noteCount)
+
+        respond(body = """{"count":1,"results":[$listDoc]}""")
+        assertNull(library.documents(config, DocumentQuery()).documents.single().noteCount)
+    }
+
+    // --- more like this ---
+
+    @Test
+    fun `more like this sends more_like_id with the filters, and no ordering or query`() = runTest {
+        respond(body = """{"count":1,"next":null,"results":[$listDoc]}""")
+
+        library.documents(config, DocumentQuery(similarTo = 9, text = "power", tagIds = setOf(1), sort = DocumentSort.TITLE))
+
+        val request = server.takeRequest()
+        assertEquals("9", request.query("more_like_id"))
+        assertNull(request.query("ordering"))
+        assertNull(request.query("query"))
+        assertEquals("1", request.query("tags__id__all"))
+        assertEquals("1", request.query("page"))
+    }
+
+    @Test
+    fun `more like this for a document out of reach is forbidden`() = runTest {
+        respond(403, """{"detail":"Invalid more_like_id"}""")
+        expectError(Kind.FORBIDDEN) { library.documents(config, DocumentQuery(similarTo = 99)) }
+    }
+
+    // --- saved views ---
+
+    /** Answers by path, for calls made side by side; an unknown path is 404. */
+    private fun route(vararg answers: Pair<String, MockResponse>) {
+        val byPath = answers.toMap()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) =
+                byPath[request.requestUrl!!.encodedPath] ?: MockResponse().setResponseCode(404)
+        }
+    }
+
+    private fun ok(body: String) = MockResponse().setBody(body)
+
+    private fun v9View(id: Int, name: String, home: Boolean, quick: Boolean, rules: String = "[]") =
+        """{"id":$id,"name":"$name","show_on_dashboard":$home,"show_in_sidebar":$quick,"sort_field":"created",""" +
+            """"sort_reverse":true,"filter_rules":$rules,"owner":1,"user_can_change":true}"""
+
+    private fun v10View(id: Int, name: String, rules: String = "[]", sort: String = "\"created\"", reverse: Boolean = true) =
+        """{"id":$id,"name":"$name","sort_field":$sort,"sort_reverse":$reverse,"filter_rules":$rules,""" +
+            """"page_size":null,"display_mode":null,"display_fields":null,"owner":1,"user_can_change":true}"""
+
+    private fun viewsPage(vararg views: String) = """{"count":${views.size},"next":null,"previous":null,"results":[${views.joinToString(",")}]}"""
+
+    private val sortOrders = """"dashboard_views_sort_order":[3,1],"sidebar_views_sort_order":[2,4]"""
+
+    @Test
+    fun `saved views on API v9 take the flags from each view, and the order from the settings`() = runTest {
+        route(
+            "/api/saved_views/" to ok(
+                viewsPage(
+                    v9View(1, "Inbox", home = true, quick = false),
+                    v9View(2, "Taxes", home = false, quick = true),
+                    v9View(3, "Bills", home = true, quick = false),
+                    v9View(4, "Recent", home = false, quick = true),
+                    v9View(5, "archive", home = true, quick = true),
+                    v9View(6, "Zebra", home = false, quick = false),
+                ),
+            ),
+            // The ids here disagree with the views' own flags, which win on v9.
+            "/api/ui_settings/" to ok("""{"settings":{"saved_views":{"dashboard_views_visible_ids":[6],"sidebar_views_visible_ids":[6],$sortOrders}}}"""),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(listOf(3, 1, 5), views.home.map { it.id })
+        assertEquals(listOf(2, 4, 5, 3, 1, 6), views.all.map { it.id })
+        assertEquals(SavedView(5, "archive", onHome = true, quickFilter = true), views.all[2])
+        val request = server.takeRequest().takeIf { it.requestUrl!!.encodedPath == "/api/saved_views/" } ?: server.takeRequest()
+        assertEquals("100", request.query("page_size"))
+    }
+
+    @Test
+    fun `saved views on API v10 take the flags and the order from the settings`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(1, "Inbox"), v10View(2, "Taxes"), v10View(3, "Bills"), v10View(4, "Recent"), v10View(5, "Alpha"))),
+            "/api/ui_settings/" to ok(
+                """{"user":{"id":1},"settings":{"saved_views":{"dashboard_views_visible_ids":[1,3,5],""" +
+                    """"sidebar_views_visible_ids":[2,4,5],$sortOrders,"warn_on_unsaved_change":true}},"permissions":[]}""",
+            ),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(listOf(3, 1, 5), views.home.map { it.id })
+        assertEquals(listOf(2, 4, 5, 3, 1), views.all.map { it.id })
+        assertEquals(
+            SavedViews(
+                home = listOf(SavedView(3, "Bills", true, false), SavedView(1, "Inbox", true, false), SavedView(5, "Alpha", true, true)),
+                all = listOf(
+                    SavedView(2, "Taxes", false, true), SavedView(4, "Recent", false, true), SavedView(5, "Alpha", true, true),
+                    SavedView(3, "Bills", true, false), SavedView(1, "Inbox", true, false),
+                ),
+            ),
+            views,
+        )
+    }
+
+    @Test
+    fun `settings without saved views give no home or quick views`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(2, "b"), v10View(1, "A"))),
+            "/api/ui_settings/" to ok("""{"settings":{}}"""),
+        )
+
+        val views = library.savedViews(config)
+
+        assertEquals(emptyList<SavedView>(), views.home)
+        assertEquals(listOf(1, 2), views.all.map { it.id })
+    }
+
+    @Test
+    fun `failing settings are ignored when every view carries its flags`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v9View(1, "Inbox", home = true, quick = true))),
+            "/api/ui_settings/" to MockResponse().setResponseCode(500),
+        )
+        assertEquals(listOf(1), library.savedViews(config).home.map { it.id })
+    }
+
+    @Test
+    fun `failing settings fail the views when they hold the flags`() = runTest {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(1, "Inbox"))),
+            "/api/ui_settings/" to MockResponse().setResponseCode(500),
+        )
+        expectError(Kind.SERVER) { library.savedViews(config) }
+    }
+
+    private val viewRules = """[{"rule_type":6,"value":"5"},{"rule_type":3,"value":"2"},{"rule_type":49,"value":"bill"},""" +
+        """{"rule_type":5,"value":"true"}]"""
+
+    private suspend fun loadView() {
+        route(
+            "/api/saved_views/" to ok(viewsPage(v10View(7, "Bills", rules = viewRules, sort = "\"title\"", reverse = false))),
+            "/api/ui_settings/" to ok("""{"settings":{}}"""),
+            "/api/documents/" to ok("""{"count":0,"results":[]}"""),
+        )
+        library.savedViews(config)
+        server.takeRequest()
+        server.takeRequest()
+    }
+
+    @Test
+    fun `a view's documents get its parameters and the app's paging and fields`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, page = 2, pageSize = 50))
+
+        val request = server.takeRequest()
+        assertEquals("/api/documents/", request.requestUrl!!.encodedPath)
+        assertEquals("5", request.query("tags__id__all"))
+        assertEquals("2", request.query("correspondent__id"))
+        assertEquals("bill", request.query("text"))
+        assertEquals("1", request.query("is_in_inbox"))
+        assertEquals("title", request.query("ordering"))
+        assertEquals("2", request.query("page"))
+        assertEquals("50", request.query("page_size"))
+        assertFalse("content" in request.query("fields")!!.split(","))
+        assertEquals(1, server.requestCount - 2)
+    }
+
+    @Test
+    fun `the user's filters narrow a view`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, tagIds = setOf(9, 1), correspondentId = 4, documentTypeId = 3))
+
+        val request = server.takeRequest()
+        assertEquals("1,5,9", request.query("tags__id__all"))
+        assertEquals("4", request.query("correspondent__id"))
+        assertEquals("3", request.query("document_type__id"))
+        assertEquals("-created", request.query("ordering"))
+    }
+
+    @Test
+    fun `typed text replaces the view's own search`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, text = " power "))
+
+        val request = server.takeRequest()
+        assertEquals("power", request.query("query"))
+        assertNull(request.query("text"))
+        assertNull(request.query("title_search"))
+        assertNull(request.query("ordering"))
+        assertEquals("5", request.query("tags__id__all"))
+    }
+
+    @Test
+    fun `more like this replaces a view's search too`() = runTest {
+        loadView()
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, similarTo = 3))
+
+        val request = server.takeRequest()
+        assertEquals("3", request.query("more_like_id"))
+        assertNull(request.query("text"))
+        assertNull(request.query("ordering"))
+    }
+
+    @Test
+    fun `a view not loaded yet is fetched by id first, once`() = runTest {
+        route(
+            "/api/saved_views/7/" to ok(v10View(7, "Bills", rules = viewRules)),
+            "/api/documents/" to ok("""{"count":0,"results":[]}"""),
+        )
+
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true))
+        library.documents(config, DocumentQuery(view = 7, viewOrder = true, page = 2))
+
+        assertEquals("/api/saved_views/7/", server.takeRequest().path)
+        val first = server.takeRequest()
+        assertEquals("/api/documents/", first.requestUrl!!.encodedPath)
+        assertEquals("bill", first.query("text"))
+        assertEquals("-created", first.query("ordering"))
+        assertEquals("/api/documents/", server.takeRequest().requestUrl!!.encodedPath)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `a gone view is not found`() = runTest {
+        respond(404, """{"detail":"No SavedView matches the given query."}""")
+        expectError(Kind.NOT_FOUND) { library.documents(config, DocumentQuery(view = 99)) }
     }
 }

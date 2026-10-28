@@ -17,6 +17,9 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -41,6 +44,7 @@ import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import java.io.File
+import java.time.Instant
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
@@ -250,6 +254,40 @@ class FakeLibrary : DocumentLibrary {
     override suspend fun trash(config: ServerConfig, page: Int, pageSize: Int) = answer(config, "trash $page $pageSize", this.page)
     override suspend fun restore(config: ServerConfig, ids: List<Int>) = answer(config, "restore $ids", Unit, writeFailure)
     override suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit) = answer(config, "bulkEdit $ids $edit", Unit, writeFailure)
+
+    var notes = listOf(Note(1, "Paid", Instant.parse("2026-10-01T09:00:00Z"), "Ann"))
+    var notesEnabled = true
+    /** Thrown by notes(), addNote() and notesEnabled() only. */
+    var notesFailure: Exception? = null
+    /** While set, addNote() waits for it, so a test can look at an add in flight. */
+    var addNoteGate: CompletableDeferred<Unit>? = null
+    /** Every addNote() as (document id, text). */
+    val addedNotes = mutableListOf<Pair<Int, String>>()
+
+    override suspend fun notes(config: ServerConfig, documentId: Int) =
+        answer(config, "notes $documentId", notes, notesFailure)
+
+    override suspend fun addNote(config: ServerConfig, documentId: Int, text: String): List<Note> {
+        addedNotes += documentId to text
+        addNoteGate?.await()
+        calls += "addNote $documentId $text"
+        configs += config
+        failure?.let { throw it }
+        notesFailure?.let { throw it }
+        notes = listOf(Note((notes.maxOfOrNull { it.id } ?: 0) + 1, text, null, "Me")) + notes
+        return notes
+    }
+
+    override suspend fun notesEnabled(config: ServerConfig) = answer(config, "notesEnabled", notesEnabled, notesFailure)
+
+    var savedViews = SavedViews(
+        home = listOf(SavedView(7, "Inbox", onHome = true, quickFilter = true)),
+        all = listOf(SavedView(7, "Inbox", onHome = true, quickFilter = true), SavedView(8, "Taxes", onHome = false, quickFilter = false)),
+    )
+    /** Thrown by savedViews() only. */
+    var savedViewsFailure: Exception? = null
+
+    override suspend fun savedViews(config: ServerConfig) = answer(config, "savedViews", savedViews, savedViewsFailure)
 }
 
 /** Records each export as "<call> <name>[ <location>]", answering [savedAs] or throwing [failure]. */

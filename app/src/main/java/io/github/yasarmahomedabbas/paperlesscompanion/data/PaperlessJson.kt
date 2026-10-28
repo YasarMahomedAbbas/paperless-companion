@@ -2,10 +2,12 @@ package io.github.yasarmahomedabbas.paperlesscompanion.data
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SearchHit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -36,7 +38,24 @@ internal fun JsonObject.toDocument(): Document = Document(
     mimeType = string("mime_type"),
     content = string("content"),
     searchHit = searchHit(this["__search_hit__"]),
+    // Only one loaded document carries its notes; lists don't ask for them.
+    noteCount = (this["notes"] as? JsonArray)?.size,
 )
+
+/**
+ * A note: `{id, note, created, user: {id, username, first_name, last_name} | null}` (the same since API v8).
+ * The author is the user's full name, else the username, else null.
+ */
+internal fun JsonObject.toNote(): Note {
+    val user = this["user"] as? JsonObject
+    val name = user?.let { "${it.string("first_name").orEmpty()} ${it.string("last_name").orEmpty()}".trim() }
+    return Note(
+        id = int("id") ?: throw ServerException(Kind.SERVER, "Paperless sent a note without an id"),
+        text = string("note").orEmpty(),
+        created = instant("created"),
+        author = name?.takeIf { it.isNotEmpty() } ?: user?.string("username")?.takeIf { it.isNotBlank() },
+    )
+}
 
 internal fun JsonObject.toTag() = Tag(
     id = int("id") ?: throw ServerException(Kind.SERVER, "Paperless sent a tag without an id"),

@@ -34,6 +34,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.Settings
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.UpdateStore
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.CheckForUpdateUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLinkUseCase
@@ -57,6 +59,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.lock.GateViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.login.LoginViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.settings.SettingsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.updates.UpdatesViewModel
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.notes.NotesViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.viewer.ViewerViewModel
 import java.io.File
 
@@ -98,7 +101,13 @@ class AppContainer(private val context: Context) {
         initializer { LoginViewModel(LoginUseCase(server, settings)) }
     }
     val documentsViewModelFactory = viewModelFactory {
-        initializer { DocumentsViewModel(BrowseDocumentsUseCase(library, settings), LoadLabelsUseCase(library, settings)) }
+        initializer {
+            DocumentsViewModel(
+                BrowseDocumentsUseCase(library, settings),
+                LoadLabelsUseCase(library, settings),
+                SavedViewsUseCase(library, settings),
+            )
+        }
     }
     val uploadsViewModelFactory = viewModelFactory {
         initializer { UploadsViewModel(UploadDocumentUseCase(server, settings)) }
@@ -116,8 +125,13 @@ class AppContainer(private val context: Context) {
                 OpenDocumentFileUseCase(library, settings),
                 DocumentLinkUseCase(server, settings),
                 ExportDocumentUseCase(exports),
+                NotesUseCase(library, settings),
             )
         }
+    }
+    /** A document's notes; MainActivity keys it by the id and each opening. */
+    fun notesViewModelFactory(documentId: Int) = viewModelFactory {
+        initializer { NotesViewModel(documentId, NotesUseCase(library, settings)) }
     }
     /** One per signed-in session, shared by the viewer and the list, so the Undo outlives the viewer. */
     val trashViewModelFactory = viewModelFactory {

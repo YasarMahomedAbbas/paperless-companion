@@ -43,7 +43,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.theme.Spacing
  * The text field of docs/design/components.md § Text field: the label above in `mfg`, a
  * 52-high `field` box with `r-ctl` corners and no outline, a 2dp `border` ring when focused.
  * [isError] turns the label and ring red; [errorText] adds the line under it. [password] hides
- * the text behind a "Show password" eye.
+ * the text behind a "Show password" eye. [multiLine] lets the box grow with the text, up to five
+ * lines (a note).
  */
 @Composable
 fun AppTextField(
@@ -58,6 +59,7 @@ fun AppTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    multiLine: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.small
@@ -79,7 +81,8 @@ fun AppTextField(
                 .fillMaxWidth()
                 .semantics { if (showError) error(errorText ?: "Check the ${label.lowercase()}") },
             enabled = enabled,
-            singleLine = true,
+            singleLine = !multiLine,
+            maxLines = if (multiLine) MULTI_LINE_MAX else 1,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
             cursorBrush = SolidColor(colors.primary),
             visualTransformation = if (password && !shown) PasswordVisualTransformation() else VisualTransformation.None,
@@ -97,7 +100,8 @@ fun AppTextField(
                             .heightIn(min = 52.dp)
                             .background(colors.surfaceContainerHigh, shape)
                             .then(if (ring != null) Modifier.border(2.dp, ring, shape) else Modifier)
-                            .padding(start = Spacing.s16, end = if (password) Spacing.s4 else Spacing.s16),
+                            .padding(start = Spacing.s16, end = if (password) Spacing.s4 else Spacing.s16)
+                            .then(if (multiLine) Modifier.padding(vertical = Spacing.s12 + 2.dp) else Modifier),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(Modifier.weight(1f)) {
@@ -128,6 +132,9 @@ fun AppTextField(
         }
     }
 }
+
+/** How many lines a [multiLine] field grows to before it scrolls inside itself. */
+private const val MULTI_LINE_MAX = 5
 
 @Preview(name = "Text fields", widthDp = 360)
 @Composable

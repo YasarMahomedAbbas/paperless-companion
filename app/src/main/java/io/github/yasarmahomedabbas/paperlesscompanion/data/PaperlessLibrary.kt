@@ -10,6 +10,9 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
@@ -17,6 +20,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -25,11 +30,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * [DocumentLibrary] over the paperless-ngx REST API. No API version is asked for, so the server's default
@@ -43,24 +50,92 @@ class PaperlessLibrary(
 ) : DocumentLibrary {
     private val http = PaperlessHttp(client, io)
 
+    /**
+     * One page of documents. With [DocumentQuery.view], the saved view's own parameters (as the web interface
+     * sends them) are the start, and the query narrows them: its tags are added to the view's, its
+     * correspondent and type replace the view's, and typed text replaces the view's own search. The view's
+     * order applies with [DocumentQuery.viewOrder] and no text; otherwise the app's sort does.
+     */
     override suspend fun documents(config: ServerConfig, query: DocumentQuery): DocumentPage {
+        val view = query.view?.let { viewFilter(config, it) }
+        val text = query.text?.trim()?.takeIf { it.isNotEmpty() }
         val params = buildMap {
+            view?.let { putAll(it.params) }
             put("page", query.page.toString())
             put("page_size", query.pageSize.toString())
             // A list needs no document text, which can be megabytes per document.
             put("fields", LIST_FIELDS)
-            val text = query.text?.trim()?.takeIf { it.isNotEmpty() }
-            if (text != null) {
-                // Full-text search answers in relevance order; an ordering would override it.
-                put("query", text)
-            } else {
-                put("ordering", (if (query.descending) "-" else "") + query.sort.field)
+            when {
+                query.similarTo != null -> {
+                    // "More like this" answers in relevance order and can't be combined with a text search.
+                    SEARCH_PARAMS.forEach { remove(it) }
+                    put("more_like_id", query.similarTo.toString())
+                }
+                text != null -> {
+                    // Full-text search answers in relevance order; an ordering would override it.
+                    SEARCH_PARAMS.forEach { remove(it) }
+                    put("query", text)
+                }
+                view != null && query.viewOrder -> put("ordering", view.ordering)
+                else -> put("ordering", (if (query.descending) "-" else "") + query.sort.field)
             }
-            if (query.tagIds.isNotEmpty()) put("tags__id__all", query.tagIds.sorted().joinToString(","))
+            if (query.tagIds.isNotEmpty()) {
+                val viewTags = this["tags__id__all"]?.split(",")?.mapNotNull { it.trim().toIntOrNull() }.orEmpty()
+                put("tags__id__all", (query.tagIds + viewTags).sorted().joinToString(","))
+            }
             query.correspondentId?.let { put("correspondent__id", it.toString()) }
             query.documentTypeId?.let { put("document_type__id", it.toString()) }
         }
         return page(http.json(config, "GET", "api/documents/", params))
+    }
+
+    /** Each saved view's filter by server address and id, so listing a view's pages needs no extra call. */
+    private val viewFilters = ConcurrentHashMap<Pair<String, Int>, ViewFilter>()
+
+    private suspend fun viewFilter(config: ServerConfig, id: Int): ViewFilter =
+        viewFilters[config.baseUrl to id]
+            ?: obj(http.json(config, "GET", "api/saved_views/$id/")).toViewFilter()
+                .also { viewFilters[config.baseUrl to id] = it }
+
+    /**
+     * The saved views. API v9 (Paperless 2) puts `show_on_dashboard` / `show_in_sidebar` on each view; v10
+     * (Paperless 3) drops them for the web interface's settings (`saved_views.dashboard_views_visible_ids` /
+     * `sidebar_views_visible_ids`). Both keep the order in `dashboard_views_sort_order` / `sidebar_views_sort_order`.
+     */
+    override suspend fun savedViews(config: ServerConfig): SavedViews = coroutineScope {
+        val settings = async {
+            try {
+                Result.success(uiSettings(config))
+            } catch (e: ServerException) {
+                Result.failure(e)
+            }
+        }
+        val json = http.pages(config, "api/saved_views/", mapOf("page_size" to "100"))
+        val allFlagged = json.all { "show_on_dashboard" in it && "show_in_sidebar" in it }
+        val ui = settings.await().getOrElse { if (allFlagged) JsonObject(emptyMap()) else throw it }
+        val saved = ui["saved_views"] as? JsonObject ?: JsonObject(emptyMap())
+        val homeIds = saved.intList("dashboard_views_visible_ids").toSet()
+        val quickIds = saved.intList("sidebar_views_visible_ids").toSet()
+        val views = json.map { view ->
+            val id = view.int("id") ?: throw ServerException(Kind.SERVER, "Paperless sent a saved view without an id")
+            viewFilters[config.baseUrl to id] = view.toViewFilter()
+            SavedView(
+                id = id,
+                name = view.string("name").orEmpty(),
+                onHome = view.flag("show_on_dashboard") ?: (id in homeIds),
+                quickFilter = view.flag("show_in_sidebar") ?: (id in quickIds),
+            )
+        }
+        val byName = compareBy<SavedView, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
+        fun ordered(subset: List<SavedView>, order: List<Int>): List<SavedView> {
+            val (known, rest) = subset.partition { it.id in order }
+            return known.sortedBy { order.indexOf(it.id) } + rest.sortedWith(byName)
+        }
+        val quick = ordered(views.filter { it.quickFilter }, saved.intList("sidebar_views_sort_order"))
+        SavedViews(
+            home = ordered(views.filter { it.onHome }, saved.intList("dashboard_views_sort_order")),
+            all = quick + views.filterNot { it.quickFilter }.sortedWith(byName),
+        )
     }
 
     override suspend fun document(config: ServerConfig, id: Int): Document =
@@ -175,6 +250,27 @@ class PaperlessLibrary(
         })
     }
 
+    /**
+     * Paperless answers a failure inside its notes view with HTTP 200 and `{"error": "…"}`, so only a list
+     * counts as an answer. A user without the note permissions gets 403 (FORBIDDEN).
+     */
+    override suspend fun notes(config: ServerConfig, documentId: Int): List<Note> =
+        notesFrom(http.json(config, "GET", "api/documents/$documentId/notes/"), "Paperless couldn't load the notes")
+
+    override suspend fun addNote(config: ServerConfig, documentId: Int, text: String): List<Note> =
+        notesFrom(
+            http.json(config, "POST", "api/documents/$documentId/notes/", body = buildJsonObject { put("note", text) }),
+            "Paperless couldn't save the note",
+        )
+
+    /** The web interface's "enable notes" setting; on unless it says false. */
+    override suspend fun notesEnabled(config: ServerConfig): Boolean =
+        (uiSettings(config)["notes_enabled"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.booleanOrNull ?: true
+
+    /** The signed-in user's web interface settings (`settings` of `api/ui_settings/`), or empty. */
+    private suspend fun uiSettings(config: ServerConfig): JsonObject =
+        (http.json(config, "GET", "api/ui_settings/") as? JsonObject)?.get("settings") as? JsonObject ?: JsonObject(emptyMap())
+
     private suspend fun labels(config: ServerConfig, path: String) =
         http.pages(config, path, mapOf("page_size" to "100", "ordering" to "name"))
 
@@ -207,6 +303,21 @@ class PaperlessLibrary(
                 DocumentSort.DOCUMENT_TYPE -> "document_type__name"
                 DocumentSort.ARCHIVE_SERIAL_NUMBER -> "archive_serial_number"
             }
+
+        /** The parameters that search: typed text or "more like this" replaces every one a view brings. */
+        val SEARCH_PARAMS = listOf("text", "title_search", "query", "more_like_id")
+
+        /** A v9 saved view's flag, or null when the view doesn't carry it (v10). */
+        fun JsonObject.flag(key: String): Boolean? =
+            (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.booleanOrNull
+
+        fun notesFrom(json: JsonElement, failed: String): List<Note> = when {
+            // Paperless 3 lists them oldest first (the note model's order); earlier versions sent newest first.
+            json is JsonArray -> json.filterIsInstance<JsonObject>().map { it.toNote() }
+                .sortedWith(compareByDescending<Note> { it.created }.thenByDescending { it.id })
+            json is JsonObject && "error" in json -> throw ServerException(Kind.SERVER, failed)
+            else -> throw ServerException(Kind.SERVER, "Paperless sent no notes")
+        }
 
         fun obj(json: JsonElement) = json as? JsonObject ?: throw ServerException(Kind.SERVER, "Paperless sent no document")
 

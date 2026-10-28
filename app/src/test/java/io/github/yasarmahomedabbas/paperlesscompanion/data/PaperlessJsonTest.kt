@@ -156,4 +156,25 @@ class PaperlessJsonTest {
         assertEquals("d", fileName("""attachment; filename="..""""", "d"))
         assertEquals("hidden", fileName("""attachment; filename=".hidden"""", "d"))
     }
+
+    @Test
+    fun `a note's author is the full name, else the username, else nobody`() {
+        assertEquals("Ann", json("""{"id":1,"user":{"username":"ann","first_name":"Ann","last_name":""}}""").toNote().author)
+        assertEquals("ann", json("""{"id":1,"user":{"username":"ann","first_name":" ","last_name":null}}""").toNote().author)
+        assertNull(json("""{"id":1,"user":{"username":""}}""").toNote().author)
+        assertNull(json("""{"id":1,"user":7}""").toNote().author)
+        assertNull(json("""{"id":1}""").toNote().author)
+    }
+
+    @Test
+    fun `a note without text or a readable date is still a note`() {
+        val note = json("""{"id":4,"created":"soon"}""").toNote()
+        assertEquals("", note.text)
+        assertNull(note.created)
+    }
+
+    @Test(expected = ServerException::class)
+    fun `a note without an id is refused`() {
+        json("""{"note":"x"}""").toNote()
+    }
 }

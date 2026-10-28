@@ -7,11 +7,14 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -40,6 +43,7 @@ private const val WINDOW_PAGE_SIZE = 100
 class DocumentsViewModel(
     private val browse: BrowseDocumentsUseCase,
     private val loadLabels: LoadLabelsUseCase,
+    private val savedViews: SavedViewsUseCase,
     private val debounceMillis: Long = 400,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DocumentsUiState())
@@ -129,7 +133,12 @@ class DocumentsViewModel(
     /** The keyboard's Search key: no waiting for the debounce. */
     fun search() = reload()
 
-    fun startSearch() = _state.update { it.copy(searching = true) }
+    /** Searching ends "More like this", which can't be combined with a text search. */
+    fun startSearch() {
+        val wasSimilar = _state.value.similar != null
+        _state.update { it.copy(searching = true, similar = null) }
+        if (wasSimilar) reload()
+    }
 
     /** Leaves searching and goes back to browsing in the chosen sort. */
     fun stopSearch() {
@@ -137,8 +146,50 @@ class DocumentsViewModel(
         if (loadedText != null || typingJob?.isActive == true) reload()
     }
 
+    /** A picked sort replaces a view's own order. */
     fun setSort(option: SortOption) {
-        _state.update { it.copy(sort = option) }
+        _state.update { it.copy(sort = option, viewOrder = false) }
+        reload()
+    }
+
+    /**
+     * Lists [view]'s documents in its own order. The user's filters are cleared, since the view
+     * brings its own; choosing the chosen view again clears it.
+     */
+    fun chooseView(view: SavedView) {
+        if (_state.value.view?.id == view.id) return clearView()
+        stopPreview()
+        _state.update { it.copy(view = view, viewOrder = true, filters = DocumentFilters(), similar = null) }
+        reload()
+    }
+
+    fun clearView() {
+        _state.update { it.copy(view = null, viewOrder = false) }
+        reload()
+    }
+
+    /**
+     * "More like this" from the viewer: the documents most like [id], most alike first. It starts
+     * from all documents, so the search, the view and the filters go; filters can then narrow it.
+     */
+    fun showSimilar(id: Int, title: String) {
+        stopPreview()
+        _state.update {
+            it.copy(
+                searching = false,
+                text = "",
+                view = null,
+                viewOrder = false,
+                filters = DocumentFilters(),
+                similar = Similar(id, title.ifBlank { "Untitled" }),
+            )
+        }
+        reload()
+    }
+
+    /** Ends "More like this"; with [alsoFilters] the filters go too (the empty state's "Show all documents"). */
+    fun clearSimilar(alsoFilters: Boolean = false) {
+        _state.update { it.copy(similar = null, filters = if (alsoFilters) DocumentFilters() else it.filters) }
         reload()
     }
 
@@ -154,7 +205,7 @@ class DocumentsViewModel(
 
     fun removeDocumentType() = setFilters(_state.value.filters.copy(documentTypeId = null))
 
-    /** "No documents match" → Clear filters: drops the filters and the search text. */
+    /** "No documents match" → Clear filters: drops the filters and the search text; a chosen view stays. */
     fun clearFilters() {
         _state.update { it.copy(filters = DocumentFilters(), text = "") }
         reload()
@@ -222,6 +273,8 @@ class DocumentsViewModel(
         // The search index covers the title, tags, correspondent and type, and ranks by them.
         if (loadedText != null) return before.copy(searchHit = null) != after.copy(searchHit = null)
         val s = _state.value
+        // A saved view's rules and order, and similarity's ranking, are the server's: any change may move it.
+        if (s.view != null || s.similar != null) return before.copy(searchHit = null) != after.copy(searchHit = null)
         val tags = s.filters.tagIds
         if (tags.isNotEmpty() && before.tagIds.toSet().intersect(tags) != after.tagIds.toSet().intersect(tags)) return true
         if (s.filters.correspondentId != null && before.correspondentId != after.correspondentId) return true
@@ -365,10 +418,13 @@ class DocumentsViewModel(
         val known = _state.value.labels
         loadJob = viewModelScope.launch {
             try {
-                val (labels, page) = coroutineScope {
-                    val labels = if (withLabels || known == null) async { loadLabels() } else null
+                val fresh = withLabels || known == null
+                val (labels, page, views) = coroutineScope {
+                    val labels = if (fresh) async { loadLabels() } else null
+                    // The views are extra: without them the list still works, only without view chips.
+                    val views = if (fresh) async { loadViews() } else null
                     val page = async { browse(query) }
-                    (labels?.await() ?: checkNotNull(known)) to page.await()
+                    Triple(labels?.await() ?: checkNotNull(known), page.await(), views?.await())
                 }
                 consumed = page.documents.size
                 hasMore = page.hasMore
@@ -376,6 +432,7 @@ class DocumentsViewModel(
                 _state.update {
                     it.copy(
                         labels = labels,
+                        views = if (fresh) views else it.views,
                         rows = page.documents.map { d -> d.toRow(labels) },
                         total = page.total,
                         status = if (page.documents.isEmpty()) ListStatus.Empty else ListStatus.Loaded,
@@ -392,6 +449,14 @@ class DocumentsViewModel(
         }
     }
 
+    private suspend fun loadViews(): SavedViews? = try {
+        savedViews()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
     private fun query(page: Int, filters: DocumentFilters = _state.value.filters): DocumentQuery {
         val s = _state.value
         return DocumentQuery(
@@ -403,6 +468,9 @@ class DocumentsViewModel(
             descending = s.sort.descending,
             page = page,
             pageSize = PAGE_SIZE,
+            view = s.view?.id,
+            viewOrder = s.viewOrder,
+            similarTo = s.similar?.id,
         )
     }
 }

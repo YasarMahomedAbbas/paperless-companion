@@ -94,6 +94,10 @@ fun ViewerScreen(
     onEdit: (Document) -> Unit,
     /** Move to trash was confirmed. */
     onTrash: () -> Unit,
+    /** More like this, from the More menu. */
+    onMoreLikeThis: (Document) -> Unit,
+    /** The Notes row in all details. */
+    onOpenNotes: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(viewModel) {
@@ -124,6 +128,8 @@ fun ViewerScreen(
         onRetry = viewModel::retry,
         onEdit = { state.document?.let(onEdit) },
         onTrash = onTrash,
+        onMoreLikeThis = { state.document?.let(onMoreLikeThis) },
+        onOpenNotes = onOpenNotes,
     )
 }
 
@@ -141,6 +147,8 @@ fun ViewerContent(
     onRetry: () -> Unit,
     onEdit: () -> Unit,
     onTrash: () -> Unit,
+    onMoreLikeThis: () -> Unit = {},
+    onOpenNotes: () -> Unit = {},
     panel: AnchoredDraggableState<PanelStop> = rememberDetailsPanelState(),
     menuOpenAtStart: Boolean = false,
     confirmTrashAtStart: Boolean = false,
@@ -174,7 +182,7 @@ fun ViewerContent(
     Box(Modifier.fillMaxSize().background(colors.background)) {
         Column(Modifier.fillMaxSize()) {
             AnimatedVisibility(visible = !fullScreen, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
-                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null }) }
+                Box(Modifier.statusBarsPadding()) { Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, onMoreLikeThis.takeIf { state.document != null }, askTrash.takeIf { state.document != null }) }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (val file = state.file) {
@@ -204,13 +212,13 @@ fun ViewerContent(
         // In full screen a tap on the page brings the bar back for a moment.
         AnimatedVisibility(visible = fullScreen && peek, enter = slideInVertically { -it }, exit = slideOutVertically { -it }) {
             Box(Modifier.background(colors.background).statusBarsPadding()) {
-                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, askTrash.takeIf { state.document != null })
+                Bar(title, onBack, onShare, canExport, menuOpen, { menuOpen = it }, onDownload, onOpenInPaperless, onMoreLikeThis.takeIf { state.document != null }, askTrash.takeIf { state.document != null })
             }
         }
         DetailsPanel(
             state = panel,
             quick = { QuickActions(state, onEdit, onDownload, onDownloadOriginal, onRetry) },
-            all = { AllDetails(state, onEdit, onDownload, onRetry) },
+            all = { AllDetails(state, onEdit, onDownload, onRetry, onOpenNotes) },
         )
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
@@ -239,7 +247,8 @@ private fun Bar(
     onMenuOpenChange: (Boolean) -> Unit,
     onDownload: () -> Unit,
     onOpenInPaperless: () -> Unit,
-    /** Null until the document has loaded. */
+    /** Null until the document has loaded, as is [onTrash]. */
+    onMoreLikeThis: (() -> Unit)?,
     onTrash: (() -> Unit)?,
 ) {
     ViewerBar(
@@ -252,6 +261,7 @@ private fun Bar(
     ) {
         MenuItem("Download", AppIcons.Download, { onMenuOpenChange(false); onDownload() }, enabled = canExport)
         MenuItem("Open in Paperless", AppIcons.OpenExternal, { onMenuOpenChange(false); onOpenInPaperless() })
+        MenuItem("More like this", AppIcons.Similar, { onMenuOpenChange(false); onMoreLikeThis?.invoke() }, enabled = onMoreLikeThis != null)
         MenuDivider()
         MenuItem("Move to trash", AppIcons.Trash, { onMenuOpenChange(false); onTrash?.invoke() }, enabled = onTrash != null, destructive = true)
     }
@@ -350,7 +360,7 @@ private fun DetailsFailed(failed: DetailsState.Failed, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun AllDetails(state: ViewerUiState, onEdit: () -> Unit, onDownload: () -> Unit, onRetry: () -> Unit) {
+private fun AllDetails(state: ViewerUiState, onEdit: () -> Unit, onDownload: () -> Unit, onRetry: () -> Unit, onOpenNotes: () -> Unit) {
     Column(Modifier.fillMaxSize().navigationBarsPadding()) {
         Column(
             Modifier
@@ -370,6 +380,10 @@ private fun AllDetails(state: ViewerUiState, onEdit: () -> Unit, onDownload: () 
                     DetailRow("Tags", d.tags.joinToString(", ").ifEmpty { "None" })
                     DetailRow("Storage path", d.storagePath ?: "None")
                     DetailRow("Added", d.added?.let(::addedAt) ?: "Unknown")
+                    // Hidden while the server's notes switch is unknown or off.
+                    if (state.notesEnabled) {
+                        DetailRow("Notes", noteCount(state.noteCount), onClick = onOpenNotes, onClickLabel = "Open notes")
+                    }
                 }
             }
         }
@@ -391,6 +405,13 @@ private fun PanelActions(state: ViewerUiState, onEdit: () -> Unit, onDownload: (
             busy = state.saving,
         )
     }
+}
+
+/** "3", "None", or "Open" when the server didn't say how many. */
+private fun noteCount(count: Int?): String = when (count) {
+    null -> "Open"
+    0 -> "None"
+    else -> count.toString()
 }
 
 private fun longDate(date: LocalDate): String = date.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))

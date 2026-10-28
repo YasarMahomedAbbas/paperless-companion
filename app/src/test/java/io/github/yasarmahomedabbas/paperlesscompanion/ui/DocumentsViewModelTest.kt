@@ -19,12 +19,15 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.BEST_MATCH
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentFilters
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.DocumentsViewModel
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.ListStatus
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.Similar
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.SortOption
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.VIEW_ORDER
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.documents.toRow
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,7 +62,11 @@ class DocumentsViewModelTest {
         library.pages = { q -> answer(q) }
     }
 
-    private fun viewModel() = DocumentsViewModel(BrowseDocumentsUseCase(library, settings), LoadLabelsUseCase(library, settings))
+    private fun viewModel() = DocumentsViewModel(
+        BrowseDocumentsUseCase(library, settings),
+        LoadLabelsUseCase(library, settings),
+        SavedViewsUseCase(library, settings),
+    )
 
     private fun TestScope.loaded(): DocumentsViewModel = viewModel().also { advanceUntilIdle() }
 
@@ -797,6 +804,230 @@ class DocumentsViewModelTest {
         assertEquals(1, ids.count { it == 3 })
     }
 
+    // Saved views
+
+    private val inbox get() = library.savedViews.home.single()
+    private val taxes get() = library.savedViews.all.last()
+
+    @Test
+    fun `the saved views load with the labels`() = runTest(main.dispatcher) {
+        val vm = loaded()
+
+        assertEquals(library.savedViews, vm.s.views)
+        assertTrue("savedViews" in library.calls)
+    }
+
+    @Test
+    fun `views that fail to load leave the list working, without view chips`() = runTest(main.dispatcher) {
+        library.savedViewsFailure = ServerException(Kind.SERVER, "500")
+        val vm = loaded()
+
+        assertNull(vm.s.views)
+        assertEquals(ListStatus.Loaded, vm.s.status)
+        assertEquals(25, vm.s.rows.size)
+    }
+
+    @Test
+    fun `a reload keeps the views it has, and a refresh loads them again`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        library.savedViewsFailure = ServerException(Kind.SERVER, "500")
+
+        vm.setSort(SortOption.OLDEST)
+        advanceUntilIdle()
+        assertEquals(library.savedViews, vm.s.views)
+
+        vm.refresh()
+        advanceUntilIdle()
+        assertNull(vm.s.views)
+    }
+
+    @Test
+    fun `choosing a view clears the filters and lists it in its own order`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.setFilters(DocumentFilters(tagIds = setOf(1), correspondentId = 2))
+        advanceUntilIdle()
+
+        vm.chooseView(taxes)
+        assertEquals(ListStatus.Loading, vm.s.status)
+        advanceUntilIdle()
+
+        assertEquals(taxes, vm.s.view)
+        assertTrue(vm.s.viewOrder)
+        assertTrue(vm.s.filters.isEmpty)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25, view = 8, viewOrder = true), queries.last())
+        assertEquals(VIEW_ORDER, vm.s.sortLabel)
+        assertTrue(vm.s.showResultLine)
+    }
+
+    @Test
+    fun `clearing the view, or choosing it again, goes back to all documents`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+
+        vm.clearView()
+        advanceUntilIdle()
+        assertNull(vm.s.view)
+        assertFalse(vm.s.viewOrder)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25), queries.last())
+
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+        assertNull(vm.s.view)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25), queries.last())
+    }
+
+    @Test
+    fun `a picked sort replaces the view's order, and filters narrow the view`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+
+        vm.setSort(SortOption.OLDEST)
+        advanceUntilIdle()
+        assertFalse(vm.s.viewOrder)
+        assertEquals(SortOption.OLDEST.label, vm.s.sortLabel)
+        assertEquals(7, queries.last().view)
+        assertFalse(queries.last().viewOrder)
+
+        vm.setFilters(DocumentFilters(tagIds = setOf(1)))
+        advanceUntilIdle()
+        assertEquals(inbox, vm.s.view)
+        assertEquals(DocumentQuery(tagIds = setOf(1), sort = DocumentSort.CREATED, descending = false, page = 1, pageSize = 25, view = 7), queries.last())
+
+        vm.clearFilters()
+        advanceUntilIdle()
+        assertEquals(inbox, vm.s.view)
+    }
+
+    @Test
+    fun `searching in a view still says best match`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        vm.onTextChange("power")
+        assertEquals(BEST_MATCH, vm.s.sortLabel)
+    }
+
+    @Test
+    fun `loading more in a view keeps the view`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+
+        vm.loadMore()
+        advanceUntilIdle()
+
+        assertEquals(DocumentQuery(page = 2, pageSize = 25, view = 7, viewOrder = true), queries.last())
+    }
+
+    // More like this
+
+    @Test
+    fun `more like this ends the search, the view and the filters and lists similar documents`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.chooseView(inbox)
+        vm.setFilters(DocumentFilters(tagIds = setOf(1)))
+        vm.startSearch()
+        vm.onTextChange("power")
+        advanceUntilIdle()
+
+        vm.showSimilar(9, "Power bill")
+        assertEquals(ListStatus.Loading, vm.s.status)
+        advanceUntilIdle()
+
+        assertEquals(Similar(9, "Power bill"), vm.s.similar)
+        assertFalse(vm.s.searching)
+        assertEquals("", vm.s.text)
+        assertNull(vm.s.view)
+        assertFalse(vm.s.viewOrder)
+        assertTrue(vm.s.filters.isEmpty)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25, similarTo = 9), queries.last())
+        assertEquals(BEST_MATCH, vm.s.sortLabel)
+        assertTrue(vm.s.showResultLine)
+    }
+
+    @Test
+    fun `an untitled document is liked as Untitled`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "  ")
+        assertEquals("Untitled", vm.s.similar?.title)
+    }
+
+    @Test
+    fun `filters narrow similar documents and keep them`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+
+        assertEquals(Similar(9, "Power bill"), vm.s.similar)
+        assertEquals(DocumentQuery(correspondentId = 2, page = 1, pageSize = 25, similarTo = 9), queries.last())
+    }
+
+    @Test
+    fun `clearing similar goes back to the list, keeping or dropping the filters`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+
+        vm.clearSimilar()
+        advanceUntilIdle()
+        assertNull(vm.s.similar)
+        assertEquals(DocumentQuery(correspondentId = 2, page = 1, pageSize = 25), queries.last())
+
+        vm.showSimilar(9, "Power bill")
+        vm.setFilters(DocumentFilters(correspondentId = 2))
+        advanceUntilIdle()
+        vm.clearSimilar(alsoFilters = true)
+        advanceUntilIdle()
+        assertNull(vm.s.similar)
+        assertTrue(vm.s.filters.isEmpty)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25), queries.last())
+    }
+
+    @Test
+    fun `starting a search ends similar`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+        val before = queries.size
+
+        vm.startSearch()
+        advanceUntilIdle()
+
+        assertNull(vm.s.similar)
+        assertTrue(vm.s.searching)
+        assertEquals(before + 1, queries.size)
+        assertNull(queries.last().similarTo)
+    }
+
+    @Test
+    fun `starting a search while not similar loads nothing`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val before = queries.size
+        vm.startSearch()
+        advanceUntilIdle()
+        assertEquals(before, queries.size)
+    }
+
+    @Test
+    fun `choosing a view ends similar`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+
+        assertNull(vm.s.similar)
+        assertEquals(DocumentQuery(page = 1, pageSize = 25, view = 7, viewOrder = true), queries.last())
+    }
+
     // A change that moves documents in the list (#32)
 
     /**
@@ -901,6 +1132,30 @@ class DocumentsViewModelTest {
         assertEquals(asked, queries.size)
         assertEquals(4, vm.documents(listOf(2)).single().storagePathId)
         assertEquals("Renamed", vm.s.rows[3].title)
+    }
+
+    @Test
+    fun `any change in a saved view or similar documents asks for the shown rows again`() = runTest(main.dispatcher) {
+        val server = documents(60)
+        serving(server)
+        val vm = loaded()
+        vm.chooseView(inbox)
+        advanceUntilIdle()
+        var asked = queries.size
+
+        // The view's own rules may drop it on a change the app can't judge.
+        vm.apply(listOf(1), BulkEdit.SetStoragePath(4))
+        advanceUntilIdle()
+        assertTrue(queries.size > asked)
+        assertEquals(7, queries.last().view)
+
+        vm.showSimilar(9, "Power bill")
+        advanceUntilIdle()
+        asked = queries.size
+        vm.patch(vm.documents(listOf(1)).single().copy(title = "Renamed"))
+        advanceUntilIdle()
+        assertTrue(queries.size > asked)
+        assertEquals(9, queries.last().similarTo)
     }
 
     @Test

@@ -13,6 +13,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSourc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.InstallEvent
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Label
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Note
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedViews
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerConfig
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.StoredSignIn
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
@@ -73,6 +75,18 @@ interface DocumentLibrary {
 
     /** Applies [edit] to every document in [ids]; nothing happens for none. */
     suspend fun bulkEdit(config: ServerConfig, ids: List<Int>, edit: BulkEdit)
+
+    /** A document's notes, newest first. */
+    suspend fun notes(config: ServerConfig, documentId: Int): List<Note>
+
+    /** Adds a note and returns all of the document's notes, newest first. */
+    suspend fun addNote(config: ServerConfig, documentId: Int, text: String): List<Note>
+
+    /** False when the server's owner switched notes off. */
+    suspend fun notesEnabled(config: ServerConfig): Boolean
+
+    /** The lists saved in the server's web interface, in its order. */
+    suspend fun savedViews(config: ServerConfig): SavedViews
 }
 
 /**
