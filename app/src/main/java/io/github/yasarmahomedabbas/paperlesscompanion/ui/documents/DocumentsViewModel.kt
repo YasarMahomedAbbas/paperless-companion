@@ -42,7 +42,12 @@ class DocumentsViewModel(
     private var loadJob: Job? = null
     private var typingJob: Job? = null
     private var previewJob: Job? = null
-    private var loadedPage = 0
+    /**
+     * How many of the server's documents, in list order, come before the next one not shown yet. It
+     * follows trash and Undo, which move the server's pages under the list, so [loadMore] neither
+     * skips a document nor shows one twice.
+     */
+    private var consumed = 0
     private var hasMore = false
 
     /** The search text the shown list was loaded with. */
@@ -65,16 +70,28 @@ class DocumentsViewModel(
         val s = _state.value
         val labels = s.labels ?: return
         if (s.loadingMore || s.refreshing || s.status != ListStatus.Loaded || !hasMore) return
-        val query = query(page = loadedPage + 1)
+        // The page holding the next unseen document; the ones before it on that page are shown already.
+        val query = query(page = consumed / PAGE_SIZE + 1)
+        val seen = consumed % PAGE_SIZE
         _state.update { it.copy(loadingMore = true, loadMoreFailed = null) }
         loadJob = viewModelScope.launch {
             try {
-                val page = browse(query)
-                loadedPage = query.page
-                hasMore = page.hasMore
-                loaded = loaded + page.documents
+                var page = browse(query)
+                var next = page.documents.drop(seen)
+                // Part of that page was shown already: the one after it too, so a scroll brings a full page.
+                if (seen > 0 && page.hasMore) {
+                    page = browse(query.copy(page = query.page + 1))
+                    next = next + page.documents
+                }
+                consumed += next.size
+                // Nothing new would ask for the same page again for ever.
+                hasMore = page.hasMore && next.isNotEmpty()
+                // A document a change elsewhere moved further down is shown once, where it was first.
+                val shown = loaded.mapTo(HashSet()) { it.id }
+                val fresh = next.filter { it.id !in shown }
+                loaded = loaded + fresh
                 _state.update {
-                    it.copy(rows = it.rows + page.documents.map { d -> d.toRow(labels) }, total = page.total, loadingMore = false)
+                    it.copy(rows = it.rows + fresh.map { d -> d.toRow(labels) }, total = page.total, loadingMore = false)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -188,6 +205,7 @@ class DocumentsViewModel(
         if (gone.isEmpty()) return
         gone.forEach { removed[it.value.id] = it }
         loaded = loaded.filter { it.id !in wanted }
+        consumed = (consumed - gone.size).coerceAtLeast(0)
         showLoaded(totalChange = -gone.size)
     }
 
@@ -198,6 +216,7 @@ class DocumentsViewModel(
         val list = loaded.toMutableList()
         back.forEach { list.add(it.index.coerceAtMost(list.size), it.value) }
         loaded = list
+        consumed += back.size
         showLoaded(totalChange = back.size)
     }
 
@@ -245,7 +264,7 @@ class DocumentsViewModel(
                     val page = async { browse(query) }
                     (labels?.await() ?: checkNotNull(known)) to page.await()
                 }
-                loadedPage = 1
+                consumed = page.documents.size
                 hasMore = page.hasMore
                 loaded = page.documents
                 _state.update {

@@ -737,4 +737,61 @@ class DocumentsViewModelTest {
         assertEquals(24, vm.s.rows.size)
         assertEquals(59, vm.s.total)
     }
+
+    /** A server holding [ids] in list order, paging them as Paperless does; trash takes them out of it. */
+    private fun serving(ids: MutableList<Int>) {
+        answer = { q ->
+            val from = (q.page - 1) * q.pageSize
+            DocumentPage(ids.size, ids.drop(from).take(q.pageSize).map { doc(it) }, hasMore = from + q.pageSize < ids.size)
+        }
+    }
+
+    @Test
+    fun `after a trash, loading more skips no document`() = runTest(main.dispatcher) {
+        val server = (1..60).toMutableList()
+        serving(server)
+        val vm = loaded()
+
+        server.remove(5)
+        vm.remove(listOf(5))
+        vm.loadMore()
+        advanceUntilIdle()
+
+        assertEquals((1..51).filter { it != 5 }, vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a trash, more, Undo and more again shows every document once`() = runTest(main.dispatcher) {
+        val server = (1..80).toMutableList()
+        serving(server)
+        val vm = loaded()
+
+        server.remove(5)
+        vm.remove(listOf(5))
+        vm.loadMore()
+        advanceUntilIdle()
+        server.add(4, 5)
+        vm.putBack(listOf(5))
+        vm.loadMore()
+        advanceUntilIdle()
+
+        assertEquals((1..80).toList(), vm.s.rows.map { it.id })
+    }
+
+    @Test
+    fun `a document that moved onto a later page is shown once`() = runTest(main.dispatcher) {
+        val server = (1..60).toMutableList()
+        serving(server)
+        val vm = loaded()
+
+        // Renamed elsewhere, it now sorts after the first page.
+        server.remove(3)
+        server.add(26, 3)
+        vm.loadMore()
+        advanceUntilIdle()
+
+        val ids = vm.s.rows.map { it.id }
+        assertEquals(ids.distinct(), ids)
+        assertEquals(1, ids.count { it == 3 })
+    }
 }

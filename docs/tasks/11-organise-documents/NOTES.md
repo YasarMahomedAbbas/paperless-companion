@@ -52,3 +52,9 @@ Branch: `feat/11-organise-documents`
   - The bulk sheets' Open Paperless needed a link the list didn't have, so `SelectionViewModel` takes a `LabelsLinkUseCase` too.
   - #9's `CorrespondentSheet` in `FiltersSheet.kt` stays private and unchanged; the pickers here are separate because they add "None", no-match → Open Paperless and the load states.
 
+## Review
+
+- Fixed: `DocumentsViewModel.loadMore` paged by page number while trash and Undo moved the server's pages under the list. Trashing one row and scrolling on skipped the next page's first document; trash, load more, Undo, load more showed a document twice, and the duplicate id crashes the `LazyColumn` (`items(rows, key = { it.id })`). The list now counts how many server positions it has consumed (trash subtracts, Undo adds), fetches from the page holding the next unseen document (plus the page after when part of it was shown), and never adds an id it already shows. Three new `DocumentsViewModelTest` cases fail without the fix.
+- Raised: https://github.com/YasarMahomedAbbas/paperless-companion/issues/32 (an edit or bulk change that moves documents out of the active filter or sort order still shifts the pages, so a later load more can skip rows; no longer a crash).
+- API: no new Paperless call. `labelsUrl` builds web-UI routes `/tags`, `/correspondents`, `/documenttypes`, `/storagepaths` (checked against `src-ui` routing in planning). The writes (PATCH / DELETE `/api/documents/{id}/`, `POST /api/trash/` restore, `bulk_edit` `modify_tags` / `set_correspondent` / `set_document_type`, `/api/documents/delete/`) are #7's, unchanged here. `verify.env` is absent, so the live `/api/schema/` was not read; left to self-verification.
+- Layers: clean. `LabelKind` and `DocumentServer.labelsUrl` are domain terms; the paths live only in `data/PaperlessApi.kt`; `ui/` imports no `data/` class. Token untouched; no new storage or manifest change.
