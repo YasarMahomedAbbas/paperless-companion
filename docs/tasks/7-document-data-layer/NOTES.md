@@ -48,3 +48,16 @@ Branch: `feat/7-document-data-layer`
 - API: checked against the server source at v3.3.4 and v2.20.15 (no live schema: `verify.env` absent, so self-verification must still read `/api/schema/`). `GET /api/documents/` (page, page_size, fields, ordering, query, tags__id__all, correspondent__id, document_type__id; v9 `all` ignored), `GET|PATCH|DELETE /api/documents/{id}/`, `/thumb/`, `/preview/`, `/download/[?original=true]`, the four label lists (paged via `next`, host pinned), `GET|POST /api/trash/`, `POST /api/documents/bulk_edit/` all match. `POST /api/documents/delete/` is v10-only; the 2.x answer was 405, not 404 (fixed above).
 - Layers: clean. No Paperless names, paths or status codes in `domain/`; `NOT_FOUND` is in the app's own words.
 - CI: full command green after the fix (275 tests, koverVerify, lint, assemble).
+
+## Doc drift
+
+- Applied: README.md:Architecture — the `data/` block now names `PaperlessLibrary`, `PaperlessHttp`, `Thumbnails` + `ThumbnailImages` (Coil) next to `PaperlessApi` (rung 3, the block lists every data class).
+- Applied: README.md:Architecture — use-case table gains the browse/get/open-file, labels, and update/delete/trash/bulk-edit use cases, including the v10 delete with its Paperless 2 fallback (rung 3).
+- Applied: README.md:Architecture — one paragraph on thumbnails: screens hand `document.thumbnail` to the app-wide Coil loader, which adds the token only for the signed-in scheme/host/port and keys the disk cache on modified time. #9 would otherwise plausibly build the URL and add the token itself (rung 3).
+- Applied: README.md:Development — Coil added to the list of code kover leaves out (rung 3).
+- Applied: CLAUDE.md:Paperless API — "every call to Paperless" named only `PaperlessApi.kt`; it now names `PaperlessLibrary.kt` and the shared `PaperlessHttp.kt` too, so the docs-and-schema rule visibly covers the new calls (rung 2, a correction, no new rule).
+- Skipped: `ServerException.Kind.NOT_FOUND` — the enum's KDoc says it and `userMessage` handles it; one `rg` finds it.
+- Skipped: `pages` follows only `next`'s query at the signed-in address — enforced by code and `PaperlessHttpTest`.
+- Skipped: Coil 3.0.4 dependency — `libs.versions.toml` says it; the README now names Coil.
+- Skipped: `.claude/skills/start-ticket` still points at `PaperlessApi.kt` as the example for a call — skills are outside this stage's scope, and the example is still valid.
+- Stale, fixed separately: README.md:Development — said only Compose screens and the Keystore code are left out of coverage; kover on main also excludes the content-URI, preference, installer, WorkManager and notification glue (ddedb9d).
