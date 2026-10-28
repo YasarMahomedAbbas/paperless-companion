@@ -21,3 +21,10 @@ Branch: `fix/21-forbidden-is-not-signed-out`
 - Tests: full CI command (`testDebugUnitTest koverVerify lintDebug assembleDebug`) BUILD SUCCESSFUL; debug unit tests 330 passed / 0 failed.
 - Outstanding: none.
 - Contradicted the plan: none.
+
+## Review
+
+- Fixed: none. Checked: every `Kind` consumer (`userMessage()` is the only exhaustive `when`; `LoginViewModel` still gets UNAUTHORIZED from sign-in; the upload status loop treats FORBIDDEN like any non-network error and reports it once), `download`'s separate error path (passes `signIn = false`, covered by the file test), and every Done-when item against the diff. Nothing from Out of scope is in the diff.
+- Raised: none.
+- API: no request or response shape changed; only status-code meaning. `POST /api/token/` (400/401/403 → UNAUTHORIZED), and every token-authed call (`/api/documents/…`, `post_document`, `/api/tasks/`): 401 → UNAUTHORIZED, 403 → FORBIDDEN, matching Paperless's auth classes and permission docs as read from the repo source at planning. Same in v9 and v10. Live schema not checked: `verify.env` absent.
+- Layers: clean. `FORBIDDEN` and its message are in the app's words; no status code or Paperless string left `data/`.
