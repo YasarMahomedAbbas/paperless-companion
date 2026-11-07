@@ -1,7 +1,7 @@
 ---
 name: pipeline
 description: >-
-  Use when a ticket should be driven from issue to released APK with nobody watching — "run the pipeline on #9", "pipeline 9", "take #9 all the way", "resume the pipeline", or when autopilot launches it. Runs start-ticket → implement-plan → self-review → doc-drift → self-verification → raise-pr → merge-release, each stage as a fresh subagent in the ticket's own worktree and tmux session. Never asks the user anything: it takes the recommendation on routine questions and parks the ticket (a research note on the issue, label `parked`) at a judgment call. Ends by merging the PR and releasing, then tears the worktree down and wakes autopilot so dependent tickets start. Not for single stages (invoke the stage skill) or a design (design-canvas).
+  Use when a ticket should be driven from issue to released APK with nobody watching — "run the pipeline on #9", "pipeline 9", "take #9 all the way", "resume the pipeline", or when autopilot launches it. Runs start-ticket → implement-plan → self-review → doc-drift → self-verification → raise-pr → merge-release, each stage as a fresh subagent in the ticket's own worktree and herd. Never asks the user anything: it takes the recommendation on routine questions and parks the ticket (a research note on the issue, label `parked`) at a judgment call. Ends by merging the PR and releasing, then tears the worktree down and wakes autopilot so dependent tickets start. Not for single stages (invoke the stage skill) or a design (design-canvas).
 ---
 
 # Pipeline
@@ -23,9 +23,9 @@ Two ideas shape everything below:
   ticket, takes the recommended option on ordinary questions, and parks anything that changes
   what is being built.
 
-Worktrees live at `<repo-parent>/worktrees/paperless-companion/issue-<n>`, each in a detached
-tmux session named `paperless-<n>` (not `issue-<n>`: that name belongs to travel-smart's
-autopilot, which counts those sessions).
+Worktrees live at `<repo-parent>/worktrees/paperless-companion/issue-<n>`, each in its own herd keyed
+`paperless-companion:<n>`: a tab named `#<n> <2-3 words of the title>`, which `herd go paperless-companion:<n>` brings on
+screen.
 
 ## Entry: which phase are you in?
 
@@ -47,24 +47,20 @@ nobody to ask; print one line saying so and stop.
 ## Bootstrap
 
 ```bash
-ROOT=$(git rev-parse --show-toplevel)
-WT="$(dirname "$ROOT")/worktrees/paperless-companion/issue-<n>"
-git -C "$ROOT" fetch -q origin main
-if [ ! -d "$WT" ]; then
-  mkdir -p "$(dirname "$WT")"
-  git -C "$ROOT" worktree add --detach "$WT" origin/main
-fi
-tmux has-session -t "paperless-<n>" 2>/dev/null \
-  || tmux new-session -d -s "paperless-<n>" -c "$WT" "claude --permission-mode auto '/pipeline #<n>'"
+herd --recipe ticket -- "paperless-companion#<n>"
 ```
 
-Detached at `origin/main`, because `main` is checked out in the main tree. Nothing to seed:
-the build runs in Docker (`./build.sh`) and the Gradle cache is shared under `~/.cache`. If a
-git command fails on a `.lock` file, another bootstrap is in the same second; retry once.
+herd reads the project's entry in `~/.config/herd/projects.json`: it fetches `origin/main`,
+adds the worktree detached at `origin/main` if it is missing (detached because `main` is
+checked out in the main tree), and starts `claude --permission-mode auto '/pipeline #<n>'` in
+it. A live herd keyed `paperless-companion:<n>` is gone to instead of started twice (herd prints
+`"existing": true`). Nothing to seed: the build runs in Docker (`./build.sh`) and the Gradle
+cache is shared under `~/.cache`. herd retries once itself when another bootstrap holds a git
+`.lock` in the same second.
 
 An existing worktree is reused, never recreated: the run resumes from the stage log.
 
-Say "Continuing in tmux session `paperless-<n>`" and stop.
+Say "Continuing in a herd tab named `#<n> …` (`herd go paperless-companion:<n>`)" and stop.
 
 ## Run
 
@@ -101,9 +97,9 @@ The ticket folder is the stage log. The branch is `<type>/<n>-<slug>`; the folde
 Say which stage you are resuming at and why, in one line. Announce every transition:
 
 ```bash
-pipeline-status running <stage>
-pipeline-status blocked <reason>
-pipeline-status done    released
+herd stage <stage>   running
+herd stage <reason>  blocked
+herd stage released done
 ```
 
 ### 3. Run a stage as a fresh subagent
@@ -175,7 +171,7 @@ line, what you decided and why.
 
 A parked ticket goes back to the user already researched.
 
-1. `pipeline-status blocked "parked · <kind> · <stage>"`.
+1. `herd stage "parked · <kind> · <stage>" blocked`.
 2. `SendMessage` the parked subagent:
 
    > This ticket is being parked here for the user. Don't continue the stage. Reply with one
@@ -194,7 +190,7 @@ A parked ticket goes back to the user already researched.
 4. `gh issue edit <n> --add-label parked`.
 5. `PushNotification` (load it via ToolSearch): title `Pipeline #<n> parked`, body the stage
    and the kind.
-6. Keep the branch and the worktree. Last action: `tmux kill-session -t "paperless-<n>"`.
+6. Keep the branch and the worktree. Last action: `herd close "paperless-companion:<n>"`.
 
 ### 6. Between stages
 
@@ -208,21 +204,21 @@ A `failed` self-verification is not a park by itself: `raise-pr` opens the PR as
 
 After `merge-release`'s STAGE COMPLETE (merged and released, or released not needed):
 
-1. `pipeline-status done released`, and `PushNotification`: title `#<n> shipped`, body the PR
+1. `herd stage released done`, and `PushNotification`: title `#<n> shipped`, body the PR
    URL and the release tag (or "no release: docs only").
 2. Wake autopilot, so tickets that needed this one start now:
 
    ```bash
-   tmux has-session -t paperless-autopilot 2>/dev/null || \
-     tmux new-session -d -s paperless-autopilot -c ~/projects/personal/paperless-companion "claude --permission-mode auto '/autopilot'"
+   herd ls --json | jq -e 'any(.[]; .name == "paperless-companion autopilot")' >/dev/null || \
+     herd --place bg --at ~/projects/personal/paperless-companion --name "paperless-companion autopilot" --group autopilot -- "/autopilot"
    ```
 
-3. Last action, one command (it deletes this session's working directory and ends it):
+3. Last action, one command (it deletes this herd's working directory and ends it):
 
    ```bash
    MAIN=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
    git -C "$MAIN" worktree remove --force "$(git rev-parse --show-toplevel)" \
-     && tmux kill-session -t "paperless-<n>"
+     && herd close "paperless-companion:<n>"
    ```
 
 ## Design tickets
