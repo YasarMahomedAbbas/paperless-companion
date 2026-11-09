@@ -32,8 +32,8 @@ At most three pipelines at once. `slots` ≤ 0 → step 5.
 
 A worktree under `<repo-parent>/worktrees/paperless-companion/issue-<n>` with no
 live herd keyed `paperless-companion:<n>` is a pipeline a reboot or a crash stopped. If its issue is open and not
-labelled `parked`, it gets a slot before any new ticket: run `pipeline`'s Bootstrap for it (it
-reuses the worktree and resumes from the stage log).
+labelled `parked`, it gets a slot before any new ticket: run `pipeline`'s Bootstrap for it, with
+`--no-focus` as in step 4 (it reuses the worktree and resumes from the stage log).
 
 ## 3. Candidates
 
@@ -54,7 +54,9 @@ A ticket qualifies only if all of these hold. When unsure, it doesn't.
 ## 4. Launch
 
 Lowest issue number first. Take the first `slots`. For each, run `pipeline`'s **Bootstrap**
-exactly as written there, one after another (the `git worktree add` calls share a lock). If a
+exactly as written there, one after another (the `git worktree add` calls share a lock), but
+with `--no-focus` added: `herd --recipe ticket --no-focus -- "paperless-companion#<n>"`. The herd opens as
+a tab beside whatever the user is doing, and a timer-started run must not grab the screen. If a
 bootstrap fails, remove the half-made worktree with `git worktree remove --force` and carry on.
 
 Two tickets that touch the same files may run at once: the later PR merges `main` in and
