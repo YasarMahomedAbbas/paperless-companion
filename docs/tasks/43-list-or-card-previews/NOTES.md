@@ -28,3 +28,10 @@ Branch: `feat/43-list-or-card-previews`
 - Tests: full check `testDebugUnitTest koverVerify lintDebug assembleDebug` green; 542 passed / 0 failed (debug unit tests). New: `PrefsDisplayPreferencesTest` (4), 4 layout tests in `DocumentsViewModelTest`, 1 in `DocumentUseCasesTest`. In this run `koverVerify` did not run `testReleaseUnitTest` (no release test task in the log), which contradicts CLAUDE.md's "koverVerify also runs the release unit tests"; left for doc-drift.
 - Outstanding: none unticked. Device-only (for self-verification): how smoothly a long cards list scrolls, how sharp thumbnails look at card size, TalkBack on a card and the toggle, and that switching keeps the first document in view.
 - Contradicted the plan: 3.1's grid-wide horizontal `contentPadding` would have doubled the gutter of `StatusCard` and `SectionHeading`, which pad themselves (20). Resolved by keeping the full-width items' own padding and padding each card cell instead (`cardCell`, `DocumentsScreen.kt:833`: 12 at the edge, 4 toward the other column), same widths and gaps as planned; the checklist text was updated. The loading-more footer's single skeleton row looked wrong under cards, so it gained a `cards` variant (recorded in the manual).
+
+## Review
+
+- Fixed: none. Checked and held up: the switch anchor is taken before the grid remeasures, and every item keeps its key and order in both layouts, so `scrollToItem` brings back the same document. `cardCell(index)` works out the column correctly because every item before the documents spans the line. The cards loading-more footer lines up with the grid (12 from the edges, 8 apart). Toggling leaves the load jobs alone (tested). Selection, long-press and TalkBack merging on the card mirror the row.
+- Raised: none
+- API: no endpoint touched; cards reuse `GET /api/documents/{id}/thumb/` through the unchanged loader.
+- Layers: clean (`DocumentLayout` / `DisplayPreferences` in domain with no Android or Paperless names; `PrefsDisplayPreferences` only named in `AppContainer`).
