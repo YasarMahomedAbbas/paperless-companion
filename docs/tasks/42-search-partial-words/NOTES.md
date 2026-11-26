@@ -40,3 +40,14 @@ Branch: `fix/42-search-partial-words`
 - Skipped: the widening rules (stop words, one-letter words, quoted/`field:`/operator tokens sent as typed): the KDoc in `PaperlessSearch.kt` and `PaperlessSearchTest` state and enforce them; a session touching search reads that file.
 - Skipped: CLAUDE.md: no new cross-cutting rule; the change stays inside `data/` as the layer rules already require.
 - Stale, fixed separately: none
+
+## Self verification
+
+Result: partial
+
+- CI build: `./build.sh ./gradlew --console=plain testDebugUnitTest koverVerify lintDebug assembleDebug` BUILD SUCCESSFUL; 546 unit tests passed, 0 failed, 0 skipped; line coverage 93.6% (1840/1966, debug report; `koverVerify` bound 80% met); lint 0 errors, 22 warnings, none in the files this branch touches; debug APK built.
+- Server: not run (`~/.config/paperless-companion/verify.env` is absent, so there is no server address or token).
+- Verified: `partialWordQuery` and the `query=` the list call sends, by `PaperlessSearchTest` and `PaperlessLibraryTest` (MockWebServer) only.
+- Failed: none
+- Not run (needs the server): live `/api/schema/` check of `query` on `GET /api/documents/`; `GET /api/documents/?query=(w OR w*)` for a prefix of a word in a known document returning it with `__search_hit__` and no 400; a quoted phrase and a `tag:` query still working; the stemming risk (a prefix past the stem, e.g. `universit`, finding nothing on a server with a stemmer). All read-only, no writes needed.
+- Not self-verifiable: none (no device-only behaviour; the search field already debounces into the same call).
