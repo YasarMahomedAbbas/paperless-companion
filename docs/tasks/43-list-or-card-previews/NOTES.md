@@ -45,3 +45,19 @@ Branch: `feat/43-list-or-card-previews`
 - Skipped: `PrefsDisplayPreferences` and the `display` preferences file in the README's `data/` block — the block doesn't list the other preference stores either, and `AppContainer` names it.
 - Skipped: a CLAUDE.md rule for the layout — nothing cross-cutting; the code and the manual carry it.
 - Stale, fixed separately: `CLAUDE.md` § Working on the app — said `koverVerify` "also runs the release unit tests" and is stricter than CI; `./build.sh ./gradlew -m koverVerify` schedules `compileReleaseKotlin` and `koverGenerateArtifactRelease` but no `testReleaseUnitTest`, so coverage comes from the debug tests only. Corrected in `docs: correct stale build docs`.
+
+## Self verification
+
+Result: partial
+
+- CI build: `testDebugUnitTest koverVerify lintDebug assembleDebug` green; 542 debug unit tests passed / 0 failed, line coverage 93.6% (bound 80), lint 0 errors (22 warnings, none in the branch's files after the fix below), debug APK built.
+- Fixed: lint flagged `cardCell(index)` in `DocumentsScreen.kt` (`ModifierFactoryExtensionFunction`, new on this branch); it is now `Modifier.cardCell(index)`, same padding. Re-ran the full check: green.
+- Server: not run (`~/.config/paperless-companion/verify.env` absent; the branch changes no Paperless call either: cards reuse the unchanged `GET /api/documents/{id}/thumb/` loader, and `PrefsDisplayPreferences` is phone-local storage).
+- Verified: the layout preference (default list, round-trip cards, unknown value reads list, survives a new ViewModel), the toggle not reloading documents, and the layer rules, by the unit tests and `ArchitectureTest` in the run above.
+- Failed: none
+- Not self-verifiable:
+  - Scroll a long Documents list in cards: it stays smooth and infinite scroll loads the next page.
+  - Thumbnails look sharp at card size (two columns).
+  - Toggle rows ↔ cards mid-list: the first visible document stays at the top; relaunch the app and sign out/in: the choice is kept.
+  - Selection (long-press a card), search, pull to refresh, uploads and the skeleton/empty/failed/loading-more states look right in cards.
+  - TalkBack reads a card as one item (title, meta, selected state) and the toggle as "Show as cards" / "Show as list".
