@@ -35,3 +35,13 @@ Branch: `feat/43-list-or-card-previews`
 - Raised: none
 - API: no endpoint touched; cards reuse `GET /api/documents/{id}/thumb/` through the unchanged loader.
 - Layers: clean (`DocumentLayout` / `DisplayPreferences` in domain with no Android or Paperless names; `PrefsDisplayPreferences` only named in `AppContainer`).
+
+## Doc drift
+
+- Applied: `README.md` intro § Documents — the rows-or-cards toggle beside Settings, remembered on the phone (rung 3, using the app).
+- Applied: `README.md` § Architecture use-case table — a `DocumentLayoutUseCase` row; the table listed every other use case, so leaving it out would make it read as complete when it isn't (rung 3).
+- Applied: `docs/design/README.md` § #43 decisions — the 500 px thumbnail claim now cites `_THUMBNAIL_MAX_WIDTH` in Paperless's `src/documents/parsers.py` (checked with `gh search code`), so a server fact names its source (rung 4).
+- Skipped: the branch's manual edits (`components.md` § Document card and § Top bars, `layouts.md` § List — Documents) — checked against `DocumentCard.kt`, `Skeleton.kt` and `DocumentsScreen.kt` (padding 8, 3:4 crop from the top, check on a `surface` disc, 70%/45% bars, six skeleton cards, two columns, labels "Show as cards" / "Show as list"); all hold.
+- Skipped: `PrefsDisplayPreferences` and the `display` preferences file in the README's `data/` block — the block doesn't list the other preference stores either, and `AppContainer` names it.
+- Skipped: a CLAUDE.md rule for the layout — nothing cross-cutting; the code and the manual carry it.
+- Stale, fixed separately: `CLAUDE.md` § Working on the app — said `koverVerify` "also runs the release unit tests" and is stricter than CI; `./build.sh ./gradlew -m koverVerify` schedules `compileReleaseKotlin` and `koverGenerateArtifactRelease` but no `testReleaseUnitTest`, so coverage comes from the debug tests only. Corrected in `docs: correct stale build docs`.
