@@ -46,6 +46,7 @@ enum class DocumentSort { CREATED, ADDED, MODIFIED, TITLE, CORRESPONDENT, DOCUME
  * documents are listed, narrowed by the other fields; [similarTo] isn't meant to be combined with it.
  */
 data class DocumentQuery(
+    /** Words to search for. A word also matches longer words that start with it. */
     val text: String? = null,
     val tagIds: Set<Int> = emptySet(),
     val correspondentId: Int? = null,

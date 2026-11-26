@@ -181,12 +181,19 @@ class PaperlessLibraryTest {
         val page = library.documents(config, DocumentQuery(text = "  power  ", sort = DocumentSort.TITLE))
 
         val request = server.takeRequest()
-        assertEquals("power", request.query("query"))
+        assertEquals("(power OR power*)", request.query("query"))
         assertNull(request.query("ordering"))
         val searchHit = page.documents.single().searchHit!!
         assertEquals(3.5, searchHit.score!!, 0.0)
         assertEquals("the power bill", searchHit.excerpt)
         assertEquals(listOf(4..8), searchHit.matches)
+    }
+
+    @Test
+    fun `burger is sent as a prefix search`() = runTest {
+        respond(body = """{"count":0,"results":[]}""")
+        library.documents(config, DocumentQuery(text = "burger"))
+        assertEquals("(burger OR burger*)", server.takeRequest().query("query"))
     }
 
     @Test
@@ -887,7 +894,7 @@ class PaperlessLibraryTest {
         library.documents(config, DocumentQuery(view = 7, viewOrder = true, text = " power "))
 
         val request = server.takeRequest()
-        assertEquals("power", request.query("query"))
+        assertEquals("(power OR power*)", request.query("query"))
         assertNull(request.query("text"))
         assertNull(request.query("title_search"))
         assertNull(request.query("ordering"))
