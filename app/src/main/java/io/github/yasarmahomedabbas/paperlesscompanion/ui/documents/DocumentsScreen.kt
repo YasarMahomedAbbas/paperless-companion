@@ -709,7 +709,7 @@ private fun DocumentList(
         when (val status = state.status) {
             ListStatus.Loading -> if (cards) {
                 items(SKELETON_CARDS, key = { "skeleton-card-$it" }) {
-                    DocumentCardSkeleton(cardCell(it).padding(bottom = Spacing.rowGap))
+                    DocumentCardSkeleton(Modifier.cardCell(it).padding(bottom = Spacing.rowGap))
                 }
             } else {
                 items(SKELETON_ROWS, key = { "skeleton-$it" }) {
@@ -787,7 +787,7 @@ private fun DocumentList(
                             meta = row.meta,
                             thumbnail = row.thumbnail,
                             onClick = onClick,
-                            modifier = cardCell(index).padding(bottom = Spacing.rowGap),
+                            modifier = Modifier.cardCell(index).padding(bottom = Spacing.rowGap),
                             selection = selected,
                             onLongClick = onLongClick,
                         )
@@ -830,11 +830,11 @@ private fun LazyGridScope.line(key: Any, content: @Composable LazyGridItemScope.
  * A card's cell in the two-column grid: 12 from the screen's edge and 4 toward the other column, so the
  * cards are the same width, 8 apart. Documents start on a fresh line, so [index] says the column.
  */
-private fun cardCell(index: Int): Modifier =
+private fun Modifier.cardCell(index: Int): Modifier =
     if (index % CARD_COLUMNS == 0) {
-        Modifier.padding(start = Spacing.cardGutter, end = Spacing.s4)
+        padding(start = Spacing.cardGutter, end = Spacing.s4)
     } else {
-        Modifier.padding(start = Spacing.s4, end = Spacing.cardGutter)
+        padding(start = Spacing.s4, end = Spacing.cardGutter)
     }
 
 private fun resultLine(total: Int, text: String): String {
