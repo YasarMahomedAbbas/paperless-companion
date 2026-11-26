@@ -25,3 +25,10 @@ Branch: `fix/42-search-partial-words`
 - Tests: `PaperlessSearchTest` (11 cases, new) and `PaperlessLibraryTest` (two `query` assertions widened, plus `burger is sent as a prefix search`). With the call reverted to the raw text, 3 of 63 library tests fail; with the fix, the full check (`testDebugUnitTest koverVerify lintDebug assembleDebug`) is BUILD SUCCESSFUL, 545 tests passed / 0 failed.
 - Outstanding: none in this stage. The real-server check of `query=(w OR w*)` (and the stemming risk) is self-verification's.
 - Contradicted the plan: none. The new library test was named without quotes (`burger is sent as a prefix search`), because the Kotlin compiler warns that `"` in a test name can break on Windows; the checklist text was updated to match.
+
+## Review
+
+- Fixed: `data/PaperlessSearch.kt` widened English stop words. Paperless 2.x (Whoosh `TEXT()`, StandardAnalyzer) strips stop words from the index and from plain query words, but keeps wildcard terms. So `bill of lading` became `... (of OR of*) ...` and required a word starting with "of", which dropped documents that only hold "bill" and "lading". Stop words (Whoosh's English list, any case) are now sent as typed, which matches what 2.x did before this branch. Covered by `a stop word is sent as typed, so Paperless 2 still drops it`, which fails without the fix.
+- Raised: none
+- API: `GET /api/documents/?query=`. Checked against the source at v3.5.1 (`search/_query.py`, `_registry.py`, `_tokenizer.py`) and v2.20.15 (`index.py` `DelayedFullTextQuery`). On 3.x the whoosh-compat parser passes a wildcard's literal run through `pattern_normalizer` (lowercase, ascii-fold, and also the stemmed form), so `Burger*` matches lower-case index terms. Every default search field (title, content, correspondent, document_type, tag) is TEXT, so a trailing `*` raises no pattern-on-numeric 400. 3.x has no stop filter. On 2.x, MultifieldParser uses the default AND group, so words stay ANDed. The response shape is unchanged. Live schema not read, because `verify.env` is absent; that check belongs to self-verification.
+- Layers: clean

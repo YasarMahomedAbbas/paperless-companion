@@ -66,4 +66,10 @@ class PaperlessSearchTest {
     fun `extra whitespace collapses to one space`() {
         assertEquals("(power OR power*) (bill OR bill*)", partialWordQuery("  power \t\n bill  "))
     }
+
+    @Test
+    fun `a stop word is sent as typed, so Paperless 2 still drops it`() {
+        assertEquals("(bill OR bill*) of (lading OR lading*)", partialWordQuery("bill of lading"))
+        assertEquals("(invoice OR invoice*) For (march OR march*)", partialWordQuery("invoice For march"))
+    }
 }
