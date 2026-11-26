@@ -246,7 +246,7 @@ Settled while building list or cards (#43), by the pipeline on the user's behalf
 
 - **Cards are a two-column grid** of portrait cards (3:4 thumbnail cropped from the top, title,
   meta), not one full-width card per line: Paperless renders thumbnails at most 500 px wide
-  (`_THUMBNAIL_MAX_WIDTH`), about 180 dp at 2.6x, so a full-width card would look soft and
+  (`_THUMBNAIL_MAX_WIDTH` in Paperless's `src/documents/parsers.py`), about 180 dp at 2.6x, so a full-width card would look soft and
   barely two would fit on screen. No adaptive column count for now.
 - **The toggle** is a tonal icon button in the large title bar before Settings ("Show as cards"
   / "Show as list"); it hides with the title row while searching or selecting, and the chosen
