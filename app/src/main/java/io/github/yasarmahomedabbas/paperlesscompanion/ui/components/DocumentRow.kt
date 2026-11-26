@@ -102,12 +102,12 @@ fun DocumentRowCard(
     }
 }
 
-/** The selectable row's 24dp round check: a `mfg` ring, or filled `primary` with an `on-primary` tick. */
+/** The selectable row's and card's 24dp round check: a `mfg` ring, or filled `primary` with an `on-primary` tick. */
 @Composable
-private fun SelectionCheck(selected: Boolean) {
+internal fun SelectionCheck(selected: Boolean, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Box(
-        Modifier
+        modifier
             .size(24.dp)
             .then(if (selected) Modifier.background(colors.primary, CircleShape) else Modifier.border(2.dp, colors.onSurfaceVariant, CircleShape)),
         contentAlignment = Alignment.Center,

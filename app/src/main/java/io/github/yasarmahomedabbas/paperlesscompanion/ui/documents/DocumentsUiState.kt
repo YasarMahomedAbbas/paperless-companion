@@ -1,6 +1,7 @@
 package io.github.yasarmahomedabbas.paperlesscompanion.ui.documents
 
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentThumbnail
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Labels
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.SavedView
@@ -81,6 +82,8 @@ data class DocumentsUiState(
     val viewOrder: Boolean = false,
     /** The list shows the documents most like this one ("More like this"), narrowed by [filters]. */
     val similar: Similar? = null,
+    /** Rows or cards; remembered on the phone. */
+    val layout: DocumentLayout = DocumentLayout.LIST,
 ) {
     val sortLabel: String
         get() = when {

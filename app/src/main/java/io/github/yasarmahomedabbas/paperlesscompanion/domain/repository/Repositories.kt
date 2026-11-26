@@ -7,6 +7,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentChanges
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFile
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSource
@@ -126,6 +127,12 @@ interface SettingsRepository {
      */
     fun save(config: ServerConfig)
     fun clear()
+}
+
+/** How the app is shown on this phone; kept across sign-out. */
+interface DisplayPreferences {
+    fun documentLayout(): DocumentLayout
+    fun setDocumentLayout(layout: DocumentLayout)
 }
 
 /** The phone's own lock (fingerprint, PIN, pattern) guarding the saved sign-in. */

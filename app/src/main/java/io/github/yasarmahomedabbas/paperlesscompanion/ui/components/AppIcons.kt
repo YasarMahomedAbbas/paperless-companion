@@ -57,6 +57,21 @@ object AppIcons {
     val Similar = outline("Similar", "M9 3h7l4 4v11H9z", "M16 3v4h4M6 7v14h9")
     /** A bookmark: the saved views. */
     val Views = outline("Views", "M6 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17l-6-4-6 4z")
+    /** Four rounded squares: show the documents as cards. */
+    val Cards = outline(
+        "Cards",
+        "M6 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+        "M15 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+        "M6 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z",
+        "M15 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z",
+    )
+    /** Three rounded bars: show the documents as a list of rows. */
+    val Rows = outline(
+        "Rows",
+        "M6 4h12a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z",
+        "M6 10h12a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z",
+        "M6 16h12a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z",
+    )
     val DocumentType = outline("DocumentType", "M6 3h8l5 5v13H6z", "M14 3v5h5M9 13h6M9 17h6")
 }
 

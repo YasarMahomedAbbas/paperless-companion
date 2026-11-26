@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -88,11 +89,42 @@ fun DocumentRowSkeleton(modifier: Modifier = Modifier) {
     }
 }
 
-/** The list footer while the next page loads: one skeleton row, then a spinner and "Loading more". */
+/** A document card with every shape a [SkeletonBlock]: same sizes and places as [DocumentCard]. */
 @Composable
-fun LoadingMoreFooter(modifier: Modifier = Modifier) {
+fun DocumentCardSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
+            .padding(Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+    ) {
+        SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(3f / 4f))
+        Column(
+            Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+        ) {
+            SkeletonBlock(Modifier.fillMaxWidth(0.7f).height(16.dp))
+            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(12.dp))
+        }
+    }
+}
+
+/**
+ * The list footer while the next page loads: one skeleton row (with [cards], a line of two skeleton
+ * cards), then a spinner and "Loading more".
+ */
+@Composable
+fun LoadingMoreFooter(modifier: Modifier = Modifier, cards: Boolean = false) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s8)) {
-        DocumentRowSkeleton()
+        if (cards) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.rowGap)) {
+                DocumentCardSkeleton(Modifier.weight(1f))
+                DocumentCardSkeleton(Modifier.weight(1f))
+            }
+        } else {
+            DocumentRowSkeleton()
+        }
         Row(
             Modifier.fillMaxWidth().padding(vertical = Spacing.s12).semantics(mergeDescendants = true) {},
             horizontalArrangement = Arrangement.spacedBy(Spacing.s8, Alignment.CenterHorizontally),

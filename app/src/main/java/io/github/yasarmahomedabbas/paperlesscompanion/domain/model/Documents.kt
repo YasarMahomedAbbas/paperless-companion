@@ -146,3 +146,6 @@ sealed interface BulkEdit {
     /** Moves them to the trash. */
     data object Delete : BulkEdit
 }
+
+/** How the document list shows its documents: rows, or cards with a large preview. */
+enum class DocumentLayout { LIST, CARDS }

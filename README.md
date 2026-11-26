@@ -2,7 +2,7 @@
 
 An Android app for scanning paper documents straight into a self-hosted [Paperless-ngx](https://docs.paperless-ngx.com/) server.
 
-- **Documents**: the app opens on your documents, newest first. Search their full text as you type (a partly typed word already matches), filter by tags, correspondent and document type, and sort by date, date added, title or correspondent. Uploads start from **Add**.
+- **Documents**: the app opens on your documents, newest first. Search their full text as you type (a partly typed word already matches), filter by tags, correspondent and document type, and sort by date, date added, title or correspondent. The button beside Settings shows them as rows or as a two-column grid of cards with a large preview; the phone remembers the choice. Uploads start from **Add**.
 - **Scan document**: Google's ML Kit document scanner (edge detection, cropping, multiple pages) makes a PDF and uploads it.
 - **Take photo** and **Choose file**: for phones without Google Play services, or for PDFs you already have.
 - **Share to Paperless Scan**: send PDFs and images from any other app.
@@ -61,6 +61,7 @@ Thumbnails go through the app-wide Coil loader that `PaperlessApp` provides: a s
 | `ExportDocumentUseCase` | Hands a fetched file to another app (Share) or saves a copy to Downloads or a picked location |
 | `SavedViewsUseCase` | The server's saved views (`GET /api/saved_views/`), as the home views and as every view, quick-list (sidebar) ones first, in the server's order: v9 reads the view's own flags, v10 the ids in `GET /api/ui_settings/` |
 | `NotesUseCase` | A document's notes, newest first, and adding one (`GET`/`POST /api/documents/{id}/notes/`; a 200 with `{"error"}` is a refusal), and whether `ui_settings` has notes switched on |
+| `DocumentLayoutUseCase` | Whether the document list shows rows or cards, kept on the phone (it survives signing out) |
 | `LoadLabelsUseCase` | Every tag, correspondent, document type and storage path, loaded side by side |
 | `UpdateDocumentUseCase`, `DeleteDocumentUseCase`, `TrashUseCase`, `BulkEditUseCase` | Edit one document (`PATCH`), move it to the trash, list and restore the trash, and change or delete many at once (`bulk_edit`; delete posts v10's `/api/documents/delete/` and falls back to `bulk_edit` on Paperless 2) |
 

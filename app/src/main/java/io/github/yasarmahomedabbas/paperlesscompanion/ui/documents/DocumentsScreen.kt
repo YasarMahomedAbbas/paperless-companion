@@ -33,10 +33,15 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -62,6 +67,7 @@ import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.LabelKind
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.AppDialog
@@ -89,6 +95,8 @@ import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ButtonVarian
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ChipVariant
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.ChipRow
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentRowCard
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentCard
+import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentCardSkeleton
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.DocumentRowSkeleton
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.IconButtonVariant
 import io.github.yasarmahomedabbas.paperlesscompanion.ui.components.LargeTitleBar
@@ -257,6 +265,7 @@ fun DocumentsScreen(
             onShowAll = { documents.clearSimilar(alsoFilters = true) },
             onAdd = { sheet = DocumentsSheet.ADD },
             onOpenSettings = onOpenSettings,
+            onToggleLayout = documents::toggleLayout,
             onClearFinished = uploads::clearFinished,
             onRetryUpload = uploads::retry,
             onOpenDocument = onOpenDocument,
@@ -413,6 +422,8 @@ class DocumentsScreenActions(
     val onShowAll: () -> Unit = {},
     val onAdd: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
+    /** Switches the list between rows and cards. */
+    val onToggleLayout: () -> Unit = {},
     val onClearFinished: () -> Unit = {},
     val onRetryUpload: (Long) -> Unit = {},
     val onOpenDocument: (Int) -> Unit = {},
@@ -437,7 +448,7 @@ private fun DocumentsContent(
     actions: DocumentsScreenActions,
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     selection: SelectionUiState = SelectionUiState(),
-    listState: LazyListState = rememberLazyListState(),
+    gridState: LazyGridState = rememberLazyGridState(),
 ) {
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
@@ -449,9 +460,9 @@ private fun DocumentsContent(
     // Registered after searching's, so Back leaves selecting first.
     BackHandler(enabled = selection.selecting, onBack = actions.onStopSelecting)
     val rowCount by rememberUpdatedState(state.rows.size)
-    LaunchedEffect(listState) {
+    LaunchedEffect(gridState) {
         snapshotFlow {
-            val info = listState.layoutInfo
+            val info = gridState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
             (rowCount > 0 && last >= info.totalItemsCount - LOAD_AHEAD) to rowCount
         }
@@ -472,7 +483,16 @@ private fun DocumentsContent(
                 SelectionBar(selection.selected.size, actions.onStopSelecting, actions.onSelectAll)
             } else if (!state.searching) {
                 LargeTitleBar("Documents") {
-                    AppIconButton(AppIcons.Settings, "Settings", actions.onOpenSettings, variant = IconButtonVariant.Tonal)
+                    val cards = state.layout == DocumentLayout.CARDS
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s8)) {
+                        AppIconButton(
+                            if (cards) AppIcons.Rows else AppIcons.Cards,
+                            if (cards) "Show as list" else "Show as cards",
+                            actions.onToggleLayout,
+                            variant = IconButtonVariant.Tonal,
+                        )
+                        AppIconButton(AppIcons.Settings, "Settings", actions.onOpenSettings, variant = IconButtonVariant.Tonal)
+                    }
                 }
             }
             Row(
@@ -511,7 +531,7 @@ private fun DocumentsContent(
                     )
                 },
             ) {
-                DocumentList(state, uploads, notice, actions, listState, selection)
+                DocumentList(state, uploads, notice, actions, gridState, selection)
             }
         }
         // The Add button moves up above a snackbar.
@@ -619,19 +639,29 @@ private fun DocumentList(
     uploads: List<UploadItem>,
     notice: String?,
     actions: DocumentsScreenActions,
-    listState: LazyListState,
+    gridState: LazyGridState,
     selection: SelectionUiState,
 ) {
     val colors = MaterialTheme.colorScheme
+    val cards = state.layout == DocumentLayout.CARDS
     val cardPadding = Modifier.padding(horizontal = Spacing.cardGutter)
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        state = listState,
+    // Switching keeps the first document in view: the index it had before the columns changed.
+    val anchor = remember(state.layout) { gridState.firstVisibleItemIndex }
+    var switched by remember { mutableStateOf(false) }
+    LaunchedEffect(state.layout) {
+        if (switched) gridState.scrollToItem(anchor) else switched = true
+    }
+    // One grid for both layouts, so there is one scroll position and one load-ahead trigger. Everything
+    // but the documents spans the line and carries its own gutter, as in the list.
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(if (cards) CARD_COLUMNS else 1),
+        modifier = Modifier.fillMaxSize(),
+        state = gridState,
         // Room under the last row for the Add button.
         contentPadding = PaddingValues(bottom = 112.dp),
     ) {
         notice?.let {
-            item(key = "notice") {
+            line(key = "notice") {
                 NoticeBanner(
                     it,
                     modifier = cardPadding.padding(bottom = Spacing.s8),
@@ -641,14 +671,14 @@ private fun DocumentList(
             }
         }
         if (uploads.isNotEmpty()) {
-            item(key = "uploading") {
+            line(key = "uploading") {
                 SectionHeading("Uploading") {
                     if (uploads.any { it.state.isFinished }) {
                         AppButton("Clear finished", actions.onClearFinished, variant = ButtonVariant.Text)
                     }
                 }
             }
-            items(uploads, key = { "upload-${it.id}" }) { item ->
+            items(uploads, key = { "upload-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { item ->
                 val (status, text) = item.state.card()
                 val documentId = (item.state as? UploadState.Done)?.documentId
                 UploadCard(
@@ -667,7 +697,7 @@ private fun DocumentList(
         }
         val total = state.total
         if (state.showResultLine && total != null) {
-            item(key = "result") {
+            line(key = "result") {
                 Text(
                     resultLine(total, state.text),
                     style = MaterialTheme.typography.bodyMedium,
@@ -677,10 +707,16 @@ private fun DocumentList(
             }
         }
         when (val status = state.status) {
-            ListStatus.Loading -> items(SKELETON_ROWS, key = { "skeleton-$it" }) {
-                DocumentRowSkeleton(cardPadding.padding(bottom = Spacing.rowGap))
+            ListStatus.Loading -> if (cards) {
+                items(SKELETON_CARDS, key = { "skeleton-card-$it" }) {
+                    DocumentCardSkeleton(Modifier.cardCell(it).padding(bottom = Spacing.rowGap))
+                }
+            } else {
+                items(SKELETON_ROWS, key = { "skeleton-$it" }) {
+                    DocumentRowSkeleton(cardPadding.padding(bottom = Spacing.rowGap))
+                }
             }
-            ListStatus.Empty -> item(key = "empty") {
+            ListStatus.Empty -> line(key = "empty") {
                 val filtered = state.text.isNotBlank() || !state.filters.isEmpty
                 val view = state.view
                 val similar = state.similar
@@ -699,7 +735,7 @@ private fun DocumentList(
                         onAction = actions.onShowAll,
                         modifier = Modifier.padding(vertical = Spacing.s24),
                     )
-                    return@item
+                    return@line
                 }
                 StatusCard(
                     icon = if (filtered || emptyView) AppIcons.Search else AppIcons.File,
@@ -729,7 +765,7 @@ private fun DocumentList(
                     modifier = Modifier.padding(vertical = Spacing.s24),
                 )
             }
-            is ListStatus.Failed -> item(key = "failed") {
+            is ListStatus.Failed -> line(key = "failed") {
                 StatusCard(
                     icon = if (status.unreachable) AppIcons.WifiOff else AppIcons.Alert,
                     tone = if (status.unreachable) StatusTone.Unreachable else StatusTone.Refused,
@@ -741,26 +777,41 @@ private fun DocumentList(
                 )
             }
             ListStatus.Loaded -> {
-                items(state.rows, key = { it.id }) { row ->
-                    DocumentRowCard(
-                        title = row.title,
-                        meta = row.meta,
-                        tags = row.tags,
-                        moreTags = row.moreTags,
-                        thumbnail = row.thumbnail,
-                        snippet = row.snippet?.highlighted(searchMatch),
-                        onClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onOpenDocument(row.id) },
-                        modifier = cardPadding.padding(bottom = Spacing.rowGap),
-                        selection = if (selection.selecting) row.id in selection.selected else null,
-                        onLongClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onStartSelecting(row.id) },
-                    )
+                itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
+                    val onClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onOpenDocument(row.id) }
+                    val onLongClick = { if (selection.selecting) actions.onToggleSelected(row.id) else actions.onStartSelecting(row.id) }
+                    val selected = if (selection.selecting) row.id in selection.selected else null
+                    if (cards) {
+                        DocumentCard(
+                            title = row.title,
+                            meta = row.meta,
+                            thumbnail = row.thumbnail,
+                            onClick = onClick,
+                            modifier = Modifier.cardCell(index).padding(bottom = Spacing.rowGap),
+                            selection = selected,
+                            onLongClick = onLongClick,
+                        )
+                    } else {
+                        DocumentRowCard(
+                            title = row.title,
+                            meta = row.meta,
+                            tags = row.tags,
+                            moreTags = row.moreTags,
+                            thumbnail = row.thumbnail,
+                            snippet = row.snippet?.highlighted(searchMatch),
+                            onClick = onClick,
+                            modifier = cardPadding.padding(bottom = Spacing.rowGap),
+                            selection = selected,
+                            onLongClick = onLongClick,
+                        )
+                    }
                 }
                 val failed = state.loadMoreFailed
                 when {
-                    failed != null -> item(key = "more-failed") {
+                    failed != null -> line(key = "more-failed") {
                         LoadMoreFailedFooter(failed, actions.onLoadMore, cardPadding)
                     }
-                    state.loadingMore -> item(key = "more") { LoadingMoreFooter(cardPadding) }
+                    state.loadingMore -> line(key = "more") { LoadingMoreFooter(cardPadding, cards = cards) }
                 }
             }
         }
@@ -768,6 +819,23 @@ private fun DocumentList(
 }
 
 private const val SKELETON_ROWS = 6
+private const val SKELETON_CARDS = 6
+private const val CARD_COLUMNS = 2
+
+/** An item that spans the whole line: everything in the grid but the documents. */
+private fun LazyGridScope.line(key: Any, content: @Composable LazyGridItemScope.() -> Unit) =
+    item(key = key, span = { GridItemSpan(maxLineSpan) }, content = content)
+
+/**
+ * A card's cell in the two-column grid: 12 from the screen's edge and 4 toward the other column, so the
+ * cards are the same width, 8 apart. Documents start on a fresh line, so [index] says the column.
+ */
+private fun Modifier.cardCell(index: Int): Modifier =
+    if (index % CARD_COLUMNS == 0) {
+        padding(start = Spacing.cardGutter, end = Spacing.s4)
+    } else {
+        padding(start = Spacing.s4, end = Spacing.cardGutter)
+    }
 
 private fun resultLine(total: Int, text: String): String {
     val documents = if (total == 1) "1 document" else "$total documents"
@@ -843,6 +911,30 @@ private fun DocumentsUploadingPreview() =
 @Composable
 private fun DocumentsLoadingMorePreview() =
     DocumentsPreview(DocumentsUiState(rows = previewRows, total = 60, status = ListStatus.Loaded, loadingMore = true))
+
+private val previewCards = DocumentsUiState(rows = previewRows, total = 60, status = ListStatus.Loaded, layout = DocumentLayout.CARDS)
+
+@Preview(name = "Cards — view", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsCardsPreview() = DocumentsPreview(previewCards)
+
+@Preview(name = "Cards — loading", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsCardsLoadingPreview() = DocumentsPreview(DocumentsUiState(layout = DocumentLayout.CARDS))
+
+@Preview(name = "Cards — selecting", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsCardsSelectingPreview() = PaperlessTheme {
+    DocumentsContent(previewCards, emptyList(), null, DocumentsScreenActions(), selection = SelectionUiState(selected = setOf(1, 4)))
+}
+
+@Preview(name = "Cards — uploading", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsCardsUploadingPreview() = DocumentsPreview(previewCards, previewUploads)
+
+@Preview(name = "Cards — loading more", widthDp = 412, heightDp = 915)
+@Composable
+private fun DocumentsCardsLoadingMorePreview() = DocumentsPreview(previewCards.copy(loadingMore = true))
 
 private val previewLabels = Labels(
     tags = listOf(Tag(1, "Bills", null, null, false, null), Tag(2, "House", null, null, false, null)),

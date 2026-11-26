@@ -241,3 +241,20 @@ Settled while building saved views, notes and more like this (#12):
   the usual status card with Try again ("Can't reach Paperless" for the network, otherwise
   "Couldn't load the notes"); a failed add is a `Refused` notice banner above the field, and the
   text stays. A speech-bubble icon (`Note`) is drawn in `AppIcons.kt` for the empty state.
+
+Settled while building list or cards (#43), by the pipeline on the user's behalf:
+
+- **Cards are a two-column grid** of portrait cards (3:4 thumbnail cropped from the top, title,
+  meta), not one full-width card per line: Paperless renders thumbnails at most 500 px wide
+  (`_THUMBNAIL_MAX_WIDTH` in Paperless's `src/documents/parsers.py`), about 180 dp at 2.6x, so a full-width card would look soft and
+  barely two would fit on screen. No adaptive column count for now.
+- **The toggle** is a tonal icon button in the large title bar before Settings ("Show as cards"
+  / "Show as list"); it hides with the title row while searching or selecting, and the chosen
+  layout stays. Its `Cards` (2 × 2 rounded squares) and `Rows` (three rounded bars) icons are
+  drawn in `AppIcons.kt`.
+- **Cards drop the search snippet** and the tags; switching to the list shows them.
+- **Loading** in cards is a grid of six card skeletons; `LoadingMoreFooter` gained a `cards`
+  variant whose skeleton is a line of two cards.
+- **One grid serves both layouts** (one column for rows), so there is one scroll position and
+  one load-ahead trigger. The card gutters are on each cell (12 at the edge, 4 toward the other
+  column) rather than the grid's padding, so the full-width parts keep their own gutters.
