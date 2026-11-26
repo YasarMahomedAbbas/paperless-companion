@@ -32,3 +32,11 @@ Branch: `fix/42-search-partial-words`
 - Raised: none
 - API: `GET /api/documents/?query=`. Checked against the source at v3.5.1 (`search/_query.py`, `_registry.py`, `_tokenizer.py`) and v2.20.15 (`index.py` `DelayedFullTextQuery`). On 3.x the whoosh-compat parser passes a wildcard's literal run through `pattern_normalizer` (lowercase, ascii-fold, and also the stemmed form), so `Burger*` matches lower-case index terms. Every default search field (title, content, correspondent, document_type, tag) is TEXT, so a trailing `*` raises no pattern-on-numeric 400. 3.x has no stop filter. On 2.x, MultifieldParser uses the default AND group, so words stay ANDed. The response shape is unchanged. Live schema not read, because `verify.env` is absent; that check belongs to self-verification.
 - Layers: clean
+
+## Doc drift
+
+- Applied: `README.md` features, Documents: search "as you type" now says a partly typed word already matches (rung 3, user-facing behaviour changed).
+- Applied: `README.md` architecture block, `data/`: added `PaperlessSearch` beside `PaperlessViews`, since the block names the `data/` helpers a session looks for (rung 3).
+- Skipped: the widening rules (stop words, one-letter words, quoted/`field:`/operator tokens sent as typed): the KDoc in `PaperlessSearch.kt` and `PaperlessSearchTest` state and enforce them; a session touching search reads that file.
+- Skipped: CLAUDE.md: no new cross-cutting rule; the change stays inside `data/` as the layer rules already require.
+- Stale, fixed separately: none
