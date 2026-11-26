@@ -4,9 +4,12 @@ import io.github.yasarmahomedabbas.paperlesscompanion.CONFIG
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.FakeSettings
 import io.github.yasarmahomedabbas.paperlesscompanion.MainDispatcherRule
+import io.github.yasarmahomedabbas.paperlesscompanion.MapStore
+import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsDisplayPreferences
 import io.github.yasarmahomedabbas.paperlesscompanion.doc
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
@@ -18,6 +21,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerExcepti
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Tag
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLayoutUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
@@ -53,6 +57,9 @@ class DocumentsViewModelTest {
     private val settings = FakeSettings(CONFIG)
     private val queries get() = library.queries
 
+    /** The phone's display preferences, shared by every ViewModel a test makes (as across restarts). */
+    private val display = MapStore()
+
     /** Three pages of 25, 60 documents in all, ids running on from page to page; a search titles them after its text. */
     private var answer: (DocumentQuery) -> DocumentPage = { q ->
         DocumentPage(60, (1..25).map { doc((q.page - 1) * 25 + it, q.text ?: "Bill") }, hasMore = q.page < 3)
@@ -66,11 +73,55 @@ class DocumentsViewModelTest {
         BrowseDocumentsUseCase(library, settings),
         LoadLabelsUseCase(library, settings),
         SavedViewsUseCase(library, settings),
+        DocumentLayoutUseCase(PrefsDisplayPreferences(display)),
     )
 
     private fun TestScope.loaded(): DocumentsViewModel = viewModel().also { advanceUntilIdle() }
 
     private val DocumentsViewModel.s get() = state.value
+
+    // Layout
+
+    @Test
+    fun `the list shows rows by default`() = runTest(main.dispatcher) {
+        assertEquals(DocumentLayout.LIST, loaded().s.layout)
+    }
+
+    @Test
+    fun `the list starts in the layout stored on the phone`() = runTest(main.dispatcher) {
+        display.values["document_layout"] = "CARDS"
+
+        assertEquals(DocumentLayout.CARDS, viewModel().s.layout)
+    }
+
+    @Test
+    fun `toggling switches to cards and back, and is remembered`() = runTest(main.dispatcher) {
+        val vm = loaded()
+
+        vm.toggleLayout()
+        assertEquals(DocumentLayout.CARDS, vm.s.layout)
+        assertEquals(DocumentLayout.CARDS, loaded().s.layout)
+
+        vm.toggleLayout()
+        assertEquals(DocumentLayout.LIST, vm.s.layout)
+        assertEquals(DocumentLayout.LIST, loaded().s.layout)
+    }
+
+    @Test
+    fun `toggling keeps the rows and asks the server for nothing`() = runTest(main.dispatcher) {
+        val vm = loaded()
+        val rows = vm.s.rows
+        val asked = queries.size
+        val calls = library.calls.size
+
+        vm.toggleLayout()
+        advanceUntilIdle()
+
+        assertEquals(rows, vm.s.rows)
+        assertEquals(ListStatus.Loaded, vm.s.status)
+        assertEquals(asked, queries.size)
+        assertEquals(calls, library.calls.size)
+    }
 
     // First load
 

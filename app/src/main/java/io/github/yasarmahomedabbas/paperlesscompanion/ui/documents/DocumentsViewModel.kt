@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Document
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentPage
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.with
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
@@ -13,6 +14,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLayoutUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.userMessage
@@ -44,9 +46,10 @@ class DocumentsViewModel(
     private val browse: BrowseDocumentsUseCase,
     private val loadLabels: LoadLabelsUseCase,
     private val savedViews: SavedViewsUseCase,
+    private val layouts: DocumentLayoutUseCase,
     private val debounceMillis: Long = 400,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(DocumentsUiState())
+    private val _state = MutableStateFlow(DocumentsUiState(layout = layouts.current()))
     val state: StateFlow<DocumentsUiState> = _state.asStateFlow()
 
     /** Page loads, first and later ones: a new first page cancels whatever runs. */
@@ -117,6 +120,13 @@ class DocumentsViewModel(
                 _state.update { it.copy(loadingMore = false, loadMoreFailed = e.failure().message) }
             }
         }
+    }
+
+    /** Switches between rows and cards and remembers the choice; the documents stay as they are. */
+    fun toggleLayout() {
+        val next = if (_state.value.layout == DocumentLayout.LIST) DocumentLayout.CARDS else DocumentLayout.LIST
+        _state.update { it.copy(layout = next) }
+        layouts.set(next)
     }
 
     /** Typing: the list follows once the text has been still for the debounce. */

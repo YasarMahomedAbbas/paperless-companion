@@ -13,6 +13,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.KeystoreTokenVault
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessApi
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PaperlessLibrary
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PhoneExports
+import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsDisplayPreferences
 import io.github.yasarmahomedabbas.paperlesscompanion.data.PrefsStore
 import io.github.yasarmahomedabbas.paperlesscompanion.data.SealedSettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.data.UriDocuments
@@ -25,6 +26,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.data.update.PrefsUpdateSto
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateNotifier
 import io.github.yasarmahomedabbas.paperlesscompanion.data.update.UpdateSchedule
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ApkDownloader
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DisplayPreferences
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentExports
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentFiles
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DocumentLibrary
@@ -33,6 +35,7 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.ReleaseS
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.SettingsRepository
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.AppLock
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLayoutUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.NotesUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.SavedViewsUseCase
@@ -73,6 +76,9 @@ class AppContainer(private val context: Context) {
     )
     val settings: SettingsRepository = sealed
     val lock: AppLockRepository = sealed
+    // Its own file, so signing out (which clears "server") keeps how the app is shown.
+    private val display: DisplayPreferences =
+        PrefsDisplayPreferences(PrefsStore(context.getSharedPreferences("display", Context.MODE_PRIVATE)))
     val documents: DocumentFiles = UriDocuments(context.contentResolver)
     private val server: DocumentServer = PaperlessApi()
     // The documents already on the server. The list (#9), the viewer (#10) and #11 build their use cases from it.
@@ -106,6 +112,7 @@ class AppContainer(private val context: Context) {
                 BrowseDocumentsUseCase(library, settings),
                 LoadLabelsUseCase(library, settings),
                 SavedViewsUseCase(library, settings),
+                DocumentLayoutUseCase(display),
             )
         }
     }

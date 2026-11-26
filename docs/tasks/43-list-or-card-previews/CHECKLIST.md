@@ -33,7 +33,7 @@ The list is a `LazyColumn` in `DocumentsScreen.kt` (`DocumentList`) of `Document
 
 Goal: the ViewModel exposes the layout, toggles it and persists it on the phone; no UI change yet.
 
-### [ ] 1.1 — Domain model and interface
+### [x] 1.1 — Domain model and interface
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Documents.kt`
 Add `enum class DocumentLayout { LIST, CARDS }` with a KDoc ("How the document list shows its documents: rows, or cards with a large preview").
@@ -48,12 +48,12 @@ interface DisplayPreferences {
 }
 ```
 
-### [ ] 1.2 — Use case
+### [x] 1.2 — Use case
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/usecase/DocumentLayoutUseCase.kt` (new)
 `class DocumentLayoutUseCase(private val preferences: DisplayPreferences) { fun current(): DocumentLayout; fun set(layout: DocumentLayout) }`, each delegating. Mirror the small use cases in `SavedViewsUseCase.kt` for style.
 
-### [ ] 1.3 — Data implementation
+### [x] 1.3 — Data implementation
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PrefsDisplayPreferences.kt` (new)
 `class PrefsDisplayPreferences(private val store: KeyValueStore) : DisplayPreferences`. Key `"document_layout"`, value the enum's `name`; a missing or unknown value reads `LIST` (`DocumentLayout.entries.firstOrNull { it.name == value } ?: LIST`). `set` writes through `store.edit { put(KEY, layout.name) }`.
@@ -63,7 +63,7 @@ File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/AppConta
 
 Test: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PrefsDisplayPreferencesTest.kt` (new) on `MapStore`: default LIST, CARDS round-trips, `"GRID"` stored reads LIST, setting LIST after CARDS stores `"LIST"`.
 
-### [ ] 1.4 — ViewModel state and action
+### [x] 1.4 — ViewModel state and action
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsUiState.kt`
 Add `val layout: DocumentLayout = DocumentLayout.LIST` to `DocumentsUiState`.

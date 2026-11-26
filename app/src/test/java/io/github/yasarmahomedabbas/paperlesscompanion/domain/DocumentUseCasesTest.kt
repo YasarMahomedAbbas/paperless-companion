@@ -9,14 +9,17 @@ import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.BulkEdit
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Change
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentChanges
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentFileKind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentLayout
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentQuery
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.DocumentSort
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.Labels
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.model.ServerException.Kind
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.repository.DisplayPreferences
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BrowseDocumentsUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.BulkEditUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DeleteDocumentUseCase
+import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.DocumentLayoutUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.ExportDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.GetDocumentUseCase
 import io.github.yasarmahomedabbas.paperlesscompanion.domain.usecase.LoadLabelsUseCase
@@ -348,5 +351,25 @@ class DocumentUseCasesTest {
     @Test
     fun `saved views pass a server error through`() = runTest {
         expectPassedThrough { SavedViewsUseCase(library, signedIn)() }
+    }
+
+    // --- layout ---
+
+    @Test
+    fun `the layout is read from and written to the phone's preferences`() {
+        val prefs = object : DisplayPreferences {
+            var stored = DocumentLayout.CARDS
+            override fun documentLayout() = stored
+            override fun setDocumentLayout(layout: DocumentLayout) {
+                stored = layout
+            }
+        }
+        val layouts = DocumentLayoutUseCase(prefs)
+
+        assertEquals(DocumentLayout.CARDS, layouts.current())
+        layouts.set(DocumentLayout.LIST)
+        assertEquals(DocumentLayout.LIST, prefs.stored)
+        assertEquals(DocumentLayout.LIST, layouts.current())
+        assertTrue("the layout never asks the server", library.calls.isEmpty())
     }
 }
