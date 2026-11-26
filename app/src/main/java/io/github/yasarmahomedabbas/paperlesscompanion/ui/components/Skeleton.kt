@@ -110,11 +110,21 @@ fun DocumentCardSkeleton(modifier: Modifier = Modifier) {
     }
 }
 
-/** The list footer while the next page loads: one skeleton row, then a spinner and "Loading more". */
+/**
+ * The list footer while the next page loads: one skeleton row (with [cards], a line of two skeleton
+ * cards), then a spinner and "Loading more".
+ */
 @Composable
-fun LoadingMoreFooter(modifier: Modifier = Modifier) {
+fun LoadingMoreFooter(modifier: Modifier = Modifier, cards: Boolean = false) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s8)) {
-        DocumentRowSkeleton()
+        if (cards) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.rowGap)) {
+                DocumentCardSkeleton(Modifier.weight(1f))
+                DocumentCardSkeleton(Modifier.weight(1f))
+            }
+        } else {
+            DocumentRowSkeleton()
+        }
         Row(
             Modifier.fillMaxWidth().padding(vertical = Spacing.s12).semantics(mergeDescendants = true) {},
             horizontalArrangement = Arrangement.spacedBy(Spacing.s8, Alignment.CenterHorizontally),

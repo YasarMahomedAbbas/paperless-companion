@@ -33,18 +33,23 @@ Sign in ──► Documents          Share to the app ──► (Unlock) ──�
 
 ```
 status bar
-Large title bar ............ "Documents"            (Settings)
+Large title bar ............ "Documents"     (Cards/Rows) (Settings)
 Search field
 Chip row ................... [Filters] [Newest first] [Bills ×] …
 (Uploading section) ........ upload cards
 Result line ................ "23 documents" — only when searching or filtering
-Document rows, infinite scroll, pull to refresh
+Document rows or cards, infinite scroll, pull to refresh
                                                [+ Add]  ← action button
 ```
 
 - Infinite scroll: the next page loads when the last five rows come into view; a footer row
   (one skeleton row and "Loading more") shows while it does.
 - Pull to refresh reloads from the top.
+- **Layout toggle**: the title bar's Cards / Rows button switches the rows to a two-column grid
+  of document cards and back. The choice is remembered on the phone (it survives restarts and
+  signing out); the default is rows. Switching keeps the first visible document in view.
+  Everything that isn't a document (notice, uploads, result line, states, footers) spans the
+  full width in both. Searching and selecting keep the chosen layout; cards drop the snippet.
 - **Searching** replaces the title row with a back arrow and the focused search field; the
   chip row stays, sort switches to "Best match", and rows gain their snippet.
 - **Selecting** replaces the title row with the selection bar and the action button with the

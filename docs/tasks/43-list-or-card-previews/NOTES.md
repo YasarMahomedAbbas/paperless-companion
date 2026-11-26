@@ -17,3 +17,14 @@ Branch: `feat/43-list-or-card-previews`
   - Cards get a skeleton grid. Selection is a round check over the thumbnail's corner plus the 2dp `primary` ring and `primary-tint` ground. No tags on cards.
 - API: no new or changed call; `/api/documents/{id}/thumb/` is unchanged (docs only add an optional `?version=`). `~/.config/paperless-companion/verify.env` is absent, so real-server checks will be skipped.
 - Open risks: smooth scrolling and thumbnail sharpness at card size can only be judged on a phone.
+
+## Implementation
+
+- Shipped:
+  - The remembered layout: `DocumentLayout` and `DisplayPreferences` in `domain/`, `DocumentLayoutUseCase`, `PrefsDisplayPreferences` (`data/PrefsDisplayPreferences.kt:7`) on its own `display` SharedPreferences file (`AppContainer.kt:80`), so sign-out keeps it; `DocumentsViewModel.toggleLayout()` (`ui/documents/DocumentsViewModel.kt:126`) flips and persists without touching the load jobs.
+  - `DocumentCard` (`ui/components/DocumentCard.kt:44`), `DocumentCardSkeleton` (`ui/components/Skeleton.kt:94`), a `cards` variant of `LoadingMoreFooter` (`Skeleton.kt:118`), drawn `Cards` / `Rows` icons (`ui/components/AppIcons.kt:61`); the row's `SelectionCheck` is now `internal` and shared.
+  - Documents is one `LazyVerticalGrid` for both layouts (`ui/documents/DocumentsScreen.kt:656`), the toggle before Settings in the title bar (`DocumentsScreen.kt:490`), the place kept across a switch (`DocumentsScreen.kt:649`), five cards previews.
+  - Manual: `docs/design/components.md` § Document card and § Top bars, `layouts.md` § List — Documents, `README.md` § Decisions "Settled while building list or cards (#43)".
+- Tests: full check `testDebugUnitTest koverVerify lintDebug assembleDebug` green; 542 passed / 0 failed (debug unit tests). New: `PrefsDisplayPreferencesTest` (4), 4 layout tests in `DocumentsViewModelTest`, 1 in `DocumentUseCasesTest`. In this run `koverVerify` did not run `testReleaseUnitTest` (no release test task in the log), which contradicts CLAUDE.md's "koverVerify also runs the release unit tests"; left for doc-drift.
+- Outstanding: none unticked. Device-only (for self-verification): how smoothly a long cards list scrolls, how sharp thumbnails look at card size, TalkBack on a card and the toggle, and that switching keeps the first document in view.
+- Contradicted the plan: 3.1's grid-wide horizontal `contentPadding` would have doubled the gutter of `StatusCard` and `SectionHeading`, which pad themselves (20). Resolved by keeping the full-width items' own padding and padding each card cell instead (`cardCell`, `DocumentsScreen.kt:833`: 12 at the edge, 4 toward the other column), same widths and gaps as planned; the checklist text was updated. The loading-more footer's single skeleton row looked wrong under cards, so it gained a `cards` variant (recorded in the manual).

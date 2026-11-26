@@ -122,29 +122,29 @@ Draw `Cards` (2 × 2 rounded squares) and `Rows` (three rounded bars) in the sam
 
 Goal: the toggle works on the screen and every list state renders in both modes.
 
-### [ ] 3.1 — One grid for both modes
+### [x] 3.1 — One grid for both modes
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/documents/DocumentsScreen.kt`
-Replace the `LazyColumn` in `DocumentList` with `LazyVerticalGrid(columns = GridCells.Fixed(if (state.layout == CARDS) 2 else 1), state = gridState, contentPadding = PaddingValues(start = cardGutter, end = cardGutter, bottom = 112.dp), horizontalArrangement = spacedBy(Spacing.rowGap))`. Every non-document item (notice, "Uploading" heading, upload cards, result line, empty, failed, loading-more and more-failed footers) is `item(span = { GridItemSpan(maxLineSpan) })`; drop the per-item horizontal `cardPadding` where the grid's padding now does it, keeping the bottom `rowGap`. The result line and the section heading keep their 20 text gutter (8 extra start/end on top of the 12). Documents: `items(state.rows, key = { it.id })` render `DocumentRowCard` in LIST and `DocumentCard` in CARDS with the same click, long-click and selection lambdas. Loading: `SKELETON_ROWS` row skeletons in LIST, `SKELETON_CARDS = 6` card skeletons in CARDS.
+Replace the `LazyColumn` in `DocumentList` with `LazyVerticalGrid(columns = GridCells.Fixed(if (state.layout == CARDS) 2 else 1), state = gridState, contentPadding = PaddingValues(bottom = 112.dp))`. Every non-document item (notice, "Uploading" heading, upload cards, result line, empty, failed, loading-more and more-failed footers) spans the line (`line(key)` helper = `item(span = { GridItemSpan(maxLineSpan) })`) and keeps its own gutter as in the list: `StatusCard` and `SectionHeading` pad themselves, so a grid-wide horizontal padding would have doubled theirs. Cards and card skeletons instead get a per-cell padding (`cardCell(index)`: 12 start / 4 end in the first column, 4 / 12 in the second), which gives equal widths, 8 apart, 12 from the edges. The loading-more footer gains a `cards` variant (a line of two card skeletons). Documents: `items(state.rows, key = { it.id })` render `DocumentRowCard` in LIST and `DocumentCard` in CARDS with the same click, long-click and selection lambdas. Loading: `SKELETON_ROWS` row skeletons in LIST, `SKELETON_CARDS = 6` card skeletons in CARDS.
 
 `DocumentsContent`'s `listState: LazyListState` becomes `gridState: LazyGridState = rememberLazyGridState()`; the load-ahead `snapshotFlow` reads `gridState.layoutInfo` the same way (in cards, `LOAD_AHEAD` items is 2.5 lines, which is fine). Wherever `MainActivity` or the screen creates/scrolls the list state (scroll to top after a refresh, etc.), switch to the grid state's equivalents.
 
-### [ ] 3.2 — Keep the place when switching
+### [x] 3.2 — Keep the place when switching
 
 File: `DocumentsScreen.kt`
 `LaunchedEffect(state.layout)` (skipping the first composition): before the column count changes, remember `gridState.firstVisibleItemIndex`; after, `scrollToItem` the same index. Since items keep their keys and order, the first visible document stays at the top.
 
-### [ ] 3.3 — The toggle
+### [x] 3.3 — The toggle
 
 File: `DocumentsScreen.kt`
 `DocumentsScreenActions` gains `val onToggleLayout: () -> Unit = {}`, wired to `documents::toggleLayout` where the actions are built. In the `LargeTitleBar("Documents")` slot, before Settings: `AppIconButton(if (state.layout == LIST) AppIcons.Cards else AppIcons.Rows, if (state.layout == LIST) "Show as cards" else "Show as list", actions.onToggleLayout, variant = IconButtonVariant.Tonal)`, 8 apart. It hides with the title row while searching or selecting; the layout stays as chosen in both.
 
-### [ ] 3.4 — Previews
+### [x] 3.4 — Previews
 
 File: `DocumentsScreen.kt`
 Add previews: cards view, cards loading (skeleton grid), cards selecting, cards with uploads, cards loading more.
 
-### [ ] 3.5 — The manual
+### [x] 3.5 — The manual
 
 File: `docs/design/components.md`
 Add `## Document card` after § Document row: the recipe in 2.1 (two columns, 8 apart, 12 from the edges; `surface`, `r-card`, padding 8; 3:4 thumbnail, `r-thumb`, cropped from the top; title 16/500 one line; meta 13 `mfg` one line; no tags, no snippet; selectable: a 24dp check over the thumbnail's top-start, `primary-tint` and 2dp `primary` ring). § Top bars, Large title: the Documents title bar holds the layout toggle beside Settings.

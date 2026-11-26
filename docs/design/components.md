@@ -35,7 +35,8 @@ screen, only on Documents.
 ## Top bars
 
 - **Large title** (top-level screen): 28/500 title left, tonal icon button right, padding
-  12 / 20 / 8. Not collapsing.
+  12 / 20 / 8. Not collapsing. On Documents the layout toggle ("Show as cards" / "Show as
+  list") sits before Settings, both tonal, 8 apart.
 - **Back bar** (pushed screen): back icon button, 22/500 title, optional actions right.
 - **Viewer bar**: back, 18/500 title ellipsised to one line, Share and More icon buttons.
 - **Selection bar**: close icon ("Stop selecting"), "3 selected" at 22/500, a "Select all"
@@ -94,6 +95,24 @@ The list's unit. `surface`, `r-card`, padding 12, 8 apart, 12 from the screen ed
 - **Selectable variant**: a 24dp round check at the start, the thumbnail shrinks to 48 × 62.
   Selected: `primary-tint` ground, 2dp `primary` inner ring, filled `primary` check.
 - Tap opens the document; long-press starts selection.
+
+## Document card
+
+The cards view's unit (Documents' layout toggle). Two columns, 8 apart, 12 from the screen
+edge. `surface`, `r-card`, padding 8.
+
+- A 3:4 thumbnail the card's width (`r-thumb`, `raised` placeholder), cropped to fill from
+  the top so the letterhead shows. Paperless's thumbnails are at most 500 px wide, sharp at
+  this size.
+- 8 under it, padded 4 in: title 16/500, one line, ellipsised; then `Correspondent · 3 Oct
+  2026` in 13 `mfg`, one line.
+- No tags and no search snippet; the rows show those.
+- **Selectable variant**: the same 24dp round check as the row, 8 in over the thumbnail's
+  top-start corner, on a `surface` disc so it reads on any thumbnail. Selected: `primary-tint`
+  ground, 2dp `primary` inner ring, filled `primary` check.
+- Tap opens the document; long-press starts selection. TalkBack reads it as one item.
+- **Skeleton**: the same shell with a 3:4 block and two bars (70% and 45% wide); loading shows
+  six of them as a grid, and the loading-more footer a line of two.
 
 ## Upload card
 
