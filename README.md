@@ -2,7 +2,7 @@
 
 An Android app for scanning paper documents straight into a self-hosted [Paperless-ngx](https://docs.paperless-ngx.com/) server.
 
-- **Documents**: the app opens on your documents, newest first. Search their full text as you type, filter by tags, correspondent and document type, and sort by date, date added, title or correspondent. The button beside Settings shows them as rows or as a two-column grid of cards with a large preview; the phone remembers the choice. Uploads start from **Add**.
+- **Documents**: the app opens on your documents, newest first. Search their full text as you type (a partly typed word already matches), filter by tags, correspondent and document type, and sort by date, date added, title or correspondent. The button beside Settings shows them as rows or as a two-column grid of cards with a large preview; the phone remembers the choice. Uploads start from **Add**.
 - **Scan document**: Google's ML Kit document scanner (edge detection, cropping, multiple pages) makes a PDF and uploads it.
 - **Take photo** and **Choose file**: for phones without Google Play services, or for PDFs you already have.
 - **Share to Paperless Scan**: send PDFs and images from any other app.
@@ -39,7 +39,8 @@ domain/   Models, repository interfaces, use cases. Plain Kotlin, no Android.
   ↑
 data/     PaperlessApi (uploads, login) and PaperlessLibrary (documents, labels, trash, bulk edit,
           saved views, notes), both on PaperlessHttp (OkHttp + paperless-ngx REST);
-          PaperlessViews (a saved view's filter rules as the web UI's query parameters); Thumbnails + ThumbnailImages (Coil),
+          PaperlessViews (a saved view's filter rules as the web UI's query parameters);
+          PaperlessSearch (typed words widened to prefix matches in the full-text query); Thumbnails + ThumbnailImages (Coil),
           SealedSettingsRepository + KeystoreTokenVault, UriDocuments,
           PhoneExports (share through the FileProvider, save to Downloads via MediaStore),
           update/ (GitHub Releases, APK download, PackageInstaller, WorkManager, the notification)
