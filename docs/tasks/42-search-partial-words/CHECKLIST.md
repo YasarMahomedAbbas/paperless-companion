@@ -38,24 +38,24 @@ Problem: searching documents only matches whole words, so typing "burger" doesn'
 
 Goal: typed search text reaches Paperless with each plain word widened to its prefixes, and the tests prove it.
 
-### [ ] 1.1 — The query rewriter
+### [x] 1.1 — The query rewriter
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessSearch.kt` (new)
 `internal fun partialWordQuery(text: String): String`. It splits the text on whitespace while keeping double-quoted runs as one token (an unclosed quote runs to the end), widens each token matching `^[\p{L}\p{N}]{2,}$` that isn't `AND`/`OR`/`NOT` to `(w OR w*)`, keeps every other token as typed, and joins with single spaces. A KDoc names the Paperless behaviour it relies on (wildcards score flat, so the exact word is kept beside the prefix) and the stemming caveat.
 
-### [ ] 1.2 — Use it in the list call
+### [x] 1.2 — Use it in the list call
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessLibrary.kt`
 In `documents()`, the `text != null` branch puts `partialWordQuery(text)` instead of `text`. Update the comment there.
 
-### [ ] 1.3 — Domain doc
+### [x] 1.3 — Domain doc
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/domain/model/Documents.kt`
 A KDoc on `DocumentQuery.text`: "Words to search for. A word also matches longer words that start with it." No code change.
 
-### [ ] 1.4 — Tests
+### [x] 1.4 — Tests
 
-Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessSearchTest.kt` (new, the cases in the test plan) and `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessLibraryTest.kt` (update the two `query` assertions to the widened form and add `"burger" is sent as a prefix search` asserting `(burger OR burger*)`).
+Files: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessSearchTest.kt` (new, the cases in the test plan) and `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/data/PaperlessLibraryTest.kt` (update the two `query` assertions to the widened form and add `burger is sent as a prefix search` asserting `(burger OR burger*)`).
 
 ### Verify
 

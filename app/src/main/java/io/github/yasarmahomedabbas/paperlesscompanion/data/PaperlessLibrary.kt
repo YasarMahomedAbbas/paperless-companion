@@ -72,9 +72,10 @@ class PaperlessLibrary(
                     put("more_like_id", query.similarTo.toString())
                 }
                 text != null -> {
-                    // Full-text search answers in relevance order; an ordering would override it.
+                    // Full-text search answers in relevance order; an ordering would override it. Each plain
+                    // word also matches the words it starts, so results come while a word is still typed.
                     SEARCH_PARAMS.forEach { remove(it) }
-                    put("query", text)
+                    put("query", partialWordQuery(text))
                 }
                 view != null && query.viewOrder -> put("ordering", view.ordering)
                 else -> put("ordering", (if (query.descending) "-" else "") + query.sort.field)
