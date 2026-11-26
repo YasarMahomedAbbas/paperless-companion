@@ -84,7 +84,7 @@ Test: `app/src/test/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/Docum
 
 Goal: the card component and its skeleton exist, follow the manual and have previews; the screen doesn't use them yet.
 
-### [ ] 2.1 — Card component
+### [x] 2.1 — Card component
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/components/DocumentCard.kt` (new)
 ```kotlin
@@ -99,14 +99,14 @@ fun DocumentCard(
     onLongClick: (() -> Unit)? = null,
 )
 ```
-`Column` on `surfaceContainer`, `MaterialTheme.shapes.medium` (`r-card`), padding `Spacing.s8`; selected: `primaryContainer` ground and a 2dp `primary` border on the same shape, `semantics { selected }` when `selection != null`; `combinedClickable(onClick, onLongClick, onLongClickLabel = "Select")` exactly as `DocumentRowCard`, and `mergeDescendants` so TalkBack reads it as one item. Inside: the thumbnail `AsyncImage` `fillMaxWidth().aspectRatio(3f / 4f)`, `shapes.extraSmall` (`r-thumb`) clip, `ContentScale.Crop` with `Alignment.TopCenter` (the letterhead shows), `surfaceContainerHigh` placeholder, `contentDescription = null`; then 8 below it the title (`cardTitle`, one line, ellipsised) and the meta (`bodySmall`-sized 13 `onSurfaceVariant`, one line, ellipsised), padded 4 horizontally. Selectable: a 24dp round check at the thumbnail's top-start, 8 in, reusing the check drawing from `DocumentRow.kt` (extract it there to an `internal fun SelectionCheck(selected: Boolean, modifier: Modifier)` rather than copying), on a `surfaceContainer` disc so it reads on any thumbnail. Mirror `DocumentRow.kt` for the image and click handling. Previews: plain, long title, no meta, selectable unselected and selected.
+`Column` on `surfaceContainer`, `MaterialTheme.shapes.medium` (`r-card`), padding `Spacing.s8`; selected: `primaryContainer` ground and a 2dp `primary` border on the same shape, `semantics { selected }` when `selection != null`; `combinedClickable(onClick, onLongClick, onLongClickLabel = "Select")` exactly as `DocumentRowCard` (the clickable merges its descendants, so TalkBack reads it as one item, as the row does). Inside: the thumbnail `AsyncImage` `fillMaxWidth().aspectRatio(3f / 4f)`, `shapes.extraSmall` (`r-thumb`) clip, `ContentScale.Crop` with `Alignment.TopCenter` (the letterhead shows), `surfaceContainerHigh` placeholder, `contentDescription = null`; then 8 below it the title (`cardTitle`, one line, ellipsised) and the meta (`bodySmall`-sized 13 `onSurfaceVariant`, one line, ellipsised), padded 4 horizontally. Selectable: a 24dp round check at the thumbnail's top-start, 8 in, reusing the check drawing from `DocumentRow.kt` (extract it there to an `internal fun SelectionCheck(selected: Boolean, modifier: Modifier)` rather than copying), on a `surfaceContainer` disc so it reads on any thumbnail. Mirror `DocumentRow.kt` for the image and click handling. Previews: plain, long title, no meta, selectable unselected and selected.
 
-### [ ] 2.2 — Card skeleton
+### [x] 2.2 — Card skeleton
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/components/Skeleton.kt`
 Add `fun DocumentCardSkeleton(modifier: Modifier = Modifier)`: the card's shell with a 3:4 skeleton block and two text bars (title 70% width, meta 45%), using the existing shimmer blocks as `DocumentRowSkeleton` does.
 
-### [ ] 2.3 — Layout icons
+### [x] 2.3 — Layout icons
 
 File: `app/src/main/java/io/github/yasarmahomedabbas/paperlesscompanion/ui/components/AppIcons.kt`
 Draw `Cards` (2 × 2 rounded squares) and `Rows` (three rounded bars) in the same stroke style as the other drawn icons (`material-icons-core` lacks both; see README § Decisions "More drawn icons").

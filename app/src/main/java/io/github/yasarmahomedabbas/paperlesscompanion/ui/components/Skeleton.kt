@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -84,6 +85,27 @@ fun DocumentRowSkeleton(modifier: Modifier = Modifier) {
                 SkeletonBlock(Modifier.width(48.dp).height(20.dp), round = true)
                 SkeletonBlock(Modifier.width(56.dp).height(20.dp), round = true)
             }
+        }
+    }
+}
+
+/** A document card with every shape a [SkeletonBlock]: same sizes and places as [DocumentCard]. */
+@Composable
+fun DocumentCardSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
+            .padding(Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+    ) {
+        SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(3f / 4f))
+        Column(
+            Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+        ) {
+            SkeletonBlock(Modifier.fillMaxWidth(0.7f).height(16.dp))
+            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(12.dp))
         }
     }
 }
